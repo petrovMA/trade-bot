@@ -1,162 +1,80 @@
-package io.bitmax.api.websocket.messages.responses;
+package io.bitmax.api.websocket.messages.responses
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.google.gson.annotations.SerializedName
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class WebSocketSummary {
-
+class WebSocketSummary {
     /**
      * symbol
      */
     @SerializedName("s")
-    private String symbol;
+    var symbol: String? = null
 
     /**
      * base asset
      */
     @SerializedName("ba")
-    private String baseAsset;
+    var baseAsset: String? = null
 
     /**
      * quote asset
      */
     @SerializedName("qa")
-    private String quoteAsset;
+    var quoteAsset: String? = null
 
     /**
      * for market summary data, the interval is always 1d
      */
     @SerializedName("i")
-    private String interval;
+    var interval: String? = null
 
     /**
      * timestamp in UTC
      */
     @SerializedName("t")
-    private long timestamp;
+    var timestamp: Long = 0
 
     /**
      * open
      */
     @SerializedName("o")
-    private double open;
+    var open = 0.0
 
     /**
      * close
      */
     @SerializedName("c")
-    private double close;
+    var close = 0.0
 
     /**
      * high
      */
     @SerializedName("h")
-    private double high;
+    var high = 0.0
 
     /**
      * low
      */
     @SerializedName("l")
-    private double low;
+    var low = 0.0
 
     /**
      * volume
      */
     @SerializedName("v")
-    private double volume;
-
-    public String getSymbol() {
-        return symbol;
-    }
-
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
-    }
-
-    public String getBaseAsset() {
-        return baseAsset;
-    }
-
-    public void setBaseAsset(String baseAsset) {
-        this.baseAsset = baseAsset;
-    }
-
-    public String getQuoteAsset() {
-        return quoteAsset;
-    }
-
-    public void setQuoteAsset(String quoteAsset) {
-        this.quoteAsset = quoteAsset;
-    }
-
-    public String getInterval() {
-        return interval;
-    }
-
-    public void setInterval(String interval) {
-        this.interval = interval;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public double getOpen() {
-        return open;
-    }
-
-    public void setOpen(double open) {
-        this.open = open;
-    }
-
-    public double getClose() {
-        return close;
-    }
-
-    public void setClose(double close) {
-        this.close = close;
-    }
-
-    public double getHigh() {
-        return high;
-    }
-
-    public void setHigh(double high) {
-        this.high = high;
-    }
-
-    public double getLow() {
-        return low;
-    }
-
-    public void setLow(double low) {
-        this.low = low;
-    }
-
-    public double getVolume() {
-        return volume;
-    }
-
-    public void setVolume(double volume) {
-        this.volume = volume;
-    }
-
-    @Override
-    public String toString() {
-        return "Summary:\n\tsymbol: " + symbol + '\n' +
-                "\tbaseAsset: " + baseAsset + '\n' +
-                "\tquoteAsset: " + quoteAsset + '\n' +
-                "\tinterval: " + interval + '\n' +
-                "\ttimestamp: " + timestamp + '\n' +
-                "\topen: " + open + '\n' +
-                "\tclose: " + close + '\n' +
-                "\thigh: " + high + '\n' +
-                "\tlow: " + low + '\n' +
-                "\tvolume: " + volume;
+    var volume = 0.0
+    override fun toString(): String {
+        return """Summary:
+	symbol: $symbol
+	baseAsset: $baseAsset
+	quoteAsset: $quoteAsset
+	interval: $interval
+	timestamp: $timestamp
+	open: $open
+	close: $close
+	high: $high
+	low: $low
+	volume: $volume"""
     }
 }

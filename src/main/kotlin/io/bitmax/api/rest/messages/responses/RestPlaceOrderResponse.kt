@@ -1,207 +1,102 @@
-package io.bitmax.api.rest.messages.responses;
+package io.bitmax.api.rest.messages.responses
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.google.gson.annotations.SerializedName
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class RestPlaceOrderResponse {
-
+class RestPlaceOrderResponse {
     /**
      * time
      */
     @SerializedName("time")
-    private long time;
+    var time: Long = 0
 
     /**
      * the unique identifier, you will need
      */
     @SerializedName("coid")
-    private String coid;
+    var coid: String? = null
 
     /**
      * symbol
      */
     @SerializedName("symbol")
-    private String symbol;
+    var symbol: String? = null
 
     /**
      * base asset
      */
     @SerializedName("baseAsset")
-    private String baseAsset;
+    var baseAsset: String? = null
 
     /**
      * quote asset
      */
     @SerializedName("quoteAsset")
-    private String quoteAsset;
+    var quoteAsset: String? = null
 
     /**
      * order side
      */
     @SerializedName("side")
-    private String side;
+    var side: String? = null
 
     /**
      * order price - only available for limit and stop limit orders
      */
     @SerializedName("orderPrice")
-    private String orderPrice;
+    var orderPrice: String? = null
 
     /**
      * order stop price - only available for stop market and stop limit orders
      */
     @SerializedName("stopPrice")
-    private String stopPrice;
+    var stopPrice: String? = null
 
     /**
      * order quantity
      */
     @SerializedName("orderQty")
-    private String orderQty;
+    var orderQty: String? = null
 
     /**
      * filled quantity
      */
     @SerializedName("filledQty")
-    private String filledQty;
+    var filledQty: String? = null
 
     /**
      * cumulative fee paid for this order
      */
     @SerializedName("fee")
-    private String fee;
+    var fee: String? = null
 
     /**
      * the asset of fee
      */
     @SerializedName("feeAsset")
-    private String feeAsset;
+    var feeAsset: String? = null
 
     /**
      * order status
      */
     @SerializedName("status")
-    private String status;
-
-    public long getTime() {
-        return time;
-    }
-
-    public void setTime(long time) {
-        this.time = time;
-    }
-
-    public String getCoid() {
-        return coid;
-    }
-
-    public void setCoid(String coid) {
-        this.coid = coid;
-    }
-
-    public String getSymbol() {
-        return symbol;
-    }
-
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
-    }
-
-    public String getBaseAsset() {
-        return baseAsset;
-    }
-
-    public void setBaseAsset(String baseAsset) {
-        this.baseAsset = baseAsset;
-    }
-
-    public String getQuoteAsset() {
-        return quoteAsset;
-    }
-
-    public void setQuoteAsset(String quoteAsset) {
-        this.quoteAsset = quoteAsset;
-    }
-
-    public String getSide() {
-        return side;
-    }
-
-    public void setSide(String side) {
-        this.side = side;
-    }
-
-    public String getOrderPrice() {
-        return orderPrice;
-    }
-
-    public void setOrderPrice(String orderPrice) {
-        this.orderPrice = orderPrice;
-    }
-
-    public String getStopPrice() {
-        return stopPrice;
-    }
-
-    public void setStopPrice(String stopPrice) {
-        this.stopPrice = stopPrice;
-    }
-
-    public String getOrderQty() {
-        return orderQty;
-    }
-
-    public void setOrderQty(String orderQty) {
-        this.orderQty = orderQty;
-    }
-
-    public String getFilledQty() {
-        return filledQty;
-    }
-
-    public void setFilledQty(String filledQty) {
-        this.filledQty = filledQty;
-    }
-
-    public String getFee() {
-        return fee;
-    }
-
-    public void setFee(String fee) {
-        this.fee = fee;
-    }
-
-    public String getFeeAsset() {
-        return feeAsset;
-    }
-
-    public void setFeeAsset(String feeAsset) {
-        this.feeAsset = feeAsset;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    @Override
-    public String toString() {
-        return "\nOrder:\n\ttime: " + time + '\n' +
-                "\tcoid: " + coid + '\n' +
-                "\tsymbol: " + symbol + '\n' +
-                "\tbaseAsset: " + baseAsset + '\n' +
-                "\tquoteAsset: " + quoteAsset + '\n' +
-                "\tside: " + side + '\n' +
-                "\torderPrice: " + orderPrice + '\n' +
-                "\tstopPrice: " + stopPrice + '\n' +
-                "\torderQty: " + orderQty + '\n' +
-                "\tfilledQty: " + filledQty + '\n' +
-                "\tfee: " + fee + '\n' +
-                "\tfeeAsset: " + feeAsset + '\n' +
-                "\tstatus: " + status;
+    var status: String? = null
+    override fun toString(): String {
+        return """
+Order:
+	time: $time
+	coid: $coid
+	symbol: $symbol
+	baseAsset: $baseAsset
+	quoteAsset: $quoteAsset
+	side: $side
+	orderPrice: $orderPrice
+	stopPrice: $stopPrice
+	orderQty: $orderQty
+	filledQty: $filledQty
+	fee: $fee
+	feeAsset: $feeAsset
+	status: $status"""
     }
 }

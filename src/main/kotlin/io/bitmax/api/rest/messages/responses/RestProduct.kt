@@ -1,186 +1,73 @@
-package io.bitmax.api.rest.messages.responses;
+package io.bitmax.api.rest.messages.responses
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.google.gson.annotations.SerializedName
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class RestProduct {
-
+class RestProduct {
     @SerializedName("symbol")
-    private String symbol;
+    var symbol: String? = null
 
     @SerializedName("domain")
-    private String domain;
+    var domain: String? = null
 
     @SerializedName("baseAsset")
-    private String baseAsset;
+    var baseAsset: String? = null
 
     @SerializedName("quoteAsset")
-    private String quoteAsset;
+    var quoteAsset: String? = null
 
     /**
      * price scale - maximum precision for order price allowed to place an order, see below for details
      */
     @SerializedName("priceScale")
-    private int priceScale;
+    var priceScale = 0
 
     /**
      * quantity scale - maximum precision for order quantity allowed to place an order, see below for details
      */
     @SerializedName("qtyScale")
-    private int qtyScale;
+    var qtyScale = 0
 
     @SerializedName("notionalScale")
-    private int notionalScale;
+    var notionalScale = 0
 
     @SerializedName("minQty")
-    private double minQty;
+    var minQty = 0.0
 
     @SerializedName("maxQty")
-    private double maxQty;
+    var maxQty = 0.0
 
     @SerializedName("minNotional")
-    private double minNotional;
+    var minNotional = 0.0
 
     @SerializedName("maxNotional")
-    private double maxNotional;
+    var maxNotional = 0.0
 
     @SerializedName("status")
-    private String status;
+    var status: String? = null
 
     @SerializedName("miningStatus")
-    private String miningStatus;
+    var miningStatus: String? = null
 
     @SerializedName("marginTradable")
-    private String marginTradable;
-
-    public String getSymbol() {
-        return symbol;
-    }
-
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
-    }
-
-    public String getDomain() {
-        return domain;
-    }
-
-    public void setDomain(String domain) {
-        this.domain = domain;
-    }
-
-    public String getBaseAsset() {
-        return baseAsset;
-    }
-
-    public void setBaseAsset(String baseAsset) {
-        this.baseAsset = baseAsset;
-    }
-
-    public String getQuoteAsset() {
-        return quoteAsset;
-    }
-
-    public void setQuoteAsset(String quoteAsset) {
-        this.quoteAsset = quoteAsset;
-    }
-
-    public int getPriceScale() {
-        return priceScale;
-    }
-
-    public void setPriceScale(int priceScale) {
-        this.priceScale = priceScale;
-    }
-
-    public int getQtyScale() {
-        return qtyScale;
-    }
-
-    public void setQtyScale(int qtyScale) {
-        this.qtyScale = qtyScale;
-    }
-
-    public int getNotionalScale() {
-        return notionalScale;
-    }
-
-    public void setNotionalScale(int notionalScale) {
-        this.notionalScale = notionalScale;
-    }
-
-    public double getMinQty() {
-        return minQty;
-    }
-
-    public void setMinQty(double minQty) {
-        this.minQty = minQty;
-    }
-
-    public double getMaxQty() {
-        return maxQty;
-    }
-
-    public void setMaxQty(double maxQty) {
-        this.maxQty = maxQty;
-    }
-
-    public double getMinNotional() {
-        return minNotional;
-    }
-
-    public void setMinNotional(double minNotional) {
-        this.minNotional = minNotional;
-    }
-
-    public double getMaxNotional() {
-        return maxNotional;
-    }
-
-    public void setMaxNotional(double maxNotional) {
-        this.maxNotional = maxNotional;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getMiningStatus() {
-        return miningStatus;
-    }
-
-    public void setMiningStatus(String miningStatus) {
-        this.miningStatus = miningStatus;
-    }
-
-    public String getMarginTradable() {
-        return marginTradable;
-    }
-
-    public void setMarginTradable(String marginTradable) {
-        this.marginTradable = marginTradable;
-    }
-
-    @Override
-    public String toString() {
-        return "\nProduct:\n\tsymbol: " + symbol + '\n' +
-                "\tdomain: " + domain + '\n' +
-                "\tbaseAsset: " + baseAsset + '\n' +
-                "\tquoteAsset: " + quoteAsset + '\n' +
-                "\tpriceScale: " + priceScale + '\n' +
-                "\tqtyScale: " + qtyScale + '\n' +
-                "\tnotionalScale: " + notionalScale + '\n' +
-                "\tminQty: " + minQty + '\n' +
-                "\tmaxQty: " + maxQty + '\n' +
-                "\tminNotional: " + minNotional + '\n' +
-                "\tmaxNotional: " + maxNotional + '\n' +
-                "\tstatus: " + status + '\n' +
-                "\tminingStatus: " + miningStatus + '\n' +
-                "\tmarginTradable: " + marginTradable;
+    var marginTradable: String? = null
+    override fun toString(): String {
+        return """
+Product:
+	symbol: $symbol
+	domain: $domain
+	baseAsset: $baseAsset
+	quoteAsset: $quoteAsset
+	priceScale: $priceScale
+	qtyScale: $qtyScale
+	notionalScale: $notionalScale
+	minQty: $minQty
+	maxQty: $maxQty
+	minNotional: $minNotional
+	maxNotional: $maxNotional
+	status: $status
+	miningStatus: $miningStatus
+	marginTradable: $marginTradable"""
     }
 }

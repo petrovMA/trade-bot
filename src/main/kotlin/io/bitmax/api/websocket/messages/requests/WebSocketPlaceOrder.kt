@@ -1,179 +1,88 @@
-package io.bitmax.api.websocket.messages.requests;
+package io.bitmax.api.websocket.messages.requests
 
-
-import com.google.gson.annotations.SerializedName;
+import com.google.gson.annotations.SerializedName
 
 /**
-* Place a New Order with WebSocket
-* */
-public class WebSocketPlaceOrder {
-
+ * Place a New Order with WebSocket
+ */
+class WebSocketPlaceOrder {
     /**
      * message type
      */
     @SerializedName("messageType")
-    private String messageType;
+    var messageType: String? = null
 
     /**
      * milliseconds since UNIX epoch in UTC
      */
     @SerializedName("time")
-    private long time;
+    var time: Long = 0
 
     /**
      * a 32-character unique client order Id
      */
     @SerializedName("coid")
-    private String coid;
+    var coid: String? = null
 
     /**
      * symbol
      */
     @SerializedName("symbol")
-    private String symbol;
+    var symbol: String? = null
 
     /**
      * order price
      */
     @SerializedName("orderPrice")
-    private String orderPrice;
+    var orderPrice: String? = null
 
     /**
      * order quantity
      */
     @SerializedName("orderQty")
-    private String orderQty;
+    var orderQty: String? = null
 
     /**
      * order type, you shall specify one of the following: "limit", "market", "stop_market", "stop_limit".
      */
     @SerializedName("orderType")
-    private String orderType;
+    var orderType: String? = null
 
     /**
      * order side "buy" or "sell"
      */
     @SerializedName("side")
-    private String side;
+    var side: String? = null
 
     /**
      * Optional, if true, the order will either be posted to the limit order book or be cancelled, i.e. the order cannot take liquidity; default value is false
      */
     @SerializedName("postOnly")
-    private boolean postOnly = false;
+    var isPostOnly = false
 
     /**
      * optional, stop price of the order. This field is required for stop market orders and stop limit orders.
      */
     @SerializedName("stopPrice")
-    private String stopPrice = "";
+    var stopPrice = ""
 
     /**
      * Optional, default is "GTC". Currently, we support "GTC" (good-till-canceled) and "IOC" (immediate-or-cancel).
      */
     @SerializedName("timeInForce")
-    private String timeInForce = "GTC";
-
-    public String getMessageType() {
-        return messageType;
-    }
-
-    public void setMessageType(String messageType) {
-        this.messageType = messageType;
-    }
-
-    public long getTime() {
-        return time;
-    }
-
-    public void setTime(long time) {
-        this.time = time;
-    }
-
-    public String getCoid() {
-        return coid;
-    }
-
-    public void setCoid(String coid) {
-        this.coid = coid;
-    }
-
-    public String getSymbol() {
-        return symbol;
-    }
-
-    public void setSymbol(String symbol) {
-        this.symbol = symbol;
-    }
-
-    public String getOrderPrice() {
-        return orderPrice;
-    }
-
-    public void setOrderPrice(String orderPrice) {
-        this.orderPrice = orderPrice;
-    }
-
-    public String getOrderQty() {
-        return orderQty;
-    }
-
-    public void setOrderQty(String orderQty) {
-        this.orderQty = orderQty;
-    }
-
-    public String getOrderType() {
-        return orderType;
-    }
-
-    public void setOrderType(String orderType) {
-        this.orderType = orderType;
-    }
-
-    public String getSide() {
-        return side;
-    }
-
-    public void setSide(String side) {
-        this.side = side;
-    }
-
-    public boolean isPostOnly() {
-        return postOnly;
-    }
-
-    public void setPostOnly(boolean postOnly) {
-        this.postOnly = postOnly;
-    }
-
-    public String getStopPrice() {
-        return stopPrice;
-    }
-
-    public void setStopPrice(String stopPrice) {
-        this.stopPrice = stopPrice;
-    }
-
-    public String getTimeInForce() {
-        return timeInForce;
-    }
-
-    public void setTimeInForce(String timeInForce) {
-        this.timeInForce = timeInForce;
-    }
-
-    @Override
-    public String toString() {
-        return "WebSocketPlaceOrder:\n\tmessageType: " + messageType +
-                "\n\ttime: " + time +
-                "\n\tcoid: " + coid +
-                "\n\tsymbol: " + symbol +
-                "\n\torderPrice: " + orderPrice +
-                "\n\torderQty: " + orderQty +
-                "\n\torderType: " + orderType +
-                "\n\tside: " + side +
-                "\n\tpostOnly: " + postOnly +
-                "\n\tstopPrice: " + stopPrice +
-                "\n\ttimeInForce: " + timeInForce;
+    var timeInForce = "GTC"
+    override fun toString(): String {
+        return """WebSocketPlaceOrder:
+	messageType: $messageType
+	time: $time
+	coid: $coid
+	symbol: $symbol
+	orderPrice: $orderPrice
+	orderQty: $orderQty
+	orderType: $orderType
+	side: $side
+	postOnly: ${isPostOnly}
+	stopPrice: $stopPrice
+	timeInForce: $timeInForce"""
     }
 }
