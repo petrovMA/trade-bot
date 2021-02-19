@@ -109,3 +109,4 @@ target/
 /nbproject/
 /build/
 /build_xchange_dependencies.sh
+/exchange/*
