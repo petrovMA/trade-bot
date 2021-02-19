@@ -6,7 +6,12 @@ import org.knowm.xchange.ExchangeFactory
 import org.knowm.xchange.binance.BinanceExchange
 import java.util.concurrent.BlockingQueue
 import org.knowm.xchange.Exchange
+import org.knowm.xchange.binance.dto.marketdata.BinanceKline
+import org.knowm.xchange.binance.dto.marketdata.KlineInterval
+import org.knowm.xchange.binance.service.BinanceMarketDataService
+import org.knowm.xchange.binance.service.BinanceMarketDataServiceRaw
 import org.knowm.xchange.binance.service.BinanceTradeService
+import org.knowm.xchange.currency.CurrencyPair
 
 
 //typealias BinanceOrder = com.binance.api.client.domain.account.Order
@@ -14,14 +19,33 @@ import org.knowm.xchange.binance.service.BinanceTradeService
 //typealias BinanceOrderBook = com.binance.api.client.domain.market.OrderBook
 
 class BinanceClient(
-    val api: String? = null,
-    val sec: String? = null,
-    instance: Exchange = ExchangeFactory.INSTANCE.createExchange(BinanceExchange::class.java, api, sec)
+    api: String? = null,
+    sec: String? = null,
+    private val instance: Exchange = ExchangeFactory.INSTANCE.createExchange(BinanceExchange::class.java, api, sec)
 ) : Client {
 
     private val tradeService: BinanceTradeService = instance.tradeService as (BinanceTradeService)
+    private val marketDataService: BinanceMarketDataService = instance.marketDataService as (BinanceMarketDataService)
 
     private val log = KotlinLogging.logger {}
+
+    override fun getAllPairs(): List<TradePair> =
+        instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
+
+
+    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
+        marketDataService.klines(
+            CurrencyPair(pair.first, pair.second),
+            asKlineInterval(interval),
+            countCandles,
+            null,
+            null
+        )
+            .map { asCandlestick(it) }
+
+//        instance
+//            .getCandlestickBars(pair.first + pair.second, interval.toCandlestickInterval(), countCandles, null, null)
+//            .map { it.toCandlestick() }
 
     override fun getOpenOrders(pair: TradePair): List<Order> = TODO("not implemented")
 //        instance
@@ -49,11 +73,6 @@ class BinanceClient(
 
     override fun getOrder(pair: TradePair, orderId: String): Order = TODO("not implemented")
 //            instance.getOrderStatus(OrderStatusRequest(pair.first + pair.second, orderId)).toOrder(pair)
-
-    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> = TODO("not implemented")
-//        instance
-//            .getCandlestickBars(pair.first + pair.second, interval.toCandlestickInterval(), countCandles, null, null)
-//            .map { it.toCandlestick() }
 
     override fun newOrder(
         pair: TradePair,
@@ -93,9 +112,6 @@ class BinanceClient(
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean) = TODO("not implemented")
 //            instance.cancelOrder(CancelOrderRequest(pair.first + pair.second, orderId))
 
-    override fun getAllPairs() = TODO("not implemented")
-    // instance.exchangeInfo.symbols.map { TradePair(it.baseAsset, it.quoteAsset) }
-
     override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         TODO("not implemented")
 //        SocketThreadBinanceImpl(
@@ -107,6 +123,34 @@ class BinanceClient(
 
     override fun nextEvent() {}
     override fun close() {}
+
+    private fun asKlineInterval(interval: INTERVAL): KlineInterval = when (interval) {
+        INTERVAL.ONE_MINUTE -> KlineInterval.m1
+        INTERVAL.THREE_MINUTES -> KlineInterval.m3
+        INTERVAL.FIVE_MINUTES -> KlineInterval.m5
+        INTERVAL.FIFTEEN_MINUTES -> KlineInterval.m15
+        INTERVAL.HALF_HOURLY -> KlineInterval.m30
+        INTERVAL.HOURLY -> KlineInterval.h1
+        INTERVAL.TWO_HOURLY -> KlineInterval.h2
+        INTERVAL.FOUR_HOURLY -> KlineInterval.h4
+        INTERVAL.SIX_HOURLY -> KlineInterval.h6
+        INTERVAL.EIGHT_HOURLY -> KlineInterval.h8
+        INTERVAL.TWELVE_HOURLY -> KlineInterval.h12
+        INTERVAL.DAILY -> KlineInterval.d1
+        INTERVAL.THREE_DAILY -> KlineInterval.d3
+        INTERVAL.WEEKLY -> KlineInterval.w1
+        INTERVAL.MONTHLY -> KlineInterval.M1
+    }
+
+    private fun asCandlestick(kline: BinanceKline): Candlestick = Candlestick(
+        openTime = kline.openTime,
+        closeTime = kline.closeTime,
+        open = kline.openPrice.toDouble(),
+        high = kline.highPrice.toDouble(),
+        low = kline.lowPrice.toDouble(),
+        close = kline.closePrice.toDouble(),
+        volume = kline.volume.toDouble()
+    )
 }
 //
 //fun AssetBalance.toBalance(): Balance = Balance(
