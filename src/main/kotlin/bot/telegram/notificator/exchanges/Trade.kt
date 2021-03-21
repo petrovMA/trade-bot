@@ -6,7 +6,6 @@ import bot.telegram.notificator.exchanges.BotEvent.Type.*
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.exchanges.clients.socket.SocketThread
 import com.typesafe.config.Config
-import mu.KLogger
 import mu.KotlinLogging
 import java.io.File
 import java.nio.file.Files
@@ -30,8 +29,9 @@ class Trade(
     private val minTradeBalance: Double = conf.getDouble("min_balance_trade"),
     private val minOverheadBalance: Double = conf.getDouble("min_overhead_balance"),
     private val syncTimeInterval: Duration = conf.getDuration("sync_interval_time"),
+    private val cancelUnknownOrdersInterval: ActionInterval = ActionInterval(conf.getDuration("cancel_unknown_orders_interval")),
     private val retrySentOrderCount: Int = conf.getInt("retry_sent_order_count"),
-    private val log: KLogger? = KotlinLogging.logger {},
+    isLog: Boolean = true,
     private val isEmulate: Boolean = false,
     val sendMessage: (String) -> Unit
 ) : Thread() {
@@ -46,11 +46,13 @@ class Trade(
     private var intervalCandlesBuy = conf.getInt("interval.candles_buy")
     private var intervalCandlesSell = conf.getInt("interval.candles_sell")
 
+    private val log = if (isLog) KotlinLogging.logger {} else null
+
     private val countCandles =
-            if (intervalCandlesBuy > intervalCandlesSell)
-                intervalCandlesBuy
-            else
-                intervalCandlesSell
+        if (intervalCandlesBuy > intervalCandlesSell)
+            intervalCandlesBuy
+        else
+            intervalCandlesSell
 
     private val waitTime = conf.getDuration("interval.wait_socket_time")
     private val mainBalance = 0.0
@@ -63,8 +65,8 @@ class Trade(
     private val exceptionWaitTime = conf.getDuration("wait_time.exception")
     private val updateCandlestickOrdersTimeInterval = conf.getDuration("update_candlestick_orders_time_interval")
     private val waitBetweenCancelAndUpdateOrders = conf.getDuration("wait_between_cancel_and_update_orders")
-    private val writeEthBalanceToHistoryInterval = conf.getDuration("save.eth_balance_to_history_interval")
-    private val isWriteEthBalance = conf.getBoolean("save.eth_balance_to_history")
+//    private val writeEthBalanceToHistoryInterval = conf.getDuration("save.eth_balance_to_history_interval")
+//    private val isWriteEthBalance = conf.getBoolean("save.eth_balance_to_history")
     private val pauseBetweenCheckOrder = conf.getDuration("pause_between_check_orders")
     private val printOrdersAndOff = conf.getBoolean("print_orders_and_off")
     private val autoCreateAnyOrders = conf.getBoolean("auto_create_any_orders")
@@ -80,7 +82,7 @@ class Trade(
     private var lastCheckBuyOrderTime: Duration = 5.s()
     private var lastCheckSellOrderTime: Duration = 5.s()
     private var lastSyncTime: Duration = 0.s()
-    private var lastLastWriteEthBalanceToHistory: Duration = 0.s()
+//    private var lastLastWriteEthBalanceToHistory: Duration = 0.s()
     private val maxTryingUpdateOrderSell: Int = 3
     private var tryingUpdateOrderSell: Int = 0
     private val maxTryingUpdateOrderBuy: Int = 3
@@ -89,10 +91,11 @@ class Trade(
     private var candlestickList = ListLimit<Candlestick>()
 
     val balance = BalanceInfo(
-            symbols = tradePair,
-            firstBalance = 0.0,
-            secondBalance = mainBalance,
-            balanceTrade = balanceTrade)
+        symbols = tradePair,
+        firstBalance = 0.0,
+        secondBalance = mainBalance,
+        balanceTrade = balanceTrade
+    )
 
     private var socket: SocketThread = client.socket(TradePair(firstSymbol, secondSymbol), interval, queue)
 
@@ -171,17 +174,17 @@ class Trade(
 
             createStaticOrdersOnStart()
 
-            balance.orderB ?: {
+            balance.orderB ?: run {
                 log?.error("$tradePair orderB is NULL. Not enough balance for start.")
                 sendMessage("#orderB_${tradePair}_is_NULL. Not enough balance for start.")
                 interruptThis()
-            }()
+            }
 
-            balance.orderS ?: {
+            balance.orderS ?: run {
                 log?.error("$tradePair orderS is NULL. Not enough balance for start.")
                 sendMessage("#orderS_${tradePair}_is_NULL. Not enough balance for start.")
                 interruptThis()
-            }()
+            }
 
             if (stopThread) return
 
@@ -301,22 +304,25 @@ class Trade(
                                     when (msg.type) {
                                         GET_PAIR_OPEN_ORDERS -> {
                                             val symbols = msg.message.split("[^a-zA-Z]+".toRegex())
-                                                    .filter { it.isNotBlank() }
+                                                .filter { it.isNotBlank() }
 
-                                            sendMessage(client.getOpenOrders(TradePair(symbols[0], symbols[1])).joinToString("\n\n"))
+                                            sendMessage(
+                                                client.getOpenOrders(TradePair(symbols[0], symbols[1]))
+                                                    .joinToString("\n\n")
+                                            )
                                         }
                                         GET_ALL_OPEN_ORDERS -> {
                                             val pairs = msg.message
-                                                    .split("\\s+".toRegex())
-                                                    .filter { it.isNotBlank() }
-                                                    .map { pair ->
-                                                        val symbols = pair.split("[^a-zA-Z]+".toRegex())
-                                                                .filter { it.isNotBlank() }
-                                                        TradePair(symbols[0], symbols[1])
-                                                    }
+                                                .split("\\s+".toRegex())
+                                                .filter { it.isNotBlank() }
+                                                .map { pair ->
+                                                    val symbols = pair.split("[^a-zA-Z]+".toRegex())
+                                                        .filter { it.isNotBlank() }
+                                                    TradePair(symbols[0], symbols[1])
+                                                }
 
                                             client.getAllOpenOrders(pairs)
-                                                    .forEach { sendMessage("${it.key}\n${it.value.joinToString("\n\n")}") }
+                                                .forEach { sendMessage("${it.key}\n${it.value.joinToString("\n\n")}") }
                                         }
 //                                        SHOW_ALL_BALANCES -> {
 //                                            sendMessage(
@@ -327,9 +333,9 @@ class Trade(
 //                                        }
                                         SHOW_BALANCES -> {
                                             sendMessage(
-                                                    "#AllBalances " +
-                                                            client.getBalances()
-                                                                    .joinToString(prefix = "\n", separator = "\n")
+                                                "#AllBalances " +
+                                                        client.getBalances()
+                                                            .joinToString(prefix = "\n", separator = "\n")
                                             )
                                         }
 //                                        SHOW_FREE_BALANCES -> {
@@ -346,7 +352,14 @@ class Trade(
 //                                        }
                                         SHOW_GAP -> {
                                             if (balance.orderB != null && balance.orderS != null)
-                                                sendMessage("#Gap $tradePair\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}")
+                                                sendMessage(
+                                                    "#Gap $tradePair\n${
+                                                        calcGapPercent(
+                                                            balance.orderB!!,
+                                                            balance.orderS!!
+                                                        )
+                                                    }"
+                                                )
                                             else
                                                 sendMessage("#orderB_or_orderS_is_NULL_Cannot_calc_Gap.")
                                         }
@@ -403,19 +416,20 @@ class Trade(
 
         if (isUnknown(balance.orderB)) {
             val price =
-                    if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                        averageHigh - averageHigh.percent(percentBuyProf)
-                    else
-                        nearBuyPrice - nearBuyPrice.percent(deltaPercent)
+                if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
+                    averageHigh - averageHigh.percent(percentBuyProf)
+                else
+                    nearBuyPrice - nearBuyPrice.percent(deltaPercent)
 
             freeSecondBalance = freeSecondBalance ?: client.getAssetBalance(secondSymbol).free
 
             if (freeSecondBalance > balance.balanceTrade + balance.balanceTrade.percent(minOverheadBalance)) {
                 balance.orderB = sentOrder(
-                        amount = balance.balanceTrade / price,
-                        price = price,
-                        orderSide = SIDE.BUY,
-                        isStaticUpdate = false)
+                    amount = balance.balanceTrade / price,
+                    price = price,
+                    orderSide = SIDE.BUY,
+                    isStaticUpdate = false
+                )
                 freeSecondBalance -= balance.balanceTrade
                 if (!isEmulate) {
                     reWriteObject(balance.orderB!!, File("$path/orderB.json"))
@@ -424,10 +438,12 @@ class Trade(
                 tryingUpdateOrderBuy = 0
             } else {
                 log?.warn("can't create orderB")
-                sendMessage("#Cannot_create_orderB_$tradePair:" +
-                        "\nbalanceTrade.percent = ${balance.balanceTrade.percent(minOverheadBalance)}" +
-                        "\nbalanceTrade = ${balance.balanceTrade}" +
-                        "\nfreeSecondBalance = $freeSecondBalance")
+                sendMessage(
+                    "#Cannot_create_orderB_$tradePair:" +
+                            "\nbalanceTrade.percent = ${balance.balanceTrade.percent(minOverheadBalance)}" +
+                            "\nbalanceTrade = ${balance.balanceTrade}" +
+                            "\nfreeSecondBalance = $freeSecondBalance"
+                )
 
                 if (tryingUpdateOrderBuy >= maxTryingUpdateOrderBuy) interruptThis()
                 else tryingUpdateOrderBuy++
@@ -437,6 +453,8 @@ class Trade(
 
             log?.info("$tradePair BUY Order created:\n${balance.orderB}")
         } else {
+
+            // todo replace with ActionInterval
             if ((lastCheckBuyOrderTime + pauseBetweenCheckOrder - time()).isNegative) {
 
                 balance.orderB = order ?: getOrder(balance.symbols, balance.orderB!!.orderId)
@@ -455,9 +473,11 @@ class Trade(
                 if (!checkBuyOrderTrigger.first) {
                     checkBuyOrderTrigger = true to time() + pauseBetweenCheckOrder
 
-                    log?.info("$tradePair Requests trying more tran 1 times in 10 seconds. " +
-                            "Time = ${time().format()}; lastCheckBuyOrderTime = ${lastCheckBuyOrderTime.format()};\n" +
-                            "TRIGGER FOR CHECK BUY: ${checkBuyOrderTrigger.second.format()}")
+                    log?.info(
+                        "$tradePair Requests trying more tran 1 times in 10 seconds. " +
+                                "Time = ${time().format()}; lastCheckBuyOrderTime = ${lastCheckBuyOrderTime.format()};\n" +
+                                "TRIGGER FOR CHECK BUY: ${checkBuyOrderTrigger.second.format()}"
+                    )
                 }
             }
         }
@@ -469,19 +489,23 @@ class Trade(
 
         if (isUnknown(balance.orderS)) {
             val price =
-                    if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                        averageLow + averageLow.percent(percentSellProf)
-                    else
-                        nearSellPrice + nearSellPrice.percent(deltaPercent)
+                if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
+                    averageLow + averageLow.percent(percentSellProf)
+                else
+                    nearSellPrice + nearSellPrice.percent(deltaPercent)
 
             freeFirstBalance = client.getAssetBalance(firstSymbol).free
 
-            if (freeFirstBalance > (balance.balanceTrade / price) + (balance.balanceTrade / price).percent(minOverheadBalance)) {
+            if (freeFirstBalance > (balance.balanceTrade / price) + (balance.balanceTrade / price).percent(
+                    minOverheadBalance
+                )
+            ) {
                 balance.orderS = sentOrder(
-                        amount = balance.balanceTrade / price,
-                        price = price,
-                        orderSide = SIDE.SELL,
-                        isStaticUpdate = false)
+                    amount = balance.balanceTrade / price,
+                    price = price,
+                    orderSide = SIDE.SELL,
+                    isStaticUpdate = false
+                )
                 freeFirstBalance -= balance.balanceTrade / price
                 if (!isEmulate) {
                     reWriteObject(balance.orderS!!, File("$path/orderS.json"))
@@ -490,10 +514,14 @@ class Trade(
                 tryingUpdateOrderSell = 0
             } else {
                 log?.warn("can't create orderS")
-                sendMessage("#Cannot_create_orderS_$tradePair:" +
-                        "\n(balance.balanceTrade / price).percent = ${(balance.balanceTrade / price).percent(minOverheadBalance)}" +
-                        "\n(balance.balanceTrade / price) = ${(balance.balanceTrade / price)}" +
-                        "\nfreeFirstBalance = $freeFirstBalance")
+                sendMessage(
+                    "#Cannot_create_orderS_$tradePair:" +
+                            "\n(balance.balanceTrade / price).percent = ${
+                                (balance.balanceTrade / price).percent(minOverheadBalance)
+                            }" +
+                            "\n(balance.balanceTrade / price) = ${(balance.balanceTrade / price)}" +
+                            "\nfreeFirstBalance = $freeFirstBalance"
+                )
 
                 if (tryingUpdateOrderSell >= maxTryingUpdateOrderSell) interruptThis()
                 else tryingUpdateOrderSell++
@@ -503,6 +531,8 @@ class Trade(
 
             log?.info("$tradePair SELL Order created:\n${balance.orderS}")
         } else {
+
+            // todo replace with ActionInterval
             if ((lastCheckSellOrderTime + pauseBetweenCheckOrder - time()).isNegative) {
 
                 balance.orderS = order ?: getOrder(balance.symbols, balance.orderS!!.orderId)
@@ -522,9 +552,11 @@ class Trade(
                 if (!checkSellOrderTrigger.first) {
                     checkSellOrderTrigger = true to time() + pauseBetweenCheckOrder
 
-                    log?.info("$tradePair Requests trying more tran 1 times in 10 seconds. " +
-                            "Time = ${time().format()}; lastCheckSellOrderTime = ${lastCheckSellOrderTime.format()};\n" +
-                            "TRIGGER FOR CHECK SELL: ${checkSellOrderTrigger.second.format()}")
+                    log?.info(
+                        "$tradePair Requests trying more tran 1 times in 10 seconds. " +
+                                "Time = ${time().format()}; lastCheckSellOrderTime = ${lastCheckSellOrderTime.format()};\n" +
+                                "TRIGGER FOR CHECK SELL: ${checkSellOrderTrigger.second.format()}"
+                    )
                 }
             }
         }
@@ -536,10 +568,10 @@ class Trade(
         log?.debug("$tradePair Start update buy: ${balance.orderB}")
 
         var price =
-                if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                    averageHigh - averageHigh.percent(percentBuyProf)
-                else
-                    nearBuyPrice - nearBuyPrice.percent(deltaPercent)
+            if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
+                averageHigh - averageHigh.percent(percentBuyProf)
+            else
+                nearBuyPrice - nearBuyPrice.percent(deltaPercent)
 
         when (balance.orderB!!.status) {
             STATUS.NEW -> {
@@ -552,16 +584,18 @@ class Trade(
                         wait(waitBetweenCancelAndUpdateOrders)
                         if (100 - (countToBuy / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
                             balance.orderB = sentOrder(
-                                    amount = countToBuy,
-                                    price = price,
-                                    orderSide = SIDE.BUY,
-                                    isStaticUpdate = false)
+                                amount = countToBuy,
+                                price = price,
+                                orderSide = SIDE.BUY,
+                                isStaticUpdate = false
+                            )
                         else
                             balance.orderB = sentOrder(
-                                    amount = balance.balanceTrade / price,
-                                    price = price,
-                                    orderSide = SIDE.BUY,
-                                    isStaticUpdate = false)
+                                amount = balance.balanceTrade / price,
+                                price = price,
+                                orderSide = SIDE.BUY,
+                                isStaticUpdate = false
+                            )
                     } else
                         log?.debug("No need update! OrderB has same price!")
 
@@ -584,10 +618,11 @@ class Trade(
                             cancelOrder(balance.symbols, balance.orderB!!, false)
                             wait(waitBetweenCancelAndUpdateOrders)
                             balance.orderB = sentOrder(
-                                    amount = countToBuy,
-                                    price = price,
-                                    orderSide = SIDE.BUY,
-                                    isStaticUpdate = false)
+                                amount = countToBuy,
+                                price = price,
+                                orderSide = SIDE.BUY,
+                                isStaticUpdate = false
+                            )
 
                             if (!isEmulate) {
                                 reWriteObject(balance.orderB!!, File("$path/orderB.json"))
@@ -596,8 +631,10 @@ class Trade(
 
                             log?.info("$tradePair BUY PARTIALLY_FILLED Order UPDATED:\n${balance.orderB}")
                         } else
-                            log?.warn("$tradePair Can't update PARTIALLY_FILLED Order BUY;\n" +
-                                    " Price: $price < ${balance.orderB!!.price}")
+                            log?.warn(
+                                "$tradePair Can't update PARTIALLY_FILLED Order BUY;\n" +
+                                        " Price: $price < ${balance.orderB!!.price}"
+                            )
                     } else {
                         if (updateIfAlmostFilled) {
                             sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
@@ -621,10 +658,10 @@ class Trade(
         log?.debug("$tradePair Start update sell: ${balance.orderS}")
 
         price =
-                if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                    averageLow + averageLow.percent(percentSellProf)
-                else
-                    nearSellPrice + nearSellPrice.percent(deltaPercent)
+            if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
+                averageLow + averageLow.percent(percentSellProf)
+            else
+                nearSellPrice + nearSellPrice.percent(deltaPercent)
 
         when (balance.orderS!!.status) {
             STATUS.NEW -> {
@@ -637,16 +674,18 @@ class Trade(
                         wait(waitBetweenCancelAndUpdateOrders)
                         if (100 - (countToSell / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
                             balance.orderS = sentOrder(
-                                    amount = countToSell,
-                                    price = price,
-                                    orderSide = SIDE.SELL,
-                                    isStaticUpdate = false)
+                                amount = countToSell,
+                                price = price,
+                                orderSide = SIDE.SELL,
+                                isStaticUpdate = false
+                            )
                         else
                             balance.orderS = sentOrder(
-                                    amount = balance.balanceTrade / price,
-                                    price = price,
-                                    orderSide = SIDE.SELL,
-                                    isStaticUpdate = false)
+                                amount = balance.balanceTrade / price,
+                                price = price,
+                                orderSide = SIDE.SELL,
+                                isStaticUpdate = false
+                            )
                     } else
                         log?.debug("No need update! OrderS has same price!")
 
@@ -669,10 +708,11 @@ class Trade(
                             cancelOrder(balance.symbols, balance.orderS!!, false)
                             wait(waitBetweenCancelAndUpdateOrders)
                             balance.orderS = sentOrder(
-                                    amount = countToSell,
-                                    price = price,
-                                    orderSide = SIDE.SELL,
-                                    isStaticUpdate = false)
+                                amount = countToSell,
+                                price = price,
+                                orderSide = SIDE.SELL,
+                                isStaticUpdate = false
+                            )
 
                             if (!isEmulate) {
                                 reWriteObject(balance.orderS!!, File("$path/orderS.json"))
@@ -681,8 +721,10 @@ class Trade(
 
                             log?.info("$tradePair SELL PARTIALLY_FILLED Order UPDATED:\n${balance.orderS}")
                         } else
-                            log?.warn("$tradePair Can't update PARTIALLY_FILLED Order SELL;\n" +
-                                    " Price: $price > ${balance.orderS!!.price}")
+                            log?.warn(
+                                "$tradePair Can't update PARTIALLY_FILLED Order SELL;\n" +
+                                        " Price: $price > ${balance.orderS!!.price}"
+                            )
                     } else {
                         if (updateIfAlmostFilled) {
                             sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
@@ -712,11 +754,12 @@ class Trade(
             val prevPrice = balance.orderB!!.price
 
             balance.orderB = sentOrder(
-                    amount = if (firstBalanceFixed) balance.balanceTrade / prevPrice
-                    else balance.balanceTrade / price,
-                    price = price,
-                    orderSide = SIDE.SELL,
-                    isStaticUpdate = false)
+                amount = if (firstBalanceFixed) balance.balanceTrade / prevPrice
+                else balance.balanceTrade / price,
+                price = price,
+                orderSide = SIDE.SELL,
+                isStaticUpdate = false
+            )
 
             if (!isEmulate) {
                 reWriteObject(balance.orderB!!, File("$path/orderB.json"))
@@ -726,18 +769,19 @@ class Trade(
             log?.info("$tradePair new BUY Order 2:\n${balance.orderB}")
         } else {
             val price =
-                    if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                        averageHigh - averageHigh.percent(percentBuyProf)
-                    else
-                        nearBuyPrice - nearBuyPrice.percent(deltaPercent)
+                if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
+                    averageHigh - averageHigh.percent(percentBuyProf)
+                else
+                    nearBuyPrice - nearBuyPrice.percent(deltaPercent)
 
             log?.info("$tradePair BUY Order FILLED 2:\n${balance.orderB}")
 
             balance.orderB = sentOrder(
-                    amount = balance.balanceTrade / price,
-                    price = price,
-                    orderSide = SIDE.BUY,
-                    isStaticUpdate = false)
+                amount = balance.balanceTrade / price,
+                price = price,
+                orderSide = SIDE.BUY,
+                isStaticUpdate = false
+            )
 
             if (!isEmulate) {
                 reWriteObject(balance.orderB!!, File("$path/orderB.json"))
@@ -756,11 +800,11 @@ class Trade(
             val prevPrice = balance.orderS!!.price
 
             balance.orderS = sentOrder(
-                    amount = if (firstBalanceFixed) balance.balanceTrade / prevPrice
-                    else balance.balanceTrade / price,
-                    price = price,
-                    orderSide = SIDE.BUY,
-                    isStaticUpdate = false
+                amount = if (firstBalanceFixed) balance.balanceTrade / prevPrice
+                else balance.balanceTrade / price,
+                price = price,
+                orderSide = SIDE.BUY,
+                isStaticUpdate = false
             )
 
             if (!isEmulate) {
@@ -770,18 +814,19 @@ class Trade(
             log?.info("$tradePair new SELL Order 2:\n${balance.orderS}")
         } else {
             val price =
-                    if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                        averageLow + averageLow.percent(percentSellProf)
-                    else
-                        nearSellPrice + nearSellPrice.percent(deltaPercent)
+                if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
+                    averageLow + averageLow.percent(percentSellProf)
+                else
+                    nearSellPrice + nearSellPrice.percent(deltaPercent)
 
             log?.info("$tradePair SELL Order FILLED 2:\n${balance.orderS}")
 
             balance.orderS = sentOrder(
-                    amount = balance.balanceTrade / price,
-                    price = price,
-                    orderSide = SIDE.SELL,
-                    isStaticUpdate = false)
+                amount = balance.balanceTrade / price,
+                price = price,
+                orderSide = SIDE.SELL,
+                isStaticUpdate = false
+            )
 
             if (!isEmulate) {
                 reWriteObject(balance.orderS!!, File("$path/orderS.json"))
@@ -794,13 +839,15 @@ class Trade(
 
     private fun calcAveragePrice() {
         val (averageHigh, averageLow, candlestickList) = calcAveragePriceStatic(
-                currentCandlestickList = candlestickList,
-                countCandles = countCandles,
-                intervalCandlesBuy = intervalCandlesBuy,
-                intervalCandlesSell = intervalCandlesSell,
-                interval = interval,
-                symbols = tradePair,
-                client = client
+            currentCandlestickList = candlestickList,
+            countCandles = countCandles,
+            intervalCandlesBuy = intervalCandlesBuy,
+            intervalCandlesSell = intervalCandlesSell,
+            interval = interval,
+            symbols = tradePair,
+            client = client,
+            log = log,
+            isEmulate = isEmulate
         )
         this.averageHigh = averageHigh
         this.averageLow = averageLow
@@ -817,16 +864,27 @@ class Trade(
         do {
 
             try {
-                order = client.newOrder(balance.symbols, orderSide, TYPE.LIMIT, amount, price, isStaticUpdate, formatCount, formatPrice)
+                order = client.newOrder(
+                    balance.symbols,
+                    orderSide,
+                    TYPE.LIMIT,
+                    amount,
+                    price,
+                    isStaticUpdate,
+                    formatCount,
+                    formatPrice
+                )
                 log?.debug("$tradePair Order sent: $order")
                 return order
             } catch (e: Exception) {
 
                 if (e.message == "Account has insufficient balance for requested action.") {
-                    throw Exception("$tradePair Account has insufficient balance for requested action.\n" +
-                            "#insufficient_${tradePair}_balance_for: $order\n" +
-                            "$firstSymbol = ${client.getAssetBalance(firstSymbol).free}\n" +
-                            "$secondSymbol = ${client.getAssetBalance(secondSymbol).free}")
+                    throw Exception(
+                        "$tradePair Account has insufficient balance for requested action.\n" +
+                                "#insufficient_${tradePair}_balance_for: $order\n" +
+                                "$firstSymbol = ${client.getAssetBalance(firstSymbol).free}\n" +
+                                "$secondSymbol = ${client.getAssetBalance(secondSymbol).free}"
+                    )
                 }
 
                 retryCount--
@@ -940,8 +998,11 @@ class Trade(
 
         if (sellPrice > nearSellPrice && buyPrice > nearBuyPrice) {
             log?.warn(
-                    "$tradePair sellPrice = ${String.format("%.8f", sellPrice)} more than nearSellPrice = ${String.format("%.8f", nearSellPrice)} " +
-                            "buyPrice = ${String.format("%.8f", buyPrice)} more than nearBuyPrice = ${String.format("%.8f", nearBuyPrice)}")
+                "$tradePair sellPrice = ${String.format("%.8f", sellPrice)} " +
+                        "more than nearSellPrice = ${String.format("%.8f", nearSellPrice)} " +
+                        "buyPrice = ${String.format("%.8f", buyPrice)} " +
+                        "more than nearBuyPrice = ${String.format("%.8f", nearBuyPrice)}"
+            )
 
             if ((lastSyncTime + syncTimeInterval - time()).isNegative) {
                 synchronizeOrders()
@@ -949,14 +1010,19 @@ class Trade(
                 checkSellOrder()
                 lastSyncTime = time()
             } else
-                log?.warn("$tradePair Requests trying more tran 60 seconds. Time = ${time().format()}; lastSyncTime = " +
-                        "${lastSyncTime.format()};")
+                log?.warn(
+                    "$tradePair Requests trying more tran 60 seconds. Time = ${time().format()}; lastSyncTime = " +
+                            "${lastSyncTime.format()};"
+                )
         }
 
         if (sellPrice < nearSellPrice && buyPrice < nearBuyPrice) {
             log?.warn(
-                    "$tradePair sellPrice = ${String.format("%.8f", sellPrice)} less than nearSellPrice = ${String.format("%.8f", nearSellPrice)} " +
-                            "buyPrice = ${String.format("%.8f", buyPrice)} less than nearBuyPrice = ${String.format("%.8f", nearBuyPrice)}")
+                "$tradePair sellPrice = ${String.format("%.8f", sellPrice)} " +
+                        "less than nearSellPrice = ${String.format("%.8f", nearSellPrice)} " +
+                        "buyPrice = ${String.format("%.8f", buyPrice)} " +
+                        "less than nearBuyPrice = ${String.format("%.8f", nearBuyPrice)}"
+            )
 
             if ((lastSyncTime + 60.s() - time()).isNegative) {
                 synchronizeOrders()
@@ -964,18 +1030,22 @@ class Trade(
                 checkSellOrder()
                 lastSyncTime = time()
             } else
-                log?.warn("$tradePair Requests trying more tran 60 seconds. Time = ${time().format()}; lastSyncTime = " +
-                        "${lastSyncTime.format()};")
+                log?.warn(
+                    "$tradePair Requests trying more tran 60 seconds. Time = ${time().format()}; lastSyncTime = " +
+                            "${lastSyncTime.format()};"
+                )
         }
 
         val minPriceDifference =
-                if (sellPrice - nearSellPrice > nearBuyPrice - buyPrice)
-                    nearBuyPrice - buyPrice
-                else
-                    sellPrice - nearSellPrice
+            if (sellPrice - nearSellPrice > nearBuyPrice - buyPrice)
+                nearBuyPrice - buyPrice
+            else
+                sellPrice - nearSellPrice
 
-        log?.trace("$tradePair Update static IF: $minPriceDifference > ${sellPrice.percent(percent)} &&" +
-                " $minPriceDifference > ${buyPrice.percent(percent)}")
+        log?.trace(
+            "$tradePair Update static IF: $minPriceDifference > ${sellPrice.percent(percent)} &&" +
+                    " $minPriceDifference > ${buyPrice.percent(percent)}"
+        )
 
         if (minPriceDifference > sellPrice.percent(percent) && minPriceDifference > buyPrice.percent(percent)) {
 
@@ -994,7 +1064,8 @@ class Trade(
             log?.debug("$tradePair StatusOrderB: ${balance.orderB!!.status}, StatusOrderS: ${balance.orderS!!.status}")
 
             if ((balance.orderB!!.status == STATUS.NEW || balance.orderB!!.status == STATUS.PARTIALLY_FILLED) &&
-                    (balance.orderS!!.status == STATUS.NEW || balance.orderS!!.status == STATUS.PARTIALLY_FILLED)) {
+                (balance.orderS!!.status == STATUS.NEW || balance.orderS!!.status == STATUS.PARTIALLY_FILLED)
+            ) {
 
                 val priceBuy = ((balance.orderB!!.price - minPriceDifference) -
                         (balance.orderB!!.price - minPriceDifference).percent(deltaPercent))
@@ -1002,7 +1073,8 @@ class Trade(
                 val priceSell = ((balance.orderS!!.price + minPriceDifference) -
                         (balance.orderS!!.price + minPriceDifference).percent(deltaPercent))
 
-                val countToBuy = balance.orderB!!.origQty * balance.orderB!!.price / priceBuy - balance.orderB!!.executedQty
+                val countToBuy =
+                    balance.orderB!!.origQty * balance.orderB!!.price / priceBuy - balance.orderB!!.executedQty
                 if (countToBuy * priceBuy < minTradeBalance && updateIfAlmostFilled) {
                     sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
                     cancelOrder(balance.symbols, balance.orderB!!, false)
@@ -1010,7 +1082,8 @@ class Trade(
                     return
                 }
 
-                val countToSell = balance.orderS!!.origQty * balance.orderS!!.price / priceSell - balance.orderS!!.executedQty
+                val countToSell =
+                    balance.orderS!!.origQty * balance.orderS!!.price / priceSell - balance.orderS!!.executedQty
                 if (countToSell * priceSell < minTradeBalance && updateIfAlmostFilled) {
                     sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
                     cancelOrder(balance.symbols, balance.orderS!!, false)
@@ -1019,27 +1092,31 @@ class Trade(
                 }
 
                 if (countToBuy * priceBuy > minTradeBalance && countToSell * priceSell > minTradeBalance) {
-                    sendMessage("#UpdateStatic_$tradePair Orders from:\nB:\n${strOrder(balance.orderB)}\n\nS:\n${strOrder(balance.orderS)}" +
-                            "\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}")
+                    sendMessage(
+                        "#UpdateStatic_$tradePair Orders from:\nB:\n${strOrder(balance.orderB)}\n\nS:\n" +
+                                "${strOrder(balance.orderS)}\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}"
+                    )
 
                     cancelOrder(balance.symbols, balance.orderB!!, true)
                     cancelOrder(balance.symbols, balance.orderS!!, true)
                     wait(waitBetweenCancelAndUpdateOrders)
 
                     balance.orderB = sentOrder(
-                            amount = countToBuy,
-                            price = priceBuy,
-                            orderSide = SIDE.SELL,
-                            isStaticUpdate = true)
+                        amount = countToBuy,
+                        price = priceBuy,
+                        orderSide = SIDE.SELL,
+                        isStaticUpdate = true
+                    )
 
                     if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
                     log?.info("$tradePair STATIC BUY Order UPDATED:\n${balance.orderB}")
 
                     balance.orderS = sentOrder(
-                            amount = countToSell,
-                            price = priceSell,
-                            orderSide = SIDE.BUY,
-                            isStaticUpdate = true)
+                        amount = countToSell,
+                        price = priceSell,
+                        orderSide = SIDE.BUY,
+                        isStaticUpdate = true
+                    )
 
                     if (!isEmulate) {
                         reWriteObject(balance.orderS!!, File("$path/orderS.json"))
@@ -1047,11 +1124,15 @@ class Trade(
                     }
 
                     log?.info("$tradePair STATIC SELL Order UPDATED:\n${balance.orderS}")
-                    sendMessage("#UpdateStatic_$tradePair Orders to:\nB:\n${strOrder(balance.orderB)}\n\nS:${strOrder(balance.orderS)}" +
-                            "\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}")
+                    sendMessage(
+                        "#UpdateStatic_$tradePair Orders to:\nB:\n${strOrder(balance.orderB)}\n\nS:${strOrder(balance.orderS)}" +
+                                "\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}"
+                    )
                 } else
-                    log?.warn("$tradePair \nSTATIC Orders update cancelled, orders PARTIALLY_FILLED:" +
-                            "\nBuy = ${balance.orderB}\nSell = ${balance.orderS}")
+                    log?.warn(
+                        "$tradePair \nSTATIC Orders update cancelled, orders PARTIALLY_FILLED:" +
+                                "\nBuy = ${balance.orderB}\nSell = ${balance.orderS}"
+                    )
             } else
                 log?.warn("$tradePair \nSTATIC Orders update cancelled, BuyOrderStatus is ${balance.orderB!!.status} != NEW, SellOrderStatus is ${balance.orderS!!.status} != NEW")
             log?.info("$tradePair STATIC Update Orders to:\nB:\n${balance.orderB}\n\nS:\n${balance.orderS}")
@@ -1108,7 +1189,14 @@ class Trade(
                 return client.getOrder(pair, orderId)
             } catch (e: Exception) {
                 log?.warn("$pair getOrder trying ${(retryCount - retryGetOrderCount).absoluteValue}:\n", e)
-                sendMessage("#getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n${printTrace(e, 0)}")
+                sendMessage(
+                    "#getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n${
+                        printTrace(
+                            e,
+                            0
+                        )
+                    }"
+                )
                 sleep(retryGetOrderInterval.toMillis())
             }
         } while (--retryCount > 0)
@@ -1126,21 +1214,29 @@ class Trade(
         if (isCancelUnknownOrders) cancelUnknownOrders()
         if (isUnknown(balance.orderB) && autoCreateAnyOrders) {
             val priceFirst =
-                    if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                        averageLow + averageLow.percent(percentSellProf)
-                    else
-                        nearSellPrice + nearSellPrice.percent(deltaPercent)
+                if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
+                    averageLow + averageLow.percent(percentSellProf)
+                else
+                    nearSellPrice + nearSellPrice.percent(deltaPercent)
 
-            if (freeFirstBalance > (balance.balanceTrade / priceFirst) + (balance.balanceTrade / priceFirst).percent(minOverheadBalance)) {
+            if (freeFirstBalance > (balance.balanceTrade / priceFirst) + (balance.balanceTrade / priceFirst).percent(
+                    minOverheadBalance
+                )
+            ) {
                 balance.orderB = sentOrder(
-                        amount = balance.balanceTrade / priceFirst,
-                        price = priceFirst,
-                        orderSide = SIDE.SELL,
-                        isStaticUpdate = false)
+                    amount = balance.balanceTrade / priceFirst,
+                    price = priceFirst,
+                    orderSide = SIDE.SELL,
+                    isStaticUpdate = false
+                )
                 if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
             } else {
                 val warnMsg = "#cannot_create_orderB_$tradePair:" +
-                        "\n(balance.balanceTrade / price).percent = ${(balance.balanceTrade / priceFirst).percent(minOverheadBalance)}" +
+                        "\n(balance.balanceTrade / price).percent = ${
+                            (balance.balanceTrade / priceFirst).percent(
+                                minOverheadBalance
+                            )
+                        }" +
                         "\n(balance.balanceTrade / price) = ${(balance.balanceTrade / priceFirst)}" +
                         "\nfreeFirstBalance = $freeFirstBalance"
                 log?.warn(warnMsg)
@@ -1151,17 +1247,18 @@ class Trade(
         val freeSecondBalance = checkBuyOrder() ?: client.getAssetBalance(secondSymbol).free
         if (isUnknown(balance.orderS) && autoCreateAnyOrders) {
             val priceSecond =
-                    if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                        averageHigh - averageHigh.percent(percentBuyProf)
-                    else
-                        nearBuyPrice - nearBuyPrice.percent(deltaPercent)
+                if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
+                    averageHigh - averageHigh.percent(percentBuyProf)
+                else
+                    nearBuyPrice - nearBuyPrice.percent(deltaPercent)
 
             if (freeSecondBalance > balance.balanceTrade + balance.balanceTrade.percent(minOverheadBalance)) {
                 balance.orderS = sentOrder(
-                        amount = balance.balanceTrade / priceSecond,
-                        price = priceSecond,
-                        orderSide = SIDE.BUY,
-                        isStaticUpdate = false)
+                    amount = balance.balanceTrade / priceSecond,
+                    price = priceSecond,
+                    orderSide = SIDE.BUY,
+                    isStaticUpdate = false
+                )
                 if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
             } else {
                 val warnMsg = "#cannot_create_orderS_$tradePair:" +
@@ -1174,10 +1271,13 @@ class Trade(
         }
     }
 
-    private fun isUnknown(order: Order?): Boolean = order == null || order.status == STATUS.UNSUPPORTED || order.side == SIDE.UNSUPPORTED
+    private fun isUnknown(order: Order?): Boolean =
+        order == null || order.status == STATUS.UNSUPPORTED || order.side == SIDE.UNSUPPORTED
 
-    private fun cancelUnknownOrders(orders: List<Order>? = null) = (orders ?: client.getOpenOrders(tradePair)).forEach {
-        if (it.orderId != balance.orderB?.orderId && it.orderId != balance.orderS?.orderId)
-            cancelOrder(tradePair, it, false)
+    private fun cancelUnknownOrders(orders: List<Order>? = null) = cancelUnknownOrdersInterval.tryInvoke {
+        (orders ?: client.getOpenOrders(tradePair)).forEach {
+            if (it.orderId != balance.orderB?.orderId && it.orderId != balance.orderS?.orderId)
+                cancelOrder(tradePair, it, false)
+        }
     }
 }

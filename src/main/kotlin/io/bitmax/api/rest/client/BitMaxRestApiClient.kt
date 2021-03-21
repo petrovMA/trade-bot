@@ -114,7 +114,7 @@ open class BitMaxRestApiClient {
                 request.body?.writeTo(buffer)
                 val body = buffer.readUtf8()
 
-                "Request:\n$request\nBody:\n$body"
+                "Request:\n$request" + (if (body.isNotBlank()) "\nBody:\n$body" else "")
             } catch (e: IOException) {
                 log.warn("Can't read request for logging")
             }

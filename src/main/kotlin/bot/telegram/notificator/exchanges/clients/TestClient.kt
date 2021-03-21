@@ -10,26 +10,22 @@ import bot.telegram.notificator.exchanges.CandlestickListsIterator
 import bot.telegram.notificator.libs.convertTime
 import bot.telegram.notificator.libs.percent
 import mu.KotlinLogging
-import java.io.File
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
 
 class TestClient(
-    filesWithCandlesticks: List<File>,
+    val iterator: CandlestickListsIterator,
     val balance: TestBalance,
     startCandleNum: Int,
     private val fee: Double = 0.15
 ) : Client {
     private val log = KotlinLogging.logger {}
-    private val files = filesWithCandlesticks.sortedBy { it.name }
     private var firstOrder: Order? = null
     private var secondOrder: Order? = null
     var lastSellPrice: Double = 0.0
         private set
     private var lastBuyPrice: Double = 0.0
     val queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque()
-
-    var iterator = CandlestickListsIterator(files.first(), 900)
 
     private var candlesticks: List<Candlestick> = iterator.next().also {
 //        addAll(readObjectFromFile(files.component1(), ArrayList::class.java).map { toCandlestick(it) })
@@ -51,7 +47,6 @@ class TestClient(
 
     val startFirstBalance = balance.firstBalance
     val startSecondBalance = balance.secondBalance
-    private var currentFileNum = 1
 
     private var candlestickNum: Int = startCandleNum
     private var prevCandlestick: Candlestick = candlesticks[candlestickNum - 1]
@@ -75,61 +70,80 @@ class TestClient(
     }
 
     override fun getBalances(): List<Balance> = listOf(
-            Balance(asset = balance.tradePair.first, free = balance.firstBalance, total = balance.firstBalance, locked = 0.0),
-            Balance(asset = balance.tradePair.second, free = balance.secondBalance, total = balance.secondBalance, locked = 0.0)
+        Balance(
+            asset = balance.tradePair.first,
+            free = balance.firstBalance,
+            total = balance.firstBalance,
+            locked = 0.0
+        ),
+        Balance(
+            asset = balance.tradePair.second,
+            free = balance.secondBalance,
+            total = balance.secondBalance,
+            locked = 0.0
+        )
     )
 
     override fun getOrderBook(pair: TradePair, limit: Int): OrderBook = OrderBook(
-            asks = listOf(OrderEntry(price = lastBuyPrice, qty = 0.0)),
-            bids = listOf(OrderEntry(price = lastSellPrice, qty = 0.0))
+        asks = listOf(OrderEntry(price = lastBuyPrice, qty = 0.0)),
+        bids = listOf(OrderEntry(price = lastSellPrice, qty = 0.0))
     )
 
     override fun getAssetBalance(asset: String): Balance = getBalances().find { it.asset == asset }
-            ?: Balance(asset = asset, free = 0.0, total = 0.0, locked = 0.0)
+        ?: Balance(asset = asset, free = 0.0, total = 0.0, locked = 0.0)
 
     override fun getOrder(pair: TradePair, orderId: String): Order =
-            getOpenOrders(pair).find { it.orderId == orderId }
-                    ?: {
-                        Order(
-                                pair = balance.tradePair,
-                                side = SIDE.SELL,
-                                type = TYPE.LIMIT,
-                                origQty = 0.0,
-                                executedQty = 0.0,
-                                price = lastBuyPrice,
-                                status = STATUS.NEW,
-                                orderId = orderId
-                        )
-                    }()
-
-    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
-            candlesticks.subList(
-                    (candlestickNum + 1 - countCandles).let {
-                        if (it < 0) {
-                            log.warn("Can't get full candlesticks list! Need ${it * -1} more candlesticks from start.")
-                            0
-                        } else it
-                    },
-                    (candlestickNum + 1).let {
-                        if (candlesticks.size < it) {
-                            log.warn("Can't get full candlesticks list! Need ${it - candlesticks.size} more candlesticks from end.")
-                            candlesticks.size
-                        } else it
-                    }
+        getOpenOrders(pair).find { it.orderId == orderId }
+            ?: Order(
+                pair = balance.tradePair,
+                side = SIDE.SELL,
+                type = TYPE.LIMIT,
+                origQty = 0.0,
+                executedQty = 0.0,
+                price = lastBuyPrice,
+                status = STATUS.NEW,
+                orderId = orderId
             )
 
-    override fun newOrder(pair: TradePair, side: SIDE, type: TYPE, amount: Double, price: Double, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order {
+    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> {
+
+        val from = (candlestickNum + 1 - countCandles).let {
+                if (it < 0) {
+                    log.warn("Can't get full candlesticks list! Need ${it * -1} more candlesticks from start.")
+                    0
+                } else it
+            }
+        val to = (candlestickNum + 1).let {
+            if (candlesticks.size < it) {
+                log.warn("Can't get full candlesticks list! Need ${it - candlesticks.size} more candlesticks from end.")
+                candlesticks.size
+            } else it
+        }
+        val result = candlesticks.subList(from, to)
+        return result
+    }
+
+    override fun newOrder(
+        pair: TradePair,
+        side: SIDE,
+        type: TYPE,
+        amount: Double,
+        price: Double,
+        isStaticUpdate: Boolean,
+        formatCount: String,
+        formatPrice: String
+    ): Order {
         if (isStaticUpdate) updateStaticOrdersCount++
         ++clientOrderId
         val order = Order(
-                pair = pair,
-                side = side,
-                type = type,
-                origQty = amount,
-                executedQty = 0.0,
-                price = price,
-                status = STATUS.NEW,
-                orderId = clientOrderId.toString()
+            pair = pair,
+            side = side,
+            type = type,
+            origQty = amount,
+            executedQty = 0.0,
+            price = price,
+            status = STATUS.NEW,
+            orderId = clientOrderId.toString()
         )
 
         if (side == SIDE.SELL)
@@ -139,7 +153,12 @@ class TestClient(
 
         if (firstOrder == null || firstOrder?.status in listOf(STATUS.FILLED, STATUS.CANCELED, STATUS.REJECTED)) {
             firstOrder = order
-        } else if (secondOrder == null || secondOrder?.status in listOf(STATUS.FILLED, STATUS.CANCELED, STATUS.REJECTED)) {
+        } else if (secondOrder == null || secondOrder?.status in listOf(
+                STATUS.FILLED,
+                STATUS.CANCELED,
+                STATUS.REJECTED
+            )
+        ) {
             secondOrder = order
         } else
             throw NoEmptyOrdersException("Empty orders not found!")
@@ -235,14 +254,8 @@ class TestClient(
                     if (iterator.hasNext()) {
                         candlesticks = iterator.next()
                         candlestickNum = 0
-                    } else {
-                        if (currentFileNum < files.size) {
-                            iterator = CandlestickListsIterator(files[currentFileNum++], 900)
-                            candlesticks = iterator.next()
-                            candlestickNum = 0
-                        } else
-                            return queue.put(BotEvent(type = BotEvent.Type.INTERRUPT))
-                    }
+                    } else
+                        return queue.put(BotEvent(type = BotEvent.Type.INTERRUPT))
 
                 queue.put(candlestick)
 
@@ -257,12 +270,15 @@ class TestClient(
         }
     }
 
-    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) = SocketThreadStub()
+    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+        SocketThreadStub()
 
     private fun check(prev: Candlestick, current: Candlestick) {
         if (prev.closeTime + 1 != current.openTime)
-            log.warn("Candlesticks has a gap between ${convertTime(prev.closeTime)} ${prev.closeTime} " +
-                    "AND ${convertTime(current.openTime)} ${current.openTime}")
+            log.warn(
+                "Candlesticks has a gap between ${convertTime(prev.closeTime)} ${prev.closeTime} " +
+                        "AND ${convertTime(current.openTime)} ${current.openTime}"
+            )
     }
 
     enum class EventState(val number: Int) {

@@ -2,21 +2,33 @@ package bot.telegram.notificator.exchanges
 
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.libs.*
-import com.google.gson.reflect.TypeToken
-import io.bitmax.api.Mapper.asObject
 import mu.KotlinLogging
-import java.io.File
+import org.apache.log4j.PropertyConfigurator
+import org.sqlite.SQLiteException
+import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.ResultSet
 import java.time.*
-import java.util.*
+import kotlin.collections.ArrayList
+
 
 fun main() {
 
+    PropertyConfigurator.configure("log4j.properties")
+
     CollectCandlestickData(
-            command = Command.WRITE_AND_CHECK,
+        command = Command.WRITE_AND_CHECK,
 //            command = Command.WRITE,
 //            command = Command.CHECK,
-            exchangeEnum = ExchangeEnum.BITMAX
+        exchangeEnum = ExchangeEnum.BITMAX
     ) {}.run()
+
+
+//        .fromTextToDataBase(
+//            "/home/asus/Blockchain/CandlestickData/BITMAX.db",
+//            "/home/asus/Blockchain/CandlestickData/BITMAX/BTT_BTC/2021_01"
+//        )
+
 }
 
 class CollectCandlestickData(
@@ -25,27 +37,26 @@ class CollectCandlestickData(
     private val exchangeEnum: ExchangeEnum,
     val sendMessage: (String) -> Unit
 ) : Thread() {
-    private val millisecondsInDay = 60_000 * 60 * 24
     private val maxLimit = 1000
     private val log = KotlinLogging.logger {}
 
     private val properties = try {
         when (exchangeEnum) {
             ExchangeEnum.BINANCE -> readConf("collect_binance_candlestick.conf")
-                    ?: throw RuntimeException("Can't read Config File!")
+                ?: throw RuntimeException("Can't read Config File!")
             ExchangeEnum.BITMAX -> readConf("collect_bitmax_candlestick.conf")
-                    ?: throw RuntimeException("Can't read Config File!")
+                ?: throw RuntimeException("Can't read Config File!")
             else -> throw UnsupportedExchangeException()
         }
     } catch (e: Throwable) {
         log.error(e.message, e)
         null
     }
-    private val markGap = properties?.getString("mark_gap")!!
-    private val path = properties?.getString("path_out")!!
+
+    private val pathDB = properties?.getString("path_db")!!
     private val ignorePairs: List<TradePair> = properties?.getStringList("ignore_pairs")
-            ?.map { TradePair(it) }
-            ?: emptyList()
+        ?.map { TradePair(it) }
+        ?: emptyList()
 
     private val firstDay = firstDay ?: properties?.getString("first_day_for_check")?.run { toLocalDate() }
     ?: LocalDate.MIN
@@ -60,17 +71,17 @@ class CollectCandlestickData(
             when (command) {
                 Command.NONE -> Unit
                 Command.CHECK -> {
-                    checkCandlesticks(path)
+                    checkCandlesticks(pathDB)
                     sendMessage("#CollectCandlestickData #$exchangeEnum check from date $firstDay done")
                 }
                 Command.WRITE -> {
-                    writeCandlesToOutFile(path, client)
+                    writeCandlesToDB(pathDB, client)
                     sendMessage("#CollectCandlestickData #$exchangeEnum write done")
                 }
                 Command.WRITE_AND_CHECK -> {
-                    writeCandlesToOutFile(path, client)
+                    writeCandlesToDB(pathDB, client)
                     sendMessage("#CollectCandlestickData #$exchangeEnum write done, starts check from date $firstDay")
-                    checkCandlesticks(path)
+                    checkCandlesticks(pathDB)
                     sendMessage("#CollectCandlestickData #$exchangeEnum check from date $firstDay done")
                 }
             }
@@ -82,168 +93,246 @@ class CollectCandlestickData(
     }
 
     fun checkCandlesticks(path: String) {
-        val mainDir = File(path)
-        if (!mainDir.isDirectory) {
-            log.error("File $path not a directory!")
-            return
-        }
+
+        val connect = connect(path)
+
+        val stmt = connect.createStatement()
+        val resultSetTables = stmt.executeQuery("SELECT name FROM sqlite_master where type='table'")
 
         var errMsg = ""
 
-        mainDir
-                .listFiles()!!
-                .toList()
-                .filter {
-                    try {
-                        !ignorePairs.contains(TradePair(it.name))
-                    } catch (t: Throwable) {
-                        t.printStackTrace()
-                        log.error("Can't parse folder '${it.absolutePath}' to TradePair object!")
-                        sendMessage("Can't parse folder '${it.absolutePath}' to TradePair object!")
-                        false
+        while (resultSetTables.next()) {
+            val tableName: String = resultSetTables.getString("name")
+            val statementCandles = connect.createStatement()
+
+            var logOut = ""
+
+            val resultSetCandlestick = statementCandles.executeQuery("SELECT * FROM $tableName ORDER BY ID_OPEN_TIME")
+
+            var prevCandlestick: CandlestickDB? = null
+            var hasGap = false
+
+            while (resultSetCandlestick.next()) {
+                val candlestick = getCandle(resultSetCandlestick)
+
+                prevCandlestick?.run {
+                    if (openTime != candlestick.openTime - 300_000) {
+                        log.debug(
+                            "$tableName table not sequence, Gap between Elements: " +
+                                    "${convertTime(openTime)} -- ${convertTime(candlestick.openTime)}"
+                        )
+                        hasGap = true
                     }
                 }
-                .forEach { symbolFile ->
-                    if (symbolFile.exists() && symbolFile.isDirectory) {
 
-                        var hasGap = false
-                        var lastTime = 0L
-                        var logOut = ""
+                prevCandlestick = candlestick
+            }
+            if (hasGap)
+                logOut += "\nTable $tableName has a gap!"
 
-                        symbolFile
-                                .listFiles()!!
-                                .sortedBy { f -> f.name }
-                                .filter { (it.name + "_01").toLocalDate().run { isAfter(firstDay) || isEqual(firstDay) } }
-                                .forEach { candlestickFile ->
-
-                                    CandlestickListsIterator(candlestickFile, 500).forEach list@{ list ->
-                                        if (list.first().openTime.toLocalDate().isBefore(firstDay))
-                                            return@list
-
-                                        if (lastTime != 0L && lastTime + 1 != list.first().openTime) {
-                                            log.debug("First element $symbolFile not sequence in file ${candlestickFile.name},\n" +
-                                                    "Gap between ${convertTime(lastTime + 1)} -- ${convertTime(list.first().openTime)}\nElement:\n" +
-                                                    "${list.first()}")
-                                            hasGap = true
-                                        }
-
-                                        for (i in 0 until list.size - 1) {
-                                            if (list[i].closeTime + 1 != list[i + 1].openTime) {
-                                                log.debug("$symbolFile array not sequence in file ${candlestickFile.name},\n" +
-                                                        "Gap between Elements:\n" +
-                                                        "closeTime: ${convertTime(list[i].closeTime + 1)} -- ${list[i]}\nopenTime:  ${convertTime(list[i + 1].openTime)} -- ${list[i + 1]}")
-                                                hasGap = true
-                                            }
-                                        }
-                                        lastTime = list.last().closeTime
-                                    }
-
-
-                                    if (hasGap && !symbolFile.name.startsWith(markGap)) {
-                                        val logLine = "Pair ${symbolFile.name} has a gap!"
-                                        logOut += "\n$logLine"
-                                    }
-                                    if (!hasGap && symbolFile.name.startsWith(markGap)) {
-                                        val logLine = "Pair ${symbolFile.name} hasn't gap!"
-                                        logOut += "\n$logLine"
-                                    }
-                                }
-
-                        if (logOut.isNotEmpty()) {
-                            log.error("\n\n++=====================================+\n$logOut\n\n++=====================================++\n")
-                            errMsg += logOut
-                            if (errMsg.length > 4000) {
-                                sendMessage("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
-                                errMsg = ""
-                            }
-
-                        }
-                    } else log.error("Directory for $symbolFile not found")
+            if (logOut.isNotEmpty()) {
+                log.error("\n\n++===========================+\n$logOut\n\n++===========================++\n")
+                errMsg += logOut
+                if (errMsg.length > 4000) {
+                    sendMessage("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
+                    errMsg = ""
                 }
 
-        if (errMsg.isNotBlank()) {
-            sendMessage("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
-            errMsg = ""
+            }
+
+            statementCandles.close()
         }
+        stmt.close()
+        connect.close()
+
+        if (errMsg.isNotBlank())
+            sendMessage("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
     }
 
 
-    private fun writeCandlesToOutFile(path: String, client: Client) {
-        val mainDir = File(path)
-
-        if (!mainDir.isDirectory) {
-            removeFile(mainDir)
-            mainDir.mkdir()
-        }
+    private fun writeCandlesToDB(pathDB: String, client: Client) {
 
         client
-                .getAllPairs()
-                .minus(ignorePairs)
-                .forEach { tradePair ->
-                    try {
-                        writeCandles(
-                                candlesticks = client.getCandlestickBars(tradePair, INTERVAL.FIVE_MINUTES, maxLimit),
-                                pair = tradePair,
-                                path = path
-                        )
-                    } catch (t: Throwable) {
-                        log.warn("Can't write pair: $tradePair Error:", t)
-                    }
+            .getAllPairs()
+            .minus(ignorePairs)
+            .forEach { tradePair ->
+
+                log.trace { "Write pair: $tradePair" }
+
+                try {
+                    writeCandlesDB(
+                        candlesticks = client.getCandlestickBars(tradePair, INTERVAL.FIVE_MINUTES, maxLimit),
+                        pair = tradePair,
+                        pathDB = pathDB
+                    )
+                } catch (t: Throwable) {
+                    sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
+                    log.warn("Can't write pair: $tradePair Error:", t)
                 }
+            }
     }
 
-    private fun writeCandles(candlesticks: List<Candlestick>, pair: TradePair, path: String) {
-        val lastTime = File("$path/${pair.first}_${pair.second}")
-                .listFiles()
-                ?.maxByOrNull { f -> f.name }
-                ?.let { lastFile -> asObject(getLastLine(lastFile), Candlestick::class.java) }
-                ?.closeTime
 
-        candlesticks.forEach {
-
-            if (lastTime != null && lastTime < it.openTime)
-                writeLine(it, File("$path/${pair.first}_${pair.second}/${convertTime(it.openTime, fileFormatMonth)}"))
+    private fun writeCandlesDB(candlesticks: List<Candlestick>, pair: TradePair, pathDB: String) {
+        if (candlesticks.isEmpty()) {
+            log.debug { "No data: $pair" }
+            return
         }
+
+        val connect = connect(pathDB)
+        val tableName = "CANDLESTICK_$pair"
+
+        val candlesticksToDB = getLastRecord(connect, tableName)?.let { last ->
+            candlesticks.filter { it.openTime >= last.openTime }
+        } ?: run {
+            createTable(connect, tableName)
+            candlesticks
+        }
+
+        val stmt = connect.createStatement()
+
+        var count = 0
+        var values = ""
+
+        for (c in 0 until candlesticksToDB.size - 1) {
+
+            if (++count > 100) {
+                values += """(${candlesticksToDB[c].openTime}, ${candlesticksToDB[c].open}, ${candlesticksToDB[c].close}, ${candlesticksToDB[c].high}, ${candlesticksToDB[c].low}, ${candlesticksToDB[c].volume});"""
+                stmt.executeUpdate("""INSERT INTO $tableName (ID_OPEN_TIME, OPEN, CLOSE, HIGH, LOW, VOLUME) VALUES $values""")
+                count = 0
+                values = ""
+            } else
+                values += """(${candlesticksToDB[c].openTime}, ${candlesticksToDB[c].open}, ${candlesticksToDB[c].close}, ${candlesticksToDB[c].high}, ${candlesticksToDB[c].low}, ${candlesticksToDB[c].volume}),"""
+        }
+
+        values += """(${candlesticksToDB.last().openTime}, ${candlesticksToDB.last().open}, ${candlesticksToDB.last().close}, ${candlesticksToDB.last().high}, ${candlesticksToDB.last().low}, ${candlesticksToDB.last().volume});"""
+
+        stmt.executeUpdate("""INSERT INTO $tableName (ID_OPEN_TIME, OPEN, CLOSE, HIGH, LOW, VOLUME) VALUES $values""")
+
+        connect.close()
+    }
+
+
+    private fun getLastRecord(connect: Connection, tableName: String): CandlestickDB? {
+
+        val stmt = connect.createStatement()
+
+        var lastCandlestick: CandlestickDB? = null
+
+        try {
+            lastCandlestick =
+                getCandle(stmt.executeQuery("SELECT * FROM $tableName ORDER BY ID_OPEN_TIME DESC LIMIT 1"))
+        } catch (e: SQLiteException) {
+            log.info("Can't find table: $tableName")
+        } catch (t: Throwable) {
+            log.info("Error:\n", t)
+        } finally {
+            stmt.close()
+            return lastCandlestick
+        }
+    }
+
+
+    private fun createTable(connect: Connection, tableName: String) {
+        val stmt = connect.createStatement()
+
+        stmt.executeUpdate(
+            """CREATE TABLE $tableName (
+                        ID_OPEN_TIME INTEGER PRIMARY KEY NOT NULL,
+                        OPEN         REAL NOT NULL,
+                        CLOSE        REAL NOT NULL,
+                        HIGH         REAL NOT NULL,
+                        LOW          REAL NOT NULL,
+                        VOLUME       REAL NOT NULL
+                        )"""
+        )
+
+        stmt.close()
     }
 }
 
 
-class CandlestickListsIterator(private val candlesticksListFile: File, private val listSize: Int) : Iterator<List<Candlestick>> {
+class CandlestickListsIterator(
+    connect: Connection,
+    private val tableName: String,
+    private val listSize: Int,
+    startDateTime: LocalDateTime,
+    endDateTime: LocalDateTime
+) : Iterator<List<Candlestick>> {
 
-    private val sc = Scanner(candlesticksListFile)
+    private val stmt = connect.createStatement()
+    private val resultSet: ResultSet = stmt.executeQuery(
+        """SELECT * FROM $tableName WHERE 
+          ID_OPEN_TIME > ${startDateTime.atZone(ZoneOffset.UTC).toInstant().toEpochMilli()} AND
+          ID_OPEN_TIME < ${endDateTime.atZone(ZoneOffset.UTC).toInstant().toEpochMilli()} ORDER BY ID_OPEN_TIME"""
+    )
     private val log = KotlinLogging.logger {}
-    private var lineCounter = 0
-    private var isOpen = true
+    private var hasNext = true
 
-    override fun hasNext(): Boolean = isOpen && sc.hasNextLine()
+    override fun hasNext(): Boolean = hasNext
 
     override fun next(): List<Candlestick> {
+        val resultList = ArrayList<Candlestick>()
         var i = 0
-        val bf = StringBuffer("[ ")
         try {
-            while (i++ < listSize) {
-                if (!hasNext()) {
-                    sc.close()
-                    isOpen = false
-                    break
-                }
-                lineCounter++
-                bf.append(sc.nextLine()).append(',')
-            }
+            var next: Boolean
+            while (resultSet.next().apply { next = this } && i++ < listSize)
+                resultList.add(getCandle(resultSet).toCandlestick())
+
+            if (!next) {
+                stmt.close()
+                hasNext = false
+            } else
+                resultList.add(getCandle(resultSet).toCandlestick())
+
         } catch (t: Throwable) {
-            log.error("File: ${candlesticksListFile.absolutePath}; Line: $$lineCounter can't read!", t)
+            log.error("Table: $tableName can't read!", t)
             throw t
         }
 
-        return readListObjectsFromString(bf.substring(0, bf.length - 1) + ']', object : TypeToken<List<Candlestick>>() {}.type)
+        return resultList
     }
 }
 
-fun getLastLine(file: File): String {
-    var r = ""
-    file.forEachLine { r = it }
-    return r
+
+private fun getCandle(result: ResultSet) = CandlestickDB(
+    openTime = result.getLong("ID_OPEN_TIME"),
+    open = result.getDouble("OPEN"),
+    close = result.getDouble("CLOSE"),
+    high = result.getDouble("HIGH"),
+    low = result.getDouble("LOW"),
+    volume = result.getDouble("VOLUME")
+)
+
+
+fun connect(pathDB: String): Connection = try {
+    Class.forName("org.sqlite.JDBC")
+    DriverManager.getConnection("jdbc:sqlite:$pathDB")
+} catch (e: Exception) {
+//    log.error { e.javaClass.name + ": " + e.message }
+    throw e
 }
+
+
+data class CandlestickDB(
+    val openTime: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double
+) {
+    fun toCandlestick(): Candlestick = Candlestick(
+        open = this.open,
+        close = this.close,
+        openTime = this.openTime,
+        closeTime = this.openTime + 299_999,
+        high = this.high,
+        low = this.low,
+        volume = this.volume
+    )
+}
+
 
 enum class Command {
     CHECK,

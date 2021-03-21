@@ -5,10 +5,9 @@ import bot.telegram.notificator.exchanges.clients.Candlestick
 import bot.telegram.notificator.exchanges.clients.Client
 import bot.telegram.notificator.exchanges.clients.INTERVAL
 import bot.telegram.notificator.exchanges.clients.TradePair
+import mu.KLogger
 import mu.KotlinLogging
 
-
-private val log = KotlinLogging.logger {}
 
 fun calcAveragePriceStatic(
     currentCandlestickList: ListLimit<Candlestick>,
@@ -18,6 +17,8 @@ fun calcAveragePriceStatic(
     symbols: TradePair,
     interval: INTERVAL,
     client: Client,
+    log: KLogger?,
+    isEmulate: Boolean
 ): Triple<Double, Double, ListLimit<Candlestick>> {
 
 
@@ -30,19 +31,20 @@ fun calcAveragePriceStatic(
     if (candlestickList.isEmpty()) {
         candlestickList = ListLimit(countCandles)
         candlestickList.addAll(client.getCandlestickBars(symbols, interval, countCandles + 1)
-                .run { subList(0, if (size - 1 < countCandles) size - 1 else countCandles) })
-        log.info("$symbols Init candlestickList:\n${candlestickList}")
+            .run { subList(0, if (size - 1 < countCandles) size - 1 else countCandles) })
+        log?.info("$symbols Init candlestickList:\n${candlestickList}")
     }
 
-    for ((i, event) in candlestickList.withIndex()) {
-        if (i < candlestickList.size - 1)
-            if (event.closeTime + 1 != candlestickList[i + 1].openTime) {
-                log.warn("$symbols candlestickList not sequence, elements:\n$event\n${candlestickList[i + 1]}")
+    if (!isEmulate)
+        for (i in 0 until candlestickList.size - 1) {
+            if (candlestickList[i].closeTime + 1 != candlestickList[i + 1].openTime) {
+                log?.warn("$symbols candlestickList not sequence:\n$candlestickList[i]\n${candlestickList[i + 1]}")
                 candlestickList = ListLimit(countCandles)
                 candlestickList.addAll(client.getCandlestickBars(symbols, interval, countCandles + 1)
-                        .run { subList(0, if (size - 1 < countCandles) size - 1 else countCandles) })
+                    .run { subList(0, if (size - 1 < countCandles) size - 1 else countCandles) })
+                break
             }
-    }
+        }
 
     for ((i, event) in candlestickList.withIndex()) {
         if (countCandles - intervalCandlesBuy <= i) {
@@ -57,6 +59,6 @@ fun calcAveragePriceStatic(
 
     averageHigh /= countHigh
     averageLow /= countLow
-    log.debug("$symbols averageHigh $averageHigh || averageLow $averageLow")
+    log?.debug("$symbols averageHigh $averageHigh || averageLow $averageLow")
     return Triple(averageHigh, averageLow, candlestickList)
 }

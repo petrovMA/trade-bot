@@ -38,21 +38,15 @@ dependencies {
     // https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc
     implementation("org.xerial:sqlite-jdbc:3.34.0")
 
-
     // logging
-//    compile group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: '2.9.1'
-//    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.9.1'
-//    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.9.1'
-//    compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.5'
     implementation("org.slf4j:slf4j-log4j12:2.0.0-alpha1")
-
-
     testImplementation("junit:junit:4.12")
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "15"
+    kotlinOptions.jvmTarget = "14"
 }
+
 tasks.withType<Jar> {
     manifest {
         attributes("Main-Class" to "bot.telegram.notificator.MainKt")
