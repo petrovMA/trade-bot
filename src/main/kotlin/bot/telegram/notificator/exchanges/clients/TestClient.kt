@@ -10,6 +10,7 @@ import bot.telegram.notificator.exchanges.CandlestickListsIterator
 import bot.telegram.notificator.libs.convertTime
 import bot.telegram.notificator.libs.percent
 import mu.KotlinLogging
+import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
 
@@ -17,14 +18,14 @@ class TestClient(
     val iterator: CandlestickListsIterator,
     val balance: TestBalance,
     startCandleNum: Int,
-    private val fee: Double = 0.15
+    private val fee: BigDecimal = BigDecimal(0.15)
 ) : Client {
     private val log = KotlinLogging.logger {}
     private var firstOrder: Order? = null
     private var secondOrder: Order? = null
-    var lastSellPrice: Double = 0.0
+    var lastSellPrice: BigDecimal = BigDecimal(0)
         private set
-    private var lastBuyPrice: Double = 0.0
+    private var lastBuyPrice: BigDecimal = BigDecimal(0)
     val queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque()
 
     private var candlesticks: List<Candlestick> = iterator.next().also {
@@ -32,7 +33,7 @@ class TestClient(
 //        addAll(readObjectFromFile(files.component2(), ArrayList::class.java).map { toCandlestick(it) })
 //        addAll(readObjectFromFile(files.component3(), ArrayList::class.java).map { toCandlestick(it) })
 
-        balance.apply { if (firstBalance == 0.0) firstBalance = secondBalance / it.first().close }
+        balance.apply { if (firstBalance == BigDecimal(0)) firstBalance = secondBalance / it.first().close }
     }
 
     val interval = when (candlesticks.first().run { closeTime + 1 - openTime }) {
@@ -58,9 +59,9 @@ class TestClient(
     var executedOrdersCount: Int = 0
         private set
 
-    val firstPrice: Double = candlesticks.first().close
+    val firstPrice: BigDecimal = candlesticks.first().close
 
-    override fun getAllOpenOrders(pairs: List<TradePair>): Map<String, List<Order>> {
+    override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
@@ -74,23 +75,23 @@ class TestClient(
             asset = balance.tradePair.first,
             free = balance.firstBalance,
             total = balance.firstBalance,
-            locked = 0.0
+            locked = BigDecimal(0)
         ),
         Balance(
             asset = balance.tradePair.second,
             free = balance.secondBalance,
             total = balance.secondBalance,
-            locked = 0.0
+            locked = BigDecimal(0)
         )
     )
 
     override fun getOrderBook(pair: TradePair, limit: Int): OrderBook = OrderBook(
-        asks = listOf(OrderEntry(price = lastBuyPrice, qty = 0.0)),
-        bids = listOf(OrderEntry(price = lastSellPrice, qty = 0.0))
+        asks = listOf(Offer(price = lastBuyPrice, qty = BigDecimal(0))),
+        bids = listOf(Offer(price = lastSellPrice, qty = BigDecimal(0)))
     )
 
     override fun getAssetBalance(asset: String): Balance = getBalances().find { it.asset == asset }
-        ?: Balance(asset = asset, free = 0.0, total = 0.0, locked = 0.0)
+        ?: Balance(asset = asset, free = BigDecimal(0), total = BigDecimal(0), locked = BigDecimal(0))
 
     override fun getOrder(pair: TradePair, orderId: String): Order =
         getOpenOrders(pair).find { it.orderId == orderId }
@@ -98,8 +99,8 @@ class TestClient(
                 pair = balance.tradePair,
                 side = SIDE.SELL,
                 type = TYPE.LIMIT,
-                origQty = 0.0,
-                executedQty = 0.0,
+                origQty = BigDecimal(0),
+                executedQty = BigDecimal(0),
                 price = lastBuyPrice,
                 status = STATUS.NEW,
                 orderId = orderId
@@ -108,27 +109,26 @@ class TestClient(
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> {
 
         val from = (candlestickNum + 1 - countCandles).let {
-                if (it < 0) {
-                    log.warn("Can't get full candlesticks list! Need ${it * -1} more candlesticks from start.")
-                    0
-                } else it
-            }
+            if (it < 0) {
+                log.warn("Can't get full candlesticks list! Need ${it * -1} more candlesticks from start.")
+                0
+            } else it
+        }
         val to = (candlestickNum + 1).let {
             if (candlesticks.size < it) {
                 log.warn("Can't get full candlesticks list! Need ${it - candlesticks.size} more candlesticks from end.")
                 candlesticks.size
             } else it
         }
-        val result = candlesticks.subList(from, to)
-        return result
+        return candlesticks.subList(from, to)
     }
 
     override fun newOrder(
         pair: TradePair,
         side: SIDE,
         type: TYPE,
-        amount: Double,
-        price: Double,
+        amount: BigDecimal,
+        price: BigDecimal,
         isStaticUpdate: Boolean,
         formatCount: String,
         formatPrice: String
@@ -140,7 +140,7 @@ class TestClient(
             side = side,
             type = type,
             origQty = amount,
-            executedQty = 0.0,
+            executedQty = BigDecimal(0),
             price = price,
             status = STATUS.NEW,
             orderId = clientOrderId.toString()
@@ -166,10 +166,10 @@ class TestClient(
         return order
     }
 
-    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean) {
+    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {
         when (orderId) {
             firstOrder?.orderId -> {
-                if (firstOrder!!.status != STATUS.NEW) return
+                if (firstOrder!!.status != STATUS.NEW) return true
                 firstOrder!!.status = STATUS.CANCELED
 
                 if (firstOrder!!.side == SIDE.SELL)
@@ -178,7 +178,7 @@ class TestClient(
                     balance.secondBalance += firstOrder!!.origQty * firstOrder!!.price
             }
             secondOrder?.orderId -> {
-                if (secondOrder!!.status != STATUS.NEW) return
+                if (secondOrder!!.status != STATUS.NEW) return true
                 secondOrder!!.status = STATUS.CANCELED
 
                 if (secondOrder!!.side == SIDE.SELL)
@@ -188,12 +188,17 @@ class TestClient(
             }
             else -> log.info("Order: id = $orderId Not found!")
         }
+        return true
     }
 
     override fun nextEvent() {
         val candlestick = candlesticks[candlestickNum]
 
         when (state) {
+            EventState.CANDLESTICK_OPEN -> {
+                queue.put(Trade(price = candlestick.open, qty = candlestick.volume, candlestick.openTime + 1))
+                state = EventState.from(state.number + 1)
+            }
             EventState.FIRST_DEPTH -> {
 
                 val openPrice = candlestick.open
@@ -209,46 +214,41 @@ class TestClient(
                 checkOrderExecuted(lastBuyPrice)
                 checkOrderExecuted(lastSellPrice)
 
-                queue.put(DepthEventOrders(OrderEntry(lastBuyPrice, 0.0), OrderEntry(lastSellPrice, 0.0)))
+                queue.put(DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0))))
                 state = EventState.from(state.number + 2)
             }
             EventState.SELL_TRADE -> {
-                checkOrderExecuted(lastSellPrice)
-                queue.put(OrderEntry(price = lastSellPrice, qty = 0.0))
-                state = EventState.from(state.number + 1)
-            }
-            EventState.BUY_DEPTH -> {
                 checkOrderExecuted(lastBuyPrice)
                 checkOrderExecuted(lastSellPrice)
-                queue.put(DepthEventOrders(OrderEntry(lastBuyPrice, 0.0), OrderEntry(lastSellPrice, 0.0)))
-                state = EventState.from(state.number + 1)
+                queue.put(Trade(price = lastSellPrice, qty = BigDecimal(0), candlestick.openTime + 10))
+                state = EventState.from(state.number + 2)
             }
+//            EventState.BUY_DEPTH -> {
+//                queue.put(DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0))))
+//                state = EventState.from(state.number + 1)
+//            }
             EventState.BUY_TRADE -> {
-                checkOrderExecuted(lastBuyPrice)
-                queue.put(OrderEntry(price = lastBuyPrice, qty = 0.0))
-                state = EventState.from(state.number + 1)
+                queue.put(Trade(price = lastBuyPrice, qty = BigDecimal(0), candlestick.openTime + 10))
+                state = EventState.from(state.number + 2)
             }
-            EventState.SELL_MAX_DEPTH -> {
-                checkOrderExecuted(candlestick.low)
-                queue.put(DepthEventOrders(OrderEntry(lastBuyPrice, 0.0), OrderEntry(candlestick.low, 0.0)))
-                state = EventState.from(state.number + 1)
-            }
+//            EventState.SELL_MAX_DEPTH -> {
+//                queue.put(DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(candlestick.low, BigDecimal(0))))
+//                state = EventState.from(state.number + 1)
+//            }
             EventState.SELL_MAX_TRADE -> {
-                checkOrderExecuted(candlestick.low)
-                queue.put(OrderEntry(price = candlestick.low, qty = 0.0))
-                state = EventState.from(state.number + 1)
+//                checkOrderExecuted(candlestick.low)
+                queue.put(Trade(price = candlestick.low, qty = BigDecimal(0), candlestick.openTime + 10))
+                state = EventState.from(state.number + 2)
             }
-            EventState.BUY_MAX_DEPTH -> {
-                checkOrderExecuted(candlestick.high)
-                queue.put(DepthEventOrders(OrderEntry(candlestick.high, 0.0), OrderEntry(lastSellPrice, 0.0)))
-                state = EventState.from(state.number + 1)
-            }
+//            EventState.BUY_MAX_DEPTH -> {
+//                queue.put(DepthEventOrders(Offer(candlestick.high, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0))))
+//                state = EventState.from(state.number + 1)
+//            }
             EventState.BUY_MAX_TRADE -> {
-                checkOrderExecuted(candlestick.high)
-                queue.put(OrderEntry(price = candlestick.high, qty = 0.0))
+                queue.put(Trade(price = candlestick.high, qty = BigDecimal(0), candlestick.openTime + 10))
                 state = EventState.from(state.number + 1)
             }
-            EventState.CANDLESTICK -> {
+            EventState.CANDLESTICK_CLOSE -> {
                 ++candlestickNum
                 if (candlestickNum >= candlesticks.size)
                     if (iterator.hasNext()) {
@@ -257,12 +257,12 @@ class TestClient(
                     } else
                         return queue.put(BotEvent(type = BotEvent.Type.INTERRUPT))
 
-                queue.put(candlestick)
+                queue.put(Trade(price = candlestick.close, qty = BigDecimal(0), candlestick.closeTime))
 
                 check(prevCandlestick, candlestick)
                 prevCandlestick = candlestick
 
-                state = EventState.from(1)
+                state = EventState.from(0)
             }
             else -> {
                 throw UnsupportedStateException()
@@ -282,6 +282,7 @@ class TestClient(
     }
 
     enum class EventState(val number: Int) {
+        CANDLESTICK_OPEN(0),
         FIRST_DEPTH(1),
         SELL_DEPTH(2),
         SELL_TRADE(3),
@@ -291,14 +292,14 @@ class TestClient(
         SELL_MAX_TRADE(7),
         BUY_MAX_DEPTH(8),
         BUY_MAX_TRADE(9),
-        CANDLESTICK(10);
+        CANDLESTICK_CLOSE(10);
 
         companion object {
             fun from(findValue: Int) = values().first { it.number == findValue }
         }
     }
 
-    private fun checkOrderExecuted(price: Double) {
+    private fun checkOrderExecuted(price: BigDecimal) {
 
         val checkOrder: (order: Order) -> Order = { order ->
             if (order.status == STATUS.NEW) {

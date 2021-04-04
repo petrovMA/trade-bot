@@ -1,31 +1,38 @@
 package bot.telegram.notificator.exchanges.clients
 
-//import bot.telegram.notificator.exchange.clients.socket.SocketThreadBinanceImpl
+import bot.telegram.notificator.exchanges.clients.socket.SocketThreadBinanceImpl
+import bot.telegram.notificator.libs.UnknownOrderStatus
 import mu.KotlinLogging
+import org.knowm.xchange.Exchange
 import org.knowm.xchange.ExchangeFactory
 import org.knowm.xchange.binance.BinanceExchange
-import java.util.concurrent.BlockingQueue
-import org.knowm.xchange.Exchange
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.marketdata.KlineInterval
+import org.knowm.xchange.binance.service.BinanceAccountService
 import org.knowm.xchange.binance.service.BinanceMarketDataService
-import org.knowm.xchange.binance.service.BinanceMarketDataServiceRaw
 import org.knowm.xchange.binance.service.BinanceTradeService
+import org.knowm.xchange.currency.Currency
 import org.knowm.xchange.currency.CurrencyPair
+import org.knowm.xchange.dto.account.AccountInfo
+import org.knowm.xchange.dto.account.Wallet
+import org.knowm.xchange.dto.trade.LimitOrder
+import org.knowm.xchange.service.trade.params.orders.DefaultQueryOrderParamCurrencyPair
+import java.math.BigDecimal
+import java.util.*
+import java.util.concurrent.BlockingQueue
 
-
-//typealias BinanceOrder = com.binance.api.client.domain.account.Order
-//typealias BinanceCandlestick = com.binance.api.client.domain.market.Candlestick
-//typealias BinanceOrderBook = com.binance.api.client.domain.market.OrderBook
 
 class BinanceClient(
-    api: String? = null,
-    sec: String? = null,
+    private val api: String? = null,
+    private val sec: String? = null,
     private val instance: Exchange = ExchangeFactory.INSTANCE.createExchange(BinanceExchange::class.java, api, sec)
 ) : Client {
 
-    private val tradeService: BinanceTradeService = instance.tradeService as (BinanceTradeService)
-    private val marketDataService: BinanceMarketDataService = instance.marketDataService as (BinanceMarketDataService)
+    private val tradeService: BinanceTradeService = instance.tradeService as BinanceTradeService
+    private val marketDataService: BinanceMarketDataService = instance.marketDataService as BinanceMarketDataService
+    private val accountService: BinanceAccountService = instance.accountService as BinanceAccountService
+    private val accountInfo: AccountInfo? = if (sec == null) null else accountService.accountInfo
+    private val wallet: Wallet? = if (sec == null) null else accountInfo!!.wallet
 
     private val log = KotlinLogging.logger {}
 
@@ -35,7 +42,7 @@ class BinanceClient(
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
         marketDataService.klines(
-            CurrencyPair(pair.first, pair.second),
+            pair.toCurrencyPair(),
             asKlineInterval(interval),
             countCandles,
             null,
@@ -43,83 +50,176 @@ class BinanceClient(
         )
             .map { asCandlestick(it) }
 
-//        instance
-//            .getCandlestickBars(pair.first + pair.second, interval.toCandlestickInterval(), countCandles, null, null)
-//            .map { it.toCandlestick() }
+    override fun getOpenOrders(pair: TradePair): List<Order> = tradeService
+        .getOpenOrders(pair.toCurrencyPair())
+        .openOrders
+        .map {
+            Order(
+                price = it.limitPrice,
+                pair = pair,
+                orderId = it.id,
+                origQty = it.originalAmount,
+                executedQty = it.cumulativeAmount,
+                side = SIDE.valueOf(it.type),
+                type = TYPE.LIMIT,
+                status = when (it.status) {
+                    org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
+                    org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
+                    org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
 
-    override fun getOpenOrders(pair: TradePair): List<Order> = TODO("not implemented")
-//        instance
-//            .getOpenOrders(OrderRequest(pair.first + pair.second))
-//            .map { it.toOrder(pair) }
+                    org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
 
-    override fun getAllOpenOrders(pairs: List<TradePair>): Map<String, List<Order>> = TODO("not implemented")
-//        pairs
-//            .map { getOpenOrders(it) }
-//            .flatten()
-//            .groupBy { it.pair.toString() }
+                    org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
+                    org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+                }
+            )
+        }
 
-    override fun getBalances(): List<Balance> = TODO("not implemented")
-//    instance.account.balances.map { it.toBalance() }
+    override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> = tradeService
+        .openOrders
+        .openOrders
+        .map {
+            Order(
+                price = it.limitPrice,
+                pair = (it.instrument as CurrencyPair).run { TradePair(base.currencyCode, counter.currencyCode) },
+                orderId = it.id,
+                origQty = it.originalAmount,
+                executedQty = it.cumulativeAmount,
+                side = SIDE.valueOf(it.type),
+                type = TYPE.LIMIT,
+                status = when (it.status) {
+                    org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
+                    org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
+                    org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
 
-    override fun getOrderBook(pair: TradePair, limit: Int): OrderBook = TODO("not implemented")
-//        instance
-//            .getOrderBook(pair.first + pair.second, limit)
-//            .toOrderBook()
+                    org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
 
-    override fun getAssetBalance(asset: String): Balance = TODO("not implemented")
-//        instance.account
-//            .getAssetBalance(asset)
-//            .toBalance()
+                    org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
+                    org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+                }
+            )
+        }
+        .groupBy { TradePair(it.pair.toString()) }
 
-    override fun getOrder(pair: TradePair, orderId: String): Order = TODO("not implemented")
-//            instance.getOrderStatus(OrderStatusRequest(pair.first + pair.second, orderId)).toOrder(pair)
+    override fun getBalances(): List<Balance> = wallet?.balances?.map {
+        Balance(
+            asset = it.key.currencyCode,
+            total = it.value.total,
+            free = it.value.available,
+            locked = it.value.frozen
+        )
+    } ?: throw UnsupportedOperationException(
+        "This initialization has no API and SECRET keys, " +
+                "because of that fun 'getBalances' not supported."
+    )
+
+    override fun getOrderBook(pair: TradePair, limit: Int): OrderBook = marketDataService
+        .getOrderBook(CurrencyPair.ETH_BTC, 5)
+        .let { book ->
+            OrderBook(
+                book.asks.map { Offer(it.limitPrice, it.originalAmount) },
+                book.bids.map { Offer(it.limitPrice, it.originalAmount) }
+            )
+        }
+
+    override fun getAssetBalance(asset: String): Balance = wallet?.getBalance(Currency(asset))?.let {
+        Balance(
+            asset = asset,
+            total = it.total,
+            free = it.available,
+            locked = it.frozen
+        )
+    } ?: throw UnsupportedOperationException(
+        "This initialization has no API and SECRET keys, " +
+                "because of that fun 'getAssetBalance' not supported."
+    )
+
+
+    override fun getOrder(pair: TradePair, orderId: String): Order =
+        tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
+            it as LimitOrder
+            Order(
+                price = it.limitPrice,
+                pair = (it.instrument as CurrencyPair).run { TradePair(base.currencyCode, counter.currencyCode) },
+                orderId = it.id,
+                origQty = it.originalAmount,
+                executedQty = it.cumulativeAmount,
+                side = SIDE.valueOf(it.type),
+                type = TYPE.LIMIT,
+                status = when (it.status) {
+                    org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
+                    org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
+                    org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
+
+                    org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
+                    org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
+
+                    org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
+                    org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+                }
+            )
+        }.first()
 
     override fun newOrder(
         pair: TradePair,
         side: SIDE,
         type: TYPE,
-        amount: Double,
-        price: Double,
+        amount: BigDecimal,
+        price: BigDecimal,
         isStaticUpdate: Boolean,
         formatCount: String,
         formatPrice: String
     ): Order {
-        TODO("not implemented")
-        /*val formattedCount = java.lang.String.format(formatCount, amount).replace(",", ".")
-        val formattedPrice = java.lang.String.format(formatPrice, price).replace(",", ".")
-
-        return instance.newOrder(
-            NewOrder(
-                pair.first + pair.second,
-                when (side) {
-                    SIDE.BUY -> OrderSide.BUY
-                    SIDE.SELL -> OrderSide.SELL
-                    else -> throw UnsupportedOrderSideException()
-                },
-                when (type) {
-                    TYPE.LIMIT -> OrderType.LIMIT
-                    TYPE.MARKET -> OrderType.MARKET
-                    else -> throw UnsupportedOrderTypeException()
-                },
-                TimeInForce.GTC,
-                formattedCount,
-                formattedPrice
+        val typeX = side.toType()
+        val currPair = CurrencyPair(pair.first, pair.second)
+        val orderId = tradeService.placeLimitOrder(
+            LimitOrder(
+                typeX,
+                String.format(formatCount, amount).toBigDecimal(),
+                currPair,
+                null,
+                Date(),
+                String.format(formatPrice, price).toBigDecimal()
             )
-        ).toBinanceOrder().toOrder(pair)*/
+        )
+
+        return Order(orderId, pair, price, amount, BigDecimal(0), side, type, STATUS.NEW)
     }
 
 
-    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean) = TODO("not implemented")
-//            instance.cancelOrder(CancelOrderRequest(pair.first + pair.second, orderId))
+    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean = try {
+        tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
+        true
+    } catch (e: Exception) {
+        log.warn("Cancel order Error: ", e)
+        false
+    }
+
 
     override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
-        TODO("not implemented")
-//        SocketThreadBinanceImpl(
-//        "${pair.first.toLowerCase()}${pair.second.toLowerCase()}",
-//        BinanceApiClientFactory.newInstance().newWebSocketClient(),
-//        interval.toCandlestickInterval(),
-//        queue
-//    )
+        SocketThreadBinanceImpl(
+            pair = pair.toCurrencyPair(),
+            queue = queue,
+            sec = sec,
+            api = api
+        )
 
     override fun nextEvent() {}
     override fun close() {}
@@ -145,11 +245,11 @@ class BinanceClient(
     private fun asCandlestick(kline: BinanceKline): Candlestick = Candlestick(
         openTime = kline.openTime,
         closeTime = kline.closeTime,
-        open = kline.openPrice.toDouble(),
-        high = kline.highPrice.toDouble(),
-        low = kline.lowPrice.toDouble(),
-        close = kline.closePrice.toDouble(),
-        volume = kline.volume.toDouble()
+        open = kline.openPrice,
+        high = kline.highPrice,
+        low = kline.lowPrice,
+        close = kline.closePrice,
+        volume = kline.volume
     )
 }
 //

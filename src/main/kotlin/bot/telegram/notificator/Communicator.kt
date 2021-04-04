@@ -21,14 +21,14 @@ class Communicator(
     timeDifference: Duration?,
     candlestickDataCommandStr: String?,
     private val candlestickDataPath: Map<ExchangeEnum, String>,
-    private val taskQueue: BlockingQueue<Thread>,
+    val taskQueue: BlockingQueue<Thread>,
     private val cmd: Commands = Commands(),
     private val defaultCommands: Map<Regex, String> = mapOf(
                 cmd.commandAllBalance to "commandAllBalance BTC ETH BNB",
                 cmd.commandBalance to "commandFreeBalance BTC ETH BNB"
         ),
     private val sendFile: (File) -> Unit,
-    private val sendMessage: (String) -> Unit
+    val sendMessage: (String) -> Unit
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -38,11 +38,12 @@ class Communicator(
     private val intervalCandlestickUpdate: Duration = intervalCandlestick ?: 2.d()
     private val intervalStatistic: Duration = intervalStatistic ?: 4.h()
     private val timeDifference: Duration = timeDifference ?: 0.ms()
+    private var symbols = File("pairsSet").useLines { it.toList() }
 
-    private var propertyPairs: Map<String, String> = scanAll(exchangeFiles)
-    private var tradePairs: MutableMap<String, Trade>? = null
+    private var propertyPairs: Map<String, String> = scanAll(exchangeFiles, symbols)
+    private var tradePairs: MutableMap<String, TraderAlgorithm>? = null
 
-    private var candlestickDataCommand: Command = candlestickDataCommandStr?.let {
+    var candlestickDataCommand: Command = candlestickDataCommandStr?.let {
         try {
             Command.valueOf(it)
         } catch (t: Throwable) {
@@ -66,7 +67,8 @@ class Communicator(
 
         when {
             cmd.commandScan.matches(message) -> {
-                this.propertyPairs = scanAll(this.exchangeFiles)
+                symbols = File("pairsSet").useLines { it.toList() }
+                this.propertyPairs = scanAll(this.exchangeFiles, symbols)
                         .mapValues {
                             msg += "${it.key}\n"
                             it.value
@@ -112,15 +114,20 @@ class Communicator(
                 taskQueue.put(DeleteOldCandlestickData(ExchangeEnum.valueOf(params[1].toUpperCase()), sendMessage, params[2].toUpperCase()))
                 msg = "DeleteOldData command accepted!"
             }
+            cmd.commandCollect.matches(message) -> {
+                val params = message.split("\\s+".toRegex())
+                taskQueue.put(CollectCandlestickData(Command.valueOf(params[2].toUpperCase()), firstDayForCheck, ExchangeEnum.valueOf(params[1].toUpperCase()), sendMessage))
+                msg = "Collect Data command accepted!"
+            }
             cmd.commandTradePairsInit.matches(message) -> {
                 tradePairs = propertyPairs.mapNotNull {
                     readConf(it.value)?.let { conf ->
                         msg += "${it.value} initialized successfully!\n"
-                        it.key to Trade(conf, sendMessage = sendMessage)
-                    } ?: {
+                        it.key to TraderAlgorithm(conf, sendMessage = sendMessage)
+                    } ?: run {
                         msg += "Config for ${it.value} not found!\n"
                         null
-                    }()
+                    }
                 }.toMap().toMutableMap()
             }
             else -> tradePairs?.apply {
@@ -141,7 +148,7 @@ class Communicator(
                                     } else {
                                         tradePairs = HashMap(propertyPairs.mapValues {
                                             msg += "${it.key}\n"
-                                            Trade(readConf(it.value)
+                                            TraderAlgorithm(readConf(it.value)
                                                     ?: throw ConfigNotFoundException(("Config file not found in: '${it.value}'")), sendMessage = sendMessage)
                                         })
                                         msg = "All properties created:\n$msg"
@@ -156,7 +163,7 @@ class Communicator(
                             msg = get(key).let { value ->
                                 if (value == null) {
                                     try {
-                                        set(key, Trade((readConf(propertyPairs[key])
+                                        set(key, TraderAlgorithm((readConf(propertyPairs[key])
                                                 ?: throw ConfigNotFoundException(("Config file not found in: '${propertyPairs[key]}'"))), sendMessage = sendMessage)
                                         )
                                         log.info("$key created")
@@ -196,10 +203,10 @@ class Communicator(
                             msg = get(key)?.start()?.let {
                                 log.info("$key started")
                                 "$key started"
-                            } ?: {
+                            } ?: run {
                                 log.info("$key not exist")
                                 "$key not exist"
-                            }()
+                            }
                         } else {
                             msg = "command 'start' must have one param"
                             log.info("command 'start' must have one param. Msg = $message")
@@ -296,7 +303,7 @@ class Communicator(
                                         log.warn("Command not added to queue $this")
                                         msg = "Command not added to queue $this"
                                     }
-                                } ?: { msg = "Working pairs not found!!!" }()
+                                } ?: run { msg = "Working pairs not found!!!" }
                         log.info(msg)
                     }
                     cmd.commandStop.matches(message) -> {
@@ -307,10 +314,10 @@ class Communicator(
                                 value.queue.add(BotEvent(type = BotEvent.Type.INTERRUPT))
                                 log.info("$key stopped")
                                 "$key stopped"
-                            } ?: {
+                            } ?: run {
                                 log.info("$key not exist")
                                 "$key not exist"
-                            }()
+                            }
                         } else {
                             msg = "command 'stop' must have one param"
                             log.info("command 'stop' must have one param. Msg = $message")
@@ -326,10 +333,10 @@ class Communicator(
                                 remove(key)
                                 log.info("$key deleted")
                                 "$key stopped and deleted"
-                            } ?: {
+                            } ?: run {
                                 log.info("$key not exist")
                                 "$key not exist"
-                            }()
+                            }
                         } else {
                             msg = "command 'deleted' must have one param"
                             log.info("command 'deleted' must have one param. Msg = $message")
@@ -357,12 +364,12 @@ class Communicator(
                                 remove(key)
                                 log.info("$key deleted")
                                 msg += "\n$key deleted"
-                            } ?: {
+                            } ?: run {
                                 log.info("$key not exist")
                                 msg += "\n$key not exist"
-                            }()
+                            }
                             try {
-                                set(key, Trade(readConf(propertyPairs[key]
+                                set(key, TraderAlgorithm(readConf(propertyPairs[key]
                                         ?: error("Property pair doesn't exist"))
                                         ?: throw ConfigNotFoundException("Config file not found in: ${propertyPairs[key]}"), sendMessage = sendMessage)
                                 )
@@ -397,10 +404,10 @@ class Communicator(
                         log.info("Unsupported command $message")
                     }
                 }
-            } ?: {
+            } ?: run {
                 msg = "TradePairs not initialized! Run command: 'tradePairs init'\n\n" +
                         "or Unsupported command:\n$message\ncommands:\n$cmd"
-            }()
+            }
         }
 
         if (msg.isNotBlank()) return sendMessage(msg)

@@ -1,79 +1,107 @@
-//package bot.telegram.notificator.exchange.clients.socket
-//
-//import bot.telegram.notificator.exchange.clients.Candlestick
-//import bot.telegram.notificator.exchange.clients.CommonExchangeData
-//import bot.telegram.notificator.exchange.clients.DepthEventOrders
-//import bot.telegram.notificator.exchange.clients.OrderEntry
-//import com.binance.api.client.BinanceApiClientFactory
-//import com.binance.api.client.BinanceApiWebSocketClient
-//import com.binance.api.client.domain.event.CandlestickEvent
-//import com.binance.api.client.domain.event.DepthEvent
-//import com.binance.api.client.domain.event.TradeEvent
-//import com.binance.api.client.domain.market.CandlestickInterval
-//import com.binance.api.client.domain.market.DepthInterval
-//import org.apache.log4j.Logger
-//
-//import java.util.concurrent.BlockingQueue
-//
-//class SocketThreadBinanceImpl(
-//        val symbol: String,
-//        var client: BinanceApiWebSocketClient?,
-//        val interval: CandlestickInterval,
-//        val queue: BlockingQueue<CommonExchangeData>)
-//    : SocketThread() {
-//
-//    override fun run() {
-//        try {
-//            client!!.onTradeEvent(symbol) { response: TradeEvent ->
-//                queue.add(OrderEntry(price = response.price.toDouble(), qty = response.quantity))
-//            }
-//        } catch (e: Exception) {
-//            LOGGER.error("Socket $symbol connection Exception: ", e)
-//            e.printStackTrace()
-//            client = BinanceApiClientFactory.newInstance().newWebSocketClient()
-//        }
-//
-//        try {
-//            client!!.onCandlestickEvent(symbol, interval) { response: CandlestickEvent ->
-//                if (response.barFinal!!)
-//                    queue.add(toCandlestick(response))
-//            }
-//        } catch (e: Exception) {
-//            LOGGER.error("Socket $symbol connection Exception: ", e)
-//            e.printStackTrace()
-//            client = BinanceApiClientFactory.newInstance().newWebSocketClient()
-//        }
-//
-//        try {
-//            client!!.onDepthEvent(symbol, DepthInterval.FIVE) { response: DepthEvent ->
-//                val bid = response.bids.first()
-//                val ask = response.asks.first()
-//                queue.add(
-//                    DepthEventOrders(
-//                        bid = OrderEntry(bid.price.toDouble(), bid.qty.toDouble()),
-//                        ask = OrderEntry(ask.price.toDouble(), ask.qty.toDouble())
-//                )
-//                )
-//            }
-//        } catch (e: Exception) {
-//            LOGGER.error("Socket $symbol connection Exception: ", e)
-//            e.printStackTrace()
-//            client = BinanceApiClientFactory.newInstance().newWebSocketClient()
-//
-//        }
-//    }
-//
-//    companion object {
-//        private val LOGGER = Logger.getLogger(SocketThreadBinanceImpl::class.java)
-//    }
-//
-//    private fun toCandlestick(event: CandlestickEvent): Candlestick = Candlestick(
-//            openTime = event.openTime,
-//            closeTime = event.closeTime,
-//            open = event.open.toDouble(),
-//            high = event.high.toDouble(),
-//            low = event.low.toDouble(),
-//            close = event.close.toDouble(),
-//            volume = event.volume.toDouble()
-//    )
-//}
+package bot.telegram.notificator.exchanges.clients.socket
+
+import bot.telegram.notificator.exchanges.clients.*
+import info.bitrich.xchangestream.binance.BinanceStreamingExchange
+import info.bitrich.xchangestream.core.ProductSubscription
+import info.bitrich.xchangestream.core.StreamingExchangeFactory
+import mu.KotlinLogging
+import org.knowm.xchange.currency.CurrencyPair
+import org.knowm.xchange.dto.Order
+import org.knowm.xchange.dto.trade.LimitOrder
+import java.util.concurrent.BlockingQueue
+
+class SocketThreadBinanceImpl(
+    val pair: CurrencyPair,
+    private val queue: BlockingQueue<CommonExchangeData>,
+    private val api: String?,
+    private val sec: String?
+) : SocketThread() {
+
+    private val log = KotlinLogging.logger {}
+
+    override fun run() {
+
+        try {
+
+            val spec = StreamingExchangeFactory.INSTANCE
+                .createExchange(BinanceStreamingExchange::class.java)
+                .defaultExchangeSpecification
+
+            api?.also { spec.apiKey = it }
+            sec?.also { spec.secretKey = it }
+
+            val exchange = StreamingExchangeFactory.INSTANCE.createExchange(spec) as BinanceStreamingExchange
+
+            val subscription = ProductSubscription.create()
+                .addTrades(pair)
+                .addOrderbook(pair)
+                .apply { if (api != null && sec != null) addOrders(pair) }
+                .build()
+
+            exchange.connect(subscription).blockingAwait()
+
+            exchange.streamingMarketDataService.getTrades(pair).subscribe(
+                { trade ->
+                    queue.add(
+                        Trade(
+                            price = trade.price,
+                            qty = trade.originalAmount,
+                            time = trade.timestamp.time
+                        )
+                    )
+                },
+                { error ->
+                    log.warn("Trade stream Error:", error)
+                }
+            )
+
+            exchange.streamingMarketDataService.getOrderBook(pair).subscribe(
+                { book ->
+                    log.trace("OrderBook: $book")
+
+                    val ask = book.asks
+                        .map { Offer(it.limitPrice, it.originalAmount) }
+                        .minByOrNull { ask -> ask.price }!!
+
+                    val bid = book.bids
+                        .map { Offer(it.limitPrice, it.originalAmount) }
+                        .maxByOrNull { it.price }!!
+
+                    queue.add(DepthEventOrders(bid = bid, ask = ask))
+                },
+                { error ->
+                    log.warn("OrderBook stream Error:", error)
+                }
+            )
+
+            if (api != null && sec != null)
+                exchange.streamingTradeService.orderChanges.subscribe(
+                    { oc: Order? ->
+                        log.trace("Order change: {}", oc)
+
+                        oc?.let { order ->
+                            if (order is LimitOrder)
+                                queue.add(
+                                    Order(
+                                        orderId = order.id,
+                                        pair = TradePair(pair),
+                                        price = order.limitPrice,
+                                        origQty = order.originalAmount,
+                                        executedQty = order.cumulativeAmount,
+                                        side = SIDE.valueOf(order.type),
+                                        type = TYPE.LIMIT,
+                                        status = STATUS.valueOf(order.status)
+                                    )
+                                )
+                        }
+                    }, { error ->
+                        log.warn("Order stream Error:", error)
+                    }
+                )
+
+        } catch (e: Exception) {
+            log.error("Socket $pair connection Exception: ", e)
+            e.printStackTrace()
+        }
+    }
+}

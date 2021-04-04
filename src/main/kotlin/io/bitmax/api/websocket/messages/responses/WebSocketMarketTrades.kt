@@ -18,5 +18,5 @@ data class TradesData(
         val q: String,
 
         /** timestamp */
-        val t: Long = 0
+        val ts: Long = 0
 )

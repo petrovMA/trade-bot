@@ -4,6 +4,7 @@ import bot.telegram.notificator.exchanges.clients.SIDE
 import bot.telegram.notificator.exchanges.clients.STATUS
 import bot.telegram.notificator.exchanges.clients.TYPE
 import bot.telegram.notificator.exchanges.clients.TradePair
+import java.math.BigDecimal
 
 data class TestBalance(
     var sellCount: Int = 0,
@@ -11,15 +12,15 @@ data class TestBalance(
     var orderS: TestOrder? = null,
     var orderB: TestOrder? = null,
     var tradePair: TradePair,
-    var firstBalance: Double = 0.toDouble(),
-    var secondBalance: Double = 0.toDouble(),
-    var balanceTrade: Double = 0.toDouble(),
-    var correctAverageHigh: Double = 0.0,
-    var correctAverageLow: Double = 0.0,
-    var previousCountSell: Double = 0.toDouble(),
-    var previousCountBuy: Double = 0.toDouble(),
-    var previousPriceSell: Double = 0.toDouble(),
-    var previousPriceBuy: Double = 0.toDouble(),
+    var firstBalance: BigDecimal = 0.toBigDecimal(),
+    var secondBalance: BigDecimal = 0.toBigDecimal(),
+    var balanceTrade: BigDecimal = 0.toBigDecimal(),
+    var correctAverageHigh: BigDecimal = 0.toBigDecimal(),
+    var correctAverageLow: BigDecimal = 0.toBigDecimal(),
+    var previousCountSell: BigDecimal = 0.toBigDecimal(),
+    var previousCountBuy: BigDecimal = 0.toBigDecimal(),
+    var previousPriceSell: BigDecimal = 0.toBigDecimal(),
+    var previousPriceBuy: BigDecimal = 0.toBigDecimal(),
     var timeStepFive: Long = java.lang.Long.MIN_VALUE,
     var lastSellTime: Long = java.lang.Long.MIN_VALUE,
     var lastBoyTime: Long = java.lang.Long.MIN_VALUE,

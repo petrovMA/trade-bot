@@ -2,6 +2,7 @@ package bot.telegram.notificator.libs
 
 import bot.telegram.notificator.exchanges.clients.Candlestick
 import bot.telegram.notificator.exchanges.clients.Client
+import bot.telegram.notificator.exchanges.clients.INTERVAL
 import bot.telegram.notificator.exchanges.clients.Order
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
@@ -15,6 +16,7 @@ import java.io.IOException
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.reflect.Type
+import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.text.ParseException
@@ -34,26 +36,25 @@ val fileFormat = SimpleDateFormat("yyyy_MM_dd").also { it.timeZone = TimeZone.ge
 val fileFormatMonth = SimpleDateFormat("yyyy_MM").also { it.timeZone = TimeZone.getTimeZone("UTC") }
 val fileFormatTime = SimpleDateFormat("yyyy_MM_dd__HH_mm_ss").also { it.timeZone = TimeZone.getTimeZone("UTC") }
 private val log = KotlinLogging.logger {}
-var symbols: List<String> = emptyList()
-    set(value) {
-        field = if (field.isEmpty()) value else field
-    }
 
 fun convertTime(time: Long, format_: SimpleDateFormat = format): String = format_.format(Date(time))
 
-fun convertTime(time: LocalDateTime, format_: String = "yyyy_MM_dd"): String = time.format(DateTimeFormatter.ofPattern(format_))
+fun convertTime(time: LocalDateTime, format_: String = "yyyy_MM_dd"): String =
+    time.format(DateTimeFormatter.ofPattern(format_))
 
 @Throws(ParseException::class)
-fun String.toLocalDate(pattern: String = "yyyy_MM_dd"): LocalDate = LocalDate.parse(this, DateTimeFormatter.ofPattern(pattern))
+fun String.toLocalDate(pattern: String = "yyyy_MM_dd"): LocalDate =
+    LocalDate.parse(this, DateTimeFormatter.ofPattern(pattern))
+
 fun Long.toLocalDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
 
 fun <T> readObjectFromFile(file: File, valueType: Class<T>): T =
-        if (file.exists() && !file.isDirectory) asObject(file, valueType)
-        else throw Exception("Can't find order file: ${file.absolutePath}")
+    if (file.exists() && !file.isDirectory) asObject(file, valueType)
+    else throw Exception("Can't find order file: ${file.absolutePath}")
 
 fun readListObjectsFromFile(file: File, type: Type): List<Candlestick> =
-        if (file.exists() && !file.isDirectory) asListObjects(file, type)
-        else throw Exception("Can't find order file: ${file.absolutePath}")
+    if (file.exists() && !file.isDirectory) asListObjects(file, type)
+    else throw Exception("Can't find order file: ${file.absolutePath}")
 
 fun readListObjectsFromString(json: String, type: Type): List<Candlestick> = asListObjects(json, type)
 
@@ -91,26 +92,8 @@ fun deleteDirectory(directoryToBeDeleted: File): Boolean {
     return directoryToBeDeleted.delete()
 }
 
-fun writeLine(text: String, file: File) {
-    try {
-        if (file.exists()) {
-            log.debug("Write to 'BalanceHistory' text: $text")
-            Files.write(file.toPath(), ('\n' + text).toByteArray(), StandardOpenOption.APPEND)
-        } else {
-            // todo CREATE FILE than write
-            log.debug("Create file 'BalanceHistory' and write: $text")
-            asFile(text, file)
-        }
-    } catch (e: IOException) {
-        log.error(e.message, e)
-    }
-}
-
-fun String.toDouble(): Double {
-    return java.lang.Double.parseDouble(this.replace(',', '.'))
-}
-
-fun Double.percent(amountOfPercents: Double = 1.0): Double = this / 100 * amountOfPercents
+fun BigDecimal.percent(amountOfPercents: BigDecimal = 1.0.toBigDecimal()): BigDecimal =
+    this / 100.toBigDecimal() * amountOfPercents
 
 fun Int.ms(): Duration = Duration.ofMillis(this.toLong())
 fun Long.ms(): Duration = Duration.ofMillis(this)
@@ -132,15 +115,15 @@ fun time() = System.currentTimeMillis().ms()
 fun Duration.format() = convertTime(this.toMillis())
 
 fun getFreeBalances(client: Client, coins: List<String> = emptyList()) =
-        client.getBalances().asSequence().filter { coins.contains(it.asset) }.map { it.asset to it.free }
+    client.getBalances().asSequence().filter { coins.contains(it.asset) }.map { it.asset to it.free }
 
-fun scanAll(directory: File) = directory.listFiles()!!
-        .filter {
-            it.isDirectory && symbols.contains(it.name)
-        }
-        .associate {
-            it.name to "${directory.path}/${it.name}/exchange.conf"
-        }
+fun scanAll(directory: File, symbols: List<String>) = directory.listFiles()!!
+    .filter {
+        it.isDirectory && symbols.contains(it.name)
+    }
+    .associate {
+        it.name to "${directory.path}/${it.name}/exchange.conf"
+    }
 
 fun readConf(path: String?): Config? = try {
     path?.run {
@@ -169,28 +152,55 @@ fun printTrace(e: Throwable, maxLines: Int = 1): String {
     return trace.substring(0..symbolNum)
 }
 
-fun repeatEvery(task: () -> Unit, timeRepeat: Duration, timeDifference: Duration = 0.ms()) = Timer().scheduleAtFixedRate(object : TimerTask() {
-    override fun run() {
-        task.invoke()
-    }
-}, timeRepeat.toMillis() - (System.currentTimeMillis() + timeDifference.toMillis()) % timeRepeat.toMillis(), timeRepeat.toMillis())
+fun repeatEvery(task: () -> Unit, timeRepeat: Duration, timeDifference: Duration = 0.ms()) =
+    Timer().scheduleAtFixedRate(
+        object : TimerTask() {
+            override fun run() {
+                task.invoke()
+            }
+        },
+        timeRepeat.toMillis() - (System.currentTimeMillis() + timeDifference.toMillis()) % timeRepeat.toMillis(),
+        timeRepeat.toMillis()
+    )
 
 fun calcGapPercent(orderB: Order, orderS: Order): String {
     var result = ""
     val (buyPrice, sellPrice) = orderB.price to orderS.price
-    val percent = ((buyPrice + sellPrice) / 2).percent()
+    val percent = ((buyPrice + sellPrice) / 2.toBigDecimal()).percent()
 
-    result += String.format("%.2f", abs((buyPrice - sellPrice) / percent))
+    result += String.format(
+        "%.2f",
+        ((buyPrice - sellPrice) / percent).let { if (it < BigDecimal(0)) it * BigDecimal(-1) else it })
     result += "\nB ${orderB.side} ${orderB.price} | S ${orderS.side} ${orderS.price}"
 
     return result
 }
 
-fun calcExecuted(orderB: Order, orderS: Order, balanceTrade: Double): String = (balanceTrade / 100.0).let { percent ->
-    "qty oB=${String.format("%.1f", orderB.price * (orderB.origQty - orderB.executedQty) / percent)}% " +
-            "oS=${String.format("%.1f", orderS.price * (orderS.origQty - orderS.executedQty) / percent)}%"
-}
+fun calcExecuted(orderB: Order, orderS: Order, balanceTrade: BigDecimal): String =
+    (balanceTrade.toDouble() / 100).let { percent ->
+        "qty oB=${String.format("%.1f", orderB.price.toDouble() * (orderB.origQty.toDouble() - orderB.executedQty.toDouble()) / percent)}% " +
+                "oS=${String.format("%.1f", orderS.price.toDouble() * (orderS.origQty.toDouble() - orderS.executedQty.toDouble()) / percent)}%"
+    }
 
 fun <E> LinkedBlockingDeque<E>.poll(time: Duration): E? = this.poll(time.seconds, TimeUnit.SECONDS)
 
 fun wait(time: Duration) = Thread.sleep(time.toMillis())
+
+fun String.toInterval(): INTERVAL = when {
+    this == "1m" -> INTERVAL.ONE_MINUTE
+    this == "3m" -> INTERVAL.THREE_MINUTES
+    this == "5m" -> INTERVAL.FIVE_MINUTES
+    this == "15m" -> INTERVAL.FIFTEEN_MINUTES
+    this == "30m" -> INTERVAL.HALF_HOURLY
+    this == "1h" -> INTERVAL.HOURLY
+    this == "2h" -> INTERVAL.TWO_HOURLY
+    this == "4h" -> INTERVAL.FOUR_HOURLY
+    this == "6h" -> INTERVAL.SIX_HOURLY
+    this == "8h" -> INTERVAL.EIGHT_HOURLY
+    this == "12h" -> INTERVAL.TWELVE_HOURLY
+    this == "1d" -> INTERVAL.DAILY
+    this == "3d" -> INTERVAL.THREE_DAILY
+    this == "1w" -> INTERVAL.WEEKLY
+    this == "1M" -> INTERVAL.MONTHLY
+    else -> throw Exception("Not supported CandlestickInterval!")
+}

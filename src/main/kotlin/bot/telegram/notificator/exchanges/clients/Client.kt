@@ -1,19 +1,20 @@
 package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.clients.socket.SocketThread
+import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 interface Client {
     fun getAllPairs(): List<TradePair>
     fun getOpenOrders(pair: TradePair): List<Order>
-    fun getAllOpenOrders(pairs: List<TradePair>): Map<String, List<Order>>
+    fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>>
     fun getBalances(): List<Balance>
     fun getOrderBook(pair: TradePair, limit: Int): OrderBook
     fun getAssetBalance(asset: String): Balance
     fun getOrder(pair: TradePair, orderId: String): Order
     fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick>
-    fun newOrder(pair: TradePair, side: SIDE, type: TYPE, amount: Double, price: Double, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order
-    fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean)
+    fun newOrder(pair: TradePair, side: SIDE, type: TYPE, amount: BigDecimal, price: BigDecimal, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order
+    fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean
 
     /**
      * @return socket with thread (process for income messages)

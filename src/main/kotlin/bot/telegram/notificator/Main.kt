@@ -2,7 +2,6 @@ package bot.telegram.notificator
 
 import bot.telegram.notificator.exchanges.clients.ExchangeEnum
 import bot.telegram.notificator.libs.readConf
-import bot.telegram.notificator.libs.symbols
 import bot.telegram.notificator.telegram.TelegramBot
 import mu.KotlinLogging
 import org.apache.log4j.PropertyConfigurator
@@ -15,8 +14,6 @@ import java.util.concurrent.LinkedBlockingDeque
 private val log = KotlinLogging.logger {}
 
 fun main() {
-    // set static values:
-    symbols = File("pairsSet").useLines { it.toList() }
     PropertyConfigurator.configure("log4j.properties")
 
     val exchangeFile = File("exchange")

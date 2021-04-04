@@ -1,28 +1,25 @@
 package bot.telegram.notificator.exchanges.clients.socket
 
 import bot.telegram.notificator.exchanges.clients.*
-import io.bitmax.api.rest.client.BitmaxInterval
 import io.bitmax.api.websocket.BitMaxApiWebSocketListener
-import io.bitmax.api.websocket.messages.responses.WebSocketBar
 import io.bitmax.api.websocket.messages.responses.WebSocketDepth
 import io.bitmax.api.websocket.messages.responses.WebSocketOrder
 import mu.KotlinLogging
+import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 class SocketThreadBitmaxImpl(
-    val symbol: String,
+    val pair: TradePair,
     var client: BitMaxApiWebSocketListener,
     val interval: INTERVAL,
     private val queue: BlockingQueue<CommonExchangeData>,
-    var asks: MutableMap<Double, Double> = mutableMapOf(),
-    var bids: MutableMap<Double, Double> = mutableMapOf()
+    var asks: MutableMap<BigDecimal, BigDecimal> = mutableMapOf(),
+    var bids: MutableMap<BigDecimal, BigDecimal> = mutableMapOf()
 ) : SocketThread() {
 
     private val log = KotlinLogging.logger {}
 
     private val depthSize: Int = 10
-
-    private var prevCandlestick: Candlestick? = null
 
     override fun run() {
 
@@ -30,32 +27,11 @@ class SocketThreadBitmaxImpl(
             client.setMarketTradesCallback { trades ->
                 log.trace("MarketTradesCallback: $trades")
                 trades.data.forEach {
-                    queue.add(
-                        OrderEntry(
-                            price = it.p.toDouble(),
-                            qty = it.q.toDouble()
-                    )
-                    )
+                    queue.add(Trade(price = it.p.toBigDecimal(), qty = it.q.toBigDecimal(), it.ts))
                 }
             }
         } catch (e: Exception) {
-            log.error("Socket $symbol connection Exception: ", e)
-            e.printStackTrace()
-        }
-
-        try {
-            client.setBarCallback {
-                log.trace("BarCallback: $it")
-                if (BitmaxInterval.from(it.data.i).toInterval() == interval) {
-                    val candlestick = toCandlestick(it)
-                    if (prevCandlestick?.closeTime != candlestick.closeTime) {
-                        prevCandlestick = candlestick
-                        queue.add(candlestick)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            log.error("Socket $symbol connection Exception: ", e)
+            log.error("Socket $pair connection Exception: ", e)
             e.printStackTrace()
         }
 
@@ -63,18 +39,14 @@ class SocketThreadBitmaxImpl(
             client.setDepthCallback { depth ->
                 log.trace("DepthCallback: $depth")
                 updateDepthStateInfo(depth)
-                val ask = asks.map { ask -> OrderEntry(ask.key, ask.value) }.minByOrNull { ask -> ask.price }!!
-                val bid = bids.map { bid -> OrderEntry(bid.key, bid.value) }.maxByOrNull { bid -> bid.price }!!
+                val ask = asks.map { ask -> Offer(ask.key, ask.value) }.minByOrNull { ask -> ask.price }!!
+                val bid = bids.map { bid -> Offer(bid.key, bid.value) }.maxByOrNull { bid -> bid.price }!!
 
-//                println("DepthCallback current orderBook: " +
-//                        "\na${asks.toList().sortedBy { it.first }.asReversed().joinToString("\na")}" +
-//                        "\nb${bids.toList().sortedBy { it.first }.joinToString("\nb")}")
-
-                if (ask.price != 0.0 || bid.price != Double.MAX_VALUE)
+                if (ask.price != 0.toBigDecimal() || bid.price != Double.MAX_VALUE.toBigDecimal())
                     queue.add(DepthEventOrders(bid = bid, ask = ask))
             }
         } catch (e: Exception) {
-            log.error("Socket $symbol connection Exception: ", e)
+            log.error("Socket $pair connection Exception: ", e)
             e.printStackTrace()
         }
 
@@ -84,7 +56,7 @@ class SocketThreadBitmaxImpl(
                 queue.add(toOrderEvent(it))
             }
         } catch (e: Exception) {
-            log.error("Socket $symbol connection Exception: ", e)
+            log.error("Socket $pair connection Exception: ", e)
             e.printStackTrace()
         }
     }
@@ -93,13 +65,14 @@ class SocketThreadBitmaxImpl(
     private fun updateDepthStateInfo(event: WebSocketDepth) {
         var askState = asks
 
-        val maxAskPrice = asks.maxByOrNull { it.key }?.key ?: 0.0
+        val maxAskPrice = asks.maxByOrNull { it.key }?.key ?: BigDecimal(0)
 
         event.data.asks.forEach {
             if (it[1] == "0")
-                askState.remove(it[0].toDouble())
+                askState.remove(it[0].toBigDecimal())
             else
-                if (askState.size < depthSize || maxAskPrice > it[0].toDouble()) askState[it[0].toDouble()] = it[1].toDouble()
+                if (askState.size < depthSize || maxAskPrice > it[0].toBigDecimal())
+                    askState[it[0].toBigDecimal()] = it[1].toBigDecimal()
         }
         if (askState.size > depthSize)
             askState = askState.map { it.key to it.value }
@@ -113,13 +86,13 @@ class SocketThreadBitmaxImpl(
 
         var bidState = bids
 
-        val minBidPrice = bids.minByOrNull { it.key }?.key ?: Double.MAX_VALUE
+        val minBidPrice = bids.minByOrNull { it.key }?.key ?: Double.MAX_VALUE.toBigDecimal()
 
         event.data.bids.forEach {
             if (it[1] == "0")
-                bidState.remove(it[0].toDouble())
+                bidState.remove(it[0].toBigDecimal())
             else
-                if (bidState.size < depthSize || minBidPrice < it[0].toDouble()) bidState[it[0].toDouble()] = it[1].toDouble()
+                if (bidState.size < depthSize || minBidPrice < it[0].toBigDecimal()) bidState[it[0].toBigDecimal()] = it[1].toBigDecimal()
         }
         if (bidState.size > depthSize)
             bidState = bidState.map { it.key to it.value }
@@ -131,35 +104,12 @@ class SocketThreadBitmaxImpl(
         bids = bidState
     }
 
-    private fun toCandlestick(event: WebSocketBar) = Candlestick(
-            openTime = event.data.ts,
-            open = event.data.o.toDouble(),
-            close = event.data.c.toDouble(),
-            high = event.data.h.toDouble(),
-            low = event.data.l.toDouble(),
-            volume = event.data.v.toDouble(),
-            closeTime = event.data.ts + when (BitmaxInterval.from(event.data.i)) {
-                BitmaxInterval.ONE_MINUTE -> 60_000L - 1
-                BitmaxInterval.FIVE_MINUTES -> 300_000L - 1
-                BitmaxInterval.FIFTEEN_MINUTES -> 900_000L - 1
-                BitmaxInterval.HALF_HOURLY -> 1_800_000L - 1
-                BitmaxInterval.HOURLY -> 3_600_000L - 1
-                BitmaxInterval.TWO_HOURLY -> 3_600_000L * 2 - 1
-                BitmaxInterval.FOUR_HOURLY -> 3_600_000L * 4 - 1
-                BitmaxInterval.SIX_HOURLY -> 3_600_000L * 6 - 1
-                BitmaxInterval.TWELVE_HOURLY -> 3_600_000L * 12 - 1
-                BitmaxInterval.DAILY -> 3_600_000L * 24 - 1
-                BitmaxInterval.WEEKLY -> 3_600_000L * 7 - 1
-                BitmaxInterval.MONTHLY -> 3_600_000L * 30 - 1
-            }
-    )
-
     private fun toOrderEvent(event: WebSocketOrder) = Order(
             orderId = event.data.orderId,
             pair = TradePair(event.data.s.replace('/', '_')),
-            price = event.data.p.toDouble(),
-            origQty = event.data.q.toDouble(),
-            executedQty = event.data.q.toDouble(),
+            price = event.data.p.toBigDecimal(),
+            origQty = event.data.q.toBigDecimal(),
+            executedQty = event.data.q.toBigDecimal(),
             type = when (event.data.ot) {
                 "Limit" -> TYPE.LIMIT
                 "Market" -> TYPE.MARKET

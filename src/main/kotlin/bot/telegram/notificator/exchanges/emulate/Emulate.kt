@@ -3,12 +3,13 @@ package bot.telegram.notificator.exchanges.emulate
 import bot.telegram.notificator.exchanges.CandlestickListsIterator
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.exchanges.emulate.libs.writeIntoExcel
-import bot.telegram.notificator.exchanges.Trade
+import bot.telegram.notificator.exchanges.TraderAlgorithm
 import bot.telegram.notificator.exchanges.connect
 import bot.telegram.notificator.libs.*
 import mu.KotlinLogging
 import java.io.File
-import java.lang.StringBuilder
+import java.math.BigDecimal
+import java.text.DecimalFormat
 import java.time.LocalDateTime
 import kotlin.text.toDouble
 
@@ -40,31 +41,33 @@ class Emulate(
     }
 
     private fun emulate(regex: Regex, startDate: String, endDate: String, pathDB: String): File {
-        val builder = StringBuilder()
 
         val logging = conf.getBoolean("logging")
 
-        val connect = connect(pathDB)
-        val stmt = connect.createStatement()
-        val resultSetTables = stmt.executeQuery("SELECT name FROM sqlite_master where type='table'")
+        val connect = connect(pathDB, log)
 
-        val tablesPairs = ArrayList<Pair<String, TradePair>>()
+        var result: List<List<Any>>
 
-        while (resultSetTables.next()) {
-            val tableName: String = resultSetTables.getString("name")
-            val pair = tableName.substring(12)
-            if (pair.matches(regex))
-                tablesPairs.add(tableName to TradePair(pair))
-        }
-        stmt.close()
+        try {
+            val stmt = connect.createStatement()
+            val resultSetTables = stmt.executeQuery("SELECT name FROM sqlite_master where type='table'")
 
-        val result = tablesPairs.map { tablePair ->
-            val firstDay = startDate.toLocalDate().atStartOfDay()
+            val tablesPairs = ArrayList<Pair<String, TradePair>>()
+
+            while (resultSetTables.next()) {
+                val tableName: String = resultSetTables.getString("name")
+                val pair = tableName.substring(12)
+                if (pair.matches(regex))
+                    tablesPairs.add(tableName to TradePair(pair))
+            }
+            stmt.close()
+
+            result = tablesPairs.map { tablePair ->
+                val firstDay = startDate.toLocalDate().atStartOfDay()
 
 //            toEpochSecond(LocalTime.of(0, 0, 0, 0), ZoneOffset.UTC) * 1000
-            val lastDay = endDate.toLocalDate().atStartOfDay()
+                val lastDay = endDate.toLocalDate().atStartOfDay()
 //                toEpochSecond(LocalTime.of(0, 0, 0, 0), ZoneOffset.UTC) * 1000
-            try {
                 calcProfit(TestClient(
                     iterator = CandlestickListsIterator(
                         connect,
@@ -74,8 +77,8 @@ class Emulate(
                         endDateTime = lastDay
                     ),
                     balance = TestBalance(
-                        secondBalance = 100.0,
-                        balanceTrade = 50.0,
+                        secondBalance = BigDecimal(100),
+                        balanceTrade = BigDecimal(50),
                         tradePair = tablePair.second
                     ),
                     startCandleNum = (conf.getInt("interval.candles_buy") to conf.getInt("interval.candles_sell"))
@@ -83,37 +86,46 @@ class Emulate(
                 ),
                     logging = logging
                 )
-            } catch (t: Throwable) {
-                builder.append(t).append('\n')
             }
-        }
-            .filterIsInstance<List<String>>()
-            .sortedBy { (it[6].toDouble()) * -1 }
-            .toMutableList()
+                .filter { it.size == 9 }
+                .sortedBy { (it[6]).toDouble() * -1 }
+                .map {
+                    listOf(
+                        it[0],
+                        it[1].toDouble(),
+                        it[2].toDouble(),
+                        it[3].toDouble(),
+                        it[4].toDouble(),
+                        it[5].toDouble(),
+                        it[6].toDouble(),
+                        it[7].toInt(),
+                        it[8].toInt()
+                    )
+                }
+                .toMutableList()
 
-        connect.close()
 
-
-        builder.append(
-            result.joinToString(
-                "\n",
-                "\n"
-            ) { "${it[0]} ${it[1]} ${it[2]} ${it[3]} ${it[4]}   Profit ByLastPrice: ${it[5]}    Profit ByFirstPrice: ${it[6]}" })
-
-        result.add(
-            0,
-            listOf(
-                "pair",
-                "firstBalance",
-                "secondBalance",
-                "secondBalanceByLastPrice",
-                "secondBalanceByFirstPrice",
-                "Profit ByLastPrice",
-                "Profit ByFirstPrice",
-                "Execute order count",
-                "Update static order count"
+            result.add(
+                0,
+                listOf(
+                    "pair",
+                    "firstBalance",
+                    "secondBalance",
+                    "secondBalanceByLastPrice",
+                    "secondBalanceByFirstPrice",
+                    "Profit ByLastPrice",
+                    "Profit ByFirstPrice",
+                    "Execute order count",
+                    "Update static order count"
+                )
             )
-        )
+        } catch (t: Throwable) {
+            log.error("CalcProfit ERROR:", t)
+            sendMessage("Calc profit ERROR:\n${printTrace(t, 5)}")
+            result = emptyList()
+        } finally {
+            connect.close()
+        }
 
         val resultDir = File("emulate/results")
         if (!resultDir.isDirectory)
@@ -122,10 +134,7 @@ class Emulate(
         return writeIntoExcel(
             File(
                 "exchange/emulate/results/start_${startDate}___end_${endDate}___time_${
-                    convertTime(
-                        LocalDateTime.now(),
-                        "yyyy_MM_dd__HH_mm_ss"
-                    )
+                    convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")
                 }.xls"
             ),
             result
@@ -134,7 +143,7 @@ class Emulate(
 
     private fun calcProfit(client: TestClient, logging: Boolean): List<String> {
         try {
-            val trade = Trade(
+            val trade = TraderAlgorithm(
                 conf = conf,
                 queue = client.queue,
                 firstSymbol = client.balance.tradePair.first,
@@ -149,6 +158,8 @@ class Emulate(
             trade.start()
             trade.join()
 
+            File("exchange/emulate/data/results").delete()
+
             val firstBalanceA = client.balance.firstBalance.let {
                 client.balance.firstBalance + client.getOpenOrders(
                     TradePair(
@@ -158,8 +169,8 @@ class Emulate(
                 ).map { order ->
                     if (order.status == STATUS.NEW && order.side == SIDE.SELL) {
                         order.origQty
-                    } else 0.0
-                }.sum()
+                    } else BigDecimal(0)
+                }.fold(BigDecimal.ZERO, BigDecimal::add)
             }
 
             val secondBalanceA = client.balance.secondBalance.let {
@@ -171,15 +182,16 @@ class Emulate(
                 ).map { order ->
                     if (order.status == STATUS.NEW && order.side == SIDE.BUY) {
                         order.origQty * order.price
-                    } else 0.0
-                }.sum()
+                    } else BigDecimal(0)
+                }.fold(BigDecimal.ZERO, BigDecimal::add)
             }
 
-            val secondBalanceByLastPrice = secondBalanceA + (firstBalanceA * client.lastSellPrice)
-            val secondBalanceByFirstPrice = secondBalanceA + (firstBalanceA * client.firstPrice)
+            val secondBalanceByLastPrice: BigDecimal = secondBalanceA + (firstBalanceA * client.lastSellPrice)
+            val secondBalanceByFirstPrice: BigDecimal = secondBalanceA + (firstBalanceA * client.firstPrice)
 
             var list = emptyList<String>()
             try {
+                val df = DecimalFormat("#,###.0000");
                 list = listOf(
                     client.balance.tradePair.toString(),
                     String.format("%.4f", firstBalanceA),

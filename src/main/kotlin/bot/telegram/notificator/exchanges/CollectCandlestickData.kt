@@ -2,14 +2,15 @@ package bot.telegram.notificator.exchanges
 
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.libs.*
+import mu.KLogger
 import mu.KotlinLogging
 import org.apache.log4j.PropertyConfigurator
 import org.sqlite.SQLiteException
+import java.math.BigDecimal
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 import java.time.*
-import kotlin.collections.ArrayList
 
 
 fun main() {
@@ -20,7 +21,7 @@ fun main() {
         command = Command.WRITE_AND_CHECK,
 //            command = Command.WRITE,
 //            command = Command.CHECK,
-        exchangeEnum = ExchangeEnum.BITMAX
+        exchangeEnum = ExchangeEnum.BINANCE
     ) {}.run()
 
 
@@ -94,7 +95,7 @@ class CollectCandlestickData(
 
     fun checkCandlesticks(path: String) {
 
-        val connect = connect(path)
+        val connect = connect(path, log)
 
         val stmt = connect.createStatement()
         val resultSetTables = stmt.executeQuery("SELECT name FROM sqlite_master where type='table'")
@@ -150,27 +151,24 @@ class CollectCandlestickData(
     }
 
 
-    private fun writeCandlesToDB(pathDB: String, client: Client) {
+    private fun writeCandlesToDB(pathDB: String, client: Client) = client
+        .getAllPairs()
+        .minus(ignorePairs)
+        .forEach { tradePair ->
 
-        client
-            .getAllPairs()
-            .minus(ignorePairs)
-            .forEach { tradePair ->
+            log.trace { "Write pair: $tradePair" }
 
-                log.trace { "Write pair: $tradePair" }
-
-                try {
-                    writeCandlesDB(
-                        candlesticks = client.getCandlestickBars(tradePair, INTERVAL.FIVE_MINUTES, maxLimit),
-                        pair = tradePair,
-                        pathDB = pathDB
-                    )
-                } catch (t: Throwable) {
-                    sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
-                    log.warn("Can't write pair: $tradePair Error:", t)
-                }
+            try {
+                writeCandlesDB(
+                    candlesticks = client.getCandlestickBars(tradePair, INTERVAL.FIVE_MINUTES, maxLimit),
+                    pair = tradePair,
+                    pathDB = pathDB
+                )
+            } catch (t: Throwable) {
+                sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
+                log.warn("Can't write pair: $tradePair Error:", t)
             }
-    }
+        }
 
 
     private fun writeCandlesDB(candlesticks: List<Candlestick>, pair: TradePair, pathDB: String) {
@@ -179,37 +177,51 @@ class CollectCandlestickData(
             return
         }
 
-        val connect = connect(pathDB)
+        val connect = connect(pathDB, log)
         val tableName = "CANDLESTICK_$pair"
 
-        val candlesticksToDB = getLastRecord(connect, tableName)?.let { last ->
-            candlesticks.filter { it.openTime >= last.openTime }
-        } ?: run {
-            createTable(connect, tableName)
-            candlesticks
-        }
+        try {
+            val candlesticksToDB = getLastRecord(connect, tableName)?.let { last ->
+                candlesticks.filter { it.openTime > last.openTime }
+            } ?: run {
+                createTable(connect, tableName)
+                candlesticks
+            }
 
-        val stmt = connect.createStatement()
+            val stmt = connect.createStatement()
+            try {
 
-        var count = 0
-        var values = ""
+                var count = 0
+                var values = ""
 
-        for (c in 0 until candlesticksToDB.size - 1) {
+                for (c in 0 until candlesticksToDB.size - 1) {
 
-            if (++count > 100) {
-                values += """(${candlesticksToDB[c].openTime}, ${candlesticksToDB[c].open}, ${candlesticksToDB[c].close}, ${candlesticksToDB[c].high}, ${candlesticksToDB[c].low}, ${candlesticksToDB[c].volume});"""
+                    if (++count > 100) {
+                        values += """(${candlesticksToDB[c].openTime}, ${candlesticksToDB[c].open}, ${candlesticksToDB[c].close}, ${candlesticksToDB[c].high}, ${candlesticksToDB[c].low}, ${candlesticksToDB[c].volume});"""
+                        stmt.executeUpdate("""INSERT INTO $tableName (ID_OPEN_TIME, OPEN, CLOSE, HIGH, LOW, VOLUME) VALUES $values""")
+                        count = 0
+                        values = ""
+                    } else
+                        values += """(${candlesticksToDB[c].openTime}, ${candlesticksToDB[c].open}, ${candlesticksToDB[c].close}, ${candlesticksToDB[c].high}, ${candlesticksToDB[c].low}, ${candlesticksToDB[c].volume}),"""
+                }
+
+                values += """(${candlesticksToDB.last().openTime}, ${candlesticksToDB.last().open}, ${candlesticksToDB.last().close}, ${candlesticksToDB.last().high}, ${candlesticksToDB.last().low}, ${candlesticksToDB.last().volume});"""
+
                 stmt.executeUpdate("""INSERT INTO $tableName (ID_OPEN_TIME, OPEN, CLOSE, HIGH, LOW, VOLUME) VALUES $values""")
-                count = 0
-                values = ""
-            } else
-                values += """(${candlesticksToDB[c].openTime}, ${candlesticksToDB[c].open}, ${candlesticksToDB[c].close}, ${candlesticksToDB[c].high}, ${candlesticksToDB[c].low}, ${candlesticksToDB[c].volume}),"""
+
+
+            } catch (t: Throwable) {
+                stmt.close()
+                log.error("Statement Write Candles to DB ERROR:", t)
+            } finally {
+                stmt.close()
+            }
+        } catch (t: Throwable) {
+            log.error("Connection Write Candles to DB ERROR:", t)
+            connect.close()
+        } finally {
+            connect.close()
         }
-
-        values += """(${candlesticksToDB.last().openTime}, ${candlesticksToDB.last().open}, ${candlesticksToDB.last().close}, ${candlesticksToDB.last().high}, ${candlesticksToDB.last().low}, ${candlesticksToDB.last().volume});"""
-
-        stmt.executeUpdate("""INSERT INTO $tableName (ID_OPEN_TIME, OPEN, CLOSE, HIGH, LOW, VOLUME) VALUES $values""")
-
-        connect.close()
     }
 
 
@@ -297,30 +309,30 @@ class CandlestickListsIterator(
 
 private fun getCandle(result: ResultSet) = CandlestickDB(
     openTime = result.getLong("ID_OPEN_TIME"),
-    open = result.getDouble("OPEN"),
-    close = result.getDouble("CLOSE"),
-    high = result.getDouble("HIGH"),
-    low = result.getDouble("LOW"),
-    volume = result.getDouble("VOLUME")
+    open = result.getBigDecimal("OPEN"),
+    close = result.getBigDecimal("CLOSE"),
+    high = result.getBigDecimal("HIGH"),
+    low = result.getBigDecimal("LOW"),
+    volume = result.getBigDecimal("VOLUME")
 )
 
 
-fun connect(pathDB: String): Connection = try {
+fun connect(pathDB: String, log: KLogger): Connection = try {
     Class.forName("org.sqlite.JDBC")
     DriverManager.getConnection("jdbc:sqlite:$pathDB")
-} catch (e: Exception) {
-//    log.error { e.javaClass.name + ": " + e.message }
-    throw e
+} catch (t: Throwable) {
+    log.error("Connect Error: {}", t)
+    throw t
 }
 
 
 data class CandlestickDB(
     val openTime: Long,
-    val open: Double,
-    val high: Double,
-    val low: Double,
-    val close: Double,
-    val volume: Double
+    val open: BigDecimal,
+    val high: BigDecimal,
+    val low: BigDecimal,
+    val close: BigDecimal,
+    val volume: BigDecimal
 ) {
     fun toCandlestick(): Candlestick = Candlestick(
         open = this.open,

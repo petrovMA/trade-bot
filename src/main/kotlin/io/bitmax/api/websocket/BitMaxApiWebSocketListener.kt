@@ -71,10 +71,11 @@ class BitMaxApiWebSocketListener {
     /**
      * Initialize listener for common messages
      */
-    constructor(url: String, vararg subscribeMessages: WebSocketMsg) {
+    constructor(url: String, timeout: Int = TIMEOUT, keepConnection: Boolean = true, vararg subscribeMessages: WebSocketMsg) {
+        this.keepConnection = keepConnection
         try {
             webSocket = WebSocketFactory()
-                    .setConnectionTimeout(TIMEOUT)
+                    .setConnectionTimeout(timeout)
                     .createSocket(url)
                     .addListener(object : WebSocketAdapter() {
                         override fun onTextMessage(websocket: WebSocket, message: String) {

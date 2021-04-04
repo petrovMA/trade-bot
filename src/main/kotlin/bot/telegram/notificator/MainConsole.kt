@@ -2,18 +2,17 @@ package bot.telegram.notificator
 
 import bot.telegram.notificator.exchanges.clients.ExchangeEnum
 import bot.telegram.notificator.libs.readConf
-import bot.telegram.notificator.libs.symbols
+import bot.telegram.notificator.libs.s
 import mu.KotlinLogging
 import org.apache.log4j.PropertyConfigurator
 import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
+import kotlin.concurrent.schedule
 
 
 private val log = KotlinLogging.logger {}
 
 fun main() {
-    // set static values:
-    symbols = File("pairsSet").useLines { it.toList() }
     PropertyConfigurator.configure("log4j.properties")
 
     val exchangeFile = File("exchange")
@@ -43,6 +42,19 @@ fun main() {
 //        java.util.Timer("start", false).schedule(7000) {
 //            println("start ALGO_BTC")
 //            bot.onUpdate("start ALGO_BTC")
+//        }
+
+
+//        java.util.Timer("emulate", false).schedule(3.s().toMillis()) {
+//            bot.onUpdate("tradePairs init")
+////            bot.onUpdate("Emulate binance QTUM_ETH 2021_01_20 2021_03_29")
+//        }
+//        java.util.Timer("start2", false).schedule(10.s().toMillis()) {
+//            bot.onUpdate("start all")
+//        }
+//        java.util.Timer("TradePairs", false).schedule(5.m().toMillis()) {
+//            bot.taskQueue.put(CollectCandlestickData(bot.candlestickDataCommand, null, ExchangeEnum.BINANCE, bot.sendMessage))
+//            bot.taskQueue.put(CollectCandlestickData(bot.candlestickDataCommand, null, ExchangeEnum.BITMAX, bot.sendMessage))
 //        }
 
         while (true)

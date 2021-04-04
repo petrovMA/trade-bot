@@ -111,3 +111,4 @@ target/
 /build_xchange_dependencies.sh
 /exchange/*
 /logging/
+/copy_files_from_server.sh

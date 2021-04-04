@@ -8,26 +8,27 @@ import bot.telegram.notificator.exchanges.clients.socket.SocketThread
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
+import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.time.Duration
 import java.util.concurrent.LinkedBlockingDeque
 import kotlin.math.absoluteValue
 
-class Trade(
+class TraderAlgorithm(
     conf: Config,
     val queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
     private val exchangeEnum: ExchangeEnum = conf.getEnum(ExchangeEnum::class.java, "exchange"),
     private val api: String = conf.getString("api"),
     private val sec: String = conf.getString("sec"),
     private var client: Client = newClient(exchangeEnum, api, sec),
-    private var firstSymbol: String = conf.getString("symbol.first")!!,
-    private var secondSymbol: String = conf.getString("symbol.second")!!,
-    private var tradePair: TradePair = TradePair(firstSymbol, secondSymbol),
+    private val firstSymbol: String = conf.getString("symbol.first")!!,
+    private val secondSymbol: String = conf.getString("symbol.second")!!,
+    private val tradePair: TradePair = TradePair(firstSymbol, secondSymbol),
     private val path: String = "exchange/${tradePair}",
-    balanceTrade: Double = conf.getDouble("balance_trade"),
-    private val minTradeBalance: Double = conf.getDouble("min_balance_trade"),
-    private val minOverheadBalance: Double = conf.getDouble("min_overhead_balance"),
+    balanceTrade: BigDecimal = conf.getDouble("balance_trade").toBigDecimal(),
+    private val minTradeBalance: BigDecimal = conf.getDouble("min_balance_trade").toBigDecimal(),
+    private val minOverheadBalance: BigDecimal = conf.getDouble("min_overhead_balance").toBigDecimal(),
     private val syncTimeInterval: Duration = conf.getDuration("sync_interval_time"),
     private val cancelUnknownOrdersInterval: ActionInterval = ActionInterval(conf.getDuration("cancel_unknown_orders_interval")),
     private val retrySentOrderCount: Int = conf.getInt("retry_sent_order_count"),
@@ -35,14 +36,14 @@ class Trade(
     private val isEmulate: Boolean = false,
     val sendMessage: (String) -> Unit
 ) : Thread() {
-    private var interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
-    private var averageHigh = 0.0
-    private var averageLow = 0.0
-    private var percent = conf.getDouble("percent.static_orders")
-    private var deltaPercent = conf.getDouble("percent.delta")
-    private var percentBuyProf = conf.getDouble("percent.buy_prof")
-    private var percentSellProf = conf.getDouble("percent.sell_prof")
-    private var percentCountForPartiallyFilledUpd = conf.getDouble("percent.count_for_partially_filled_upd")
+    private val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
+    private var averageHigh = 0.toBigDecimal()
+    private var averageLow = 0.toBigDecimal()
+    private var percent = conf.getDouble("percent.static_orders").toBigDecimal()
+    private var deltaPercent = conf.getDouble("percent.delta").toBigDecimal()
+    private var percentBuyProf = conf.getDouble("percent.buy_prof").toBigDecimal()
+    private var percentSellProf = conf.getDouble("percent.sell_prof").toBigDecimal()
+    private var percentCountForPartiallyFilledUpd = conf.getDouble("percent.count_for_partially_filled_upd").toBigDecimal()
     private var intervalCandlesBuy = conf.getInt("interval.candles_buy")
     private var intervalCandlesSell = conf.getInt("interval.candles_sell")
 
@@ -55,7 +56,7 @@ class Trade(
             intervalCandlesSell
 
     private val waitTime = conf.getDuration("interval.wait_socket_time")
-    private val mainBalance = 0.0
+    private val mainBalance = 0.0.toBigDecimal()
     private val firstBalanceFixed: Boolean = conf.getBoolean("first_balance_fixed")
     private val formatCount = conf.getString("format.count")
     private val formatPrice = conf.getString("format.price")
@@ -65,7 +66,8 @@ class Trade(
     private val exceptionWaitTime = conf.getDuration("wait_time.exception")
     private val updateCandlestickOrdersTimeInterval = conf.getDuration("update_candlestick_orders_time_interval")
     private val waitBetweenCancelAndUpdateOrders = conf.getDuration("wait_between_cancel_and_update_orders")
-//    private val writeEthBalanceToHistoryInterval = conf.getDuration("save.eth_balance_to_history_interval")
+
+    //    private val writeEthBalanceToHistoryInterval = conf.getDuration("save.eth_balance_to_history_interval")
 //    private val isWriteEthBalance = conf.getBoolean("save.eth_balance_to_history")
     private val pauseBetweenCheckOrder = conf.getDuration("pause_between_check_orders")
     private val printOrdersAndOff = conf.getBoolean("print_orders_and_off")
@@ -74,25 +76,26 @@ class Trade(
     private val updateIfAlmostFilled = conf.getBoolean("update_if_almost_filled")
 
     private var stopThread = false
-    private var nearSellPrice: Double = 0.0
-    private var nearBuyPrice: Double = 0.0
-    private var lastTradePrice: Double = 0.toDouble()
+    private var nearSellPrice: BigDecimal = 0.toBigDecimal()
+    private var nearBuyPrice: BigDecimal = 0.toBigDecimal()
+    private var lastTradePrice: BigDecimal = 0.toBigDecimal()
     private var checkBuyOrderTrigger = false to 1.s()
     private var checkSellOrderTrigger = false to 1.s()
     private var lastCheckBuyOrderTime: Duration = 5.s()
     private var lastCheckSellOrderTime: Duration = 5.s()
     private var lastSyncTime: Duration = 0.s()
-//    private var lastLastWriteEthBalanceToHistory: Duration = 0.s()
+
+    //    private var lastLastWriteEthBalanceToHistory: Duration = 0.s()
     private val maxTryingUpdateOrderSell: Int = 3
     private var tryingUpdateOrderSell: Int = 0
     private val maxTryingUpdateOrderBuy: Int = 3
     private var tryingUpdateOrderBuy: Int = 0
-
-    private var candlestickList = ListLimit<Candlestick>()
+    private var candlestickList = ListLimit<Candlestick>(limit = countCandles)
+    private val klineConstructor = KlineConstructor(interval)
 
     val balance = BalanceInfo(
         symbols = tradePair,
-        firstBalance = 0.0,
+        firstBalance = 0.0.toBigDecimal(),
         secondBalance = mainBalance,
         balanceTrade = balanceTrade
     )
@@ -140,22 +143,31 @@ class Trade(
                             nearSellPrice = msg.ask.price
                             log?.debug("$tradePair First DepthEvent:\n$msg")
                         }
-                        is Candlestick -> {
-                            log?.info("$tradePair First CandlestickEvent:\n$msg")
-                            val closePrice = msg.close
-                            val openPrice = msg.open
-                            log?.info("$tradePair ClosePrice = $closePrice, OpenPrice = $openPrice")
+                        is Trade -> {
+                            lastTradePrice = msg.price
+                            log?.debug("$tradePair TradeEvent:\n$msg")
 
-                            if (closePrice > openPrice) {
-                                nearBuyPrice = closePrice
-                                nearSellPrice = openPrice
-                            } else {
-                                nearBuyPrice = openPrice
-                                nearSellPrice = closePrice
+                            klineConstructor.nextKline(msg).forEach { kline ->
+                                if (kline.first) {
+
+                                    log?.info("$tradePair First CandlestickEvent:\n${kline.second}")
+                                    val closePrice = kline.second.close
+                                    val openPrice = kline.second.open
+                                    log?.info("$tradePair ClosePrice = $closePrice, OpenPrice = $openPrice")
+
+                                    if (closePrice > openPrice) {
+                                        nearBuyPrice = closePrice
+                                        nearSellPrice = openPrice
+                                    } else {
+                                        nearBuyPrice = openPrice
+                                        nearSellPrice = closePrice
+                                    }
+
+                                    candlestickList.add(kline.second)
+                                    calcAveragePrice()
+
+                                }
                             }
-
-                            candlestickList.add(msg)
-                            calcAveragePrice()
                         }
                     }
 
@@ -209,9 +221,20 @@ class Trade(
                                         updateStaticOrders()
                                     }
                                 }
-                                is OrderEntry -> {
+                                is Trade -> {
                                     lastTradePrice = msg.price
                                     log?.debug("$tradePair TradeEvent:\n$msg")
+
+                                    klineConstructor.nextKline(msg).forEach { kline ->
+                                        if (kline.first)
+                                            candlestickList.add(kline.second)
+                                    }
+                                    if (candlestickList.last().closeTime.ms() >= lastCandlestickOrdersUpdateTime + updateCandlestickOrdersTimeInterval) {
+                                        log?.debug("$tradePair Update orders by CandlestickEvent!")
+                                        lastCandlestickOrdersUpdateTime = candlestickList.last().closeTime.ms()
+                                        calcAveragePrice()
+                                        updateOrders()
+                                    }
 
                                     if (checkBuyOrderTrigger.first) {
                                         if ((checkBuyOrderTrigger.second + pauseBetweenCheckOrder - time()).isNegative) {
@@ -269,16 +292,6 @@ class Trade(
                                         else log?.warn("$tradePair Unsupported order side: ${balance.orderS!!.side}")
                                     }
 
-                                }
-                                is Candlestick -> {
-                                    log?.debug("$tradePair CandlestickEvent:\n$msg")
-                                    candlestickList.add(msg)
-                                    if (msg.closeTime.ms() >= lastCandlestickOrdersUpdateTime + updateCandlestickOrdersTimeInterval) {
-                                        log?.debug("$tradePair Update orders by CandlestickEvent!")
-                                        lastCandlestickOrdersUpdateTime = msg.closeTime.ms()
-                                        calcAveragePrice()
-                                        updateOrders()
-                                    }
                                 }
                                 is Order -> {
                                     log?.debug("$tradePair OrderUpdate:\n$msg")
@@ -380,8 +393,8 @@ class Trade(
                             createStaticOrdersOnStart()
                         }
                     } else {
-                        log?.error("$tradePair Connection lost!!!")
-                        sendMessage("#lost_connection_$tradePair!!!")
+                        log?.error("$tradePair Connection lost. No messages during $waitTime!!!")
+                        sendMessage("#lost_connection_$tradePair\nNo messages during $waitTime!!!")
                         sleep(reconnectWaitTime.toMillis())
                         socket = client.socket(TradePair(firstSymbol, secondSymbol), interval, queue)
 
@@ -411,8 +424,8 @@ class Trade(
     }
 
 
-    private fun checkBuyOrder(order: Order? = null): Double? {
-        var freeSecondBalance: Double? = null
+    private fun checkBuyOrder(order: Order? = null): BigDecimal? {
+        var freeSecondBalance: BigDecimal? = null
 
         if (isUnknown(balance.orderB)) {
             val price =
@@ -484,8 +497,8 @@ class Trade(
         return freeSecondBalance
     }
 
-    private fun checkSellOrder(order: Order? = null): Double? {
-        var freeFirstBalance: Double? = null
+    private fun checkSellOrder(order: Order? = null): BigDecimal? {
+        var freeFirstBalance: BigDecimal? = null
 
         if (isUnknown(balance.orderS)) {
             val price =
@@ -582,7 +595,7 @@ class Trade(
                     if (price != balance.orderB?.price) {
                         cancelOrder(balance.symbols, balance.orderB!!, false)
                         wait(waitBetweenCancelAndUpdateOrders)
-                        if (100 - (countToBuy / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
+                        if (BigDecimal(100) - (countToBuy / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
                             balance.orderB = sentOrder(
                                 amount = countToBuy,
                                 price = price,
@@ -672,7 +685,7 @@ class Trade(
                     if (price != balance.orderS?.price) {
                         cancelOrder(balance.symbols, balance.orderS!!, false)
                         wait(waitBetweenCancelAndUpdateOrders)
-                        if (100 - (countToSell / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
+                        if (BigDecimal(100) - (countToSell / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
                             balance.orderS = sentOrder(
                                 amount = countToSell,
                                 price = price,
@@ -854,7 +867,7 @@ class Trade(
         this.candlestickList = candlestickList
     }
 
-    private fun sentOrder(price: Double, amount: Double, orderSide: SIDE, isStaticUpdate: Boolean): Order {
+    private fun sentOrder(price: BigDecimal, amount: BigDecimal, orderSide: SIDE, isStaticUpdate: Boolean): Order {
 
         log?.info("$tradePair Sent order with params: price = $price; count = $amount; side = $orderSide")
 

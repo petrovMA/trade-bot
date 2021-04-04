@@ -17,11 +17,12 @@ import io.bitmax.api.websocket.messages.requests.WebSocketMsg
 import mu.KotlinLogging
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 class BitmaxClient(
-    val api: String? = null,
-    val sec: String? = null,
+    private val api: String? = null,
+    private val sec: String? = null,
     private val instance: BitMaxRestApiClient = newBitmaxClient(api, sec)
 ) : Client {
 
@@ -55,12 +56,12 @@ class BitmaxClient(
         .filter { it.symbol == "${pair.first}/${pair.second}" }
         .map { it.toOrder() }
 
-    override fun getAllOpenOrders(pairs: List<TradePair>): Map<String, List<Order>> {
+    override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> {
         val filter = pairs.map { "${it.first}/${it.second}" }
         return instance.openOrders!!.data
             .filter { filter.contains(it.symbol) }
             .map { it.toOrder() }
-            .groupBy { it.pair.toString() }
+            .groupBy { TradePair(it.pair.toString()) }
     }
 
     override fun getBalances(): List<Balance> = instance.balance!!.data.map { it.toBalance() }
@@ -68,12 +69,12 @@ class BitmaxClient(
     override fun getOrderBook(pair: TradePair, limit: Int): OrderBook {
         val book = instance.getOrderBook("${pair.first}/${pair.second}")
 
-        val asks: List<OrderEntry> = book.data?.data?.asks?.map { OrderEntry(it[0].toDouble(), it[1].toDouble()) }
+        val asks: List<Offer> = book.data?.data?.asks?.map { Offer(it[0].toBigDecimal(), it[1].toBigDecimal()) }
             ?.sortedBy { it.price }
             ?.run { if (size > limit) subList(0, limit) else this }
             ?: throw UnsupportedOrderBookException("Order Book data Empty!")
 
-        val bids: List<OrderEntry> = book.data.data.bids.map { OrderEntry(it[0].toDouble(), it[1].toDouble()) }
+        val bids: List<Offer> = book.data.data.bids.map { Offer(it[0].toBigDecimal(), it[1].toBigDecimal()) }
             .sortedBy { it.price }
             .run { if (size > limit) subList(size - limit, size) else this }
 
@@ -116,8 +117,8 @@ class BitmaxClient(
         pair: TradePair,
         side: SIDE,
         type: TYPE,
-        amount: Double,
-        price: Double,
+        amount: BigDecimal,
+        price: BigDecimal,
         isStaticUpdate: Boolean,
         formatCount: String,
         formatPrice: String
@@ -162,7 +163,7 @@ class BitmaxClient(
             )
     }
 
-    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean) {
+    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {
         val time = System.currentTimeMillis()
 
         val cancelOrderRequest = RestCancelOrderRequest(
@@ -177,7 +178,7 @@ class BitmaxClient(
         val resp = instance.cancelOrder(cancelOrderRequest)
 
         if (resp?.data?.status == "Ack")
-            return
+            return true
         else
             throw RuntimeException("Error placeOrderResponse: $resp")
     }
@@ -193,11 +194,10 @@ class BitmaxClient(
         val authMsg = Authorization(api, sec).getAuthSocketMsg(System.currentTimeMillis())
 
         return SocketThreadBitmaxImpl(
-            symbol = "${pair.first}-${pair.second}",
+            pair = pair,
             client = BitMaxApiWebSocketListener(
                 authMsg, url, 5000, true,
                 WebSocketMsg(op = "sub", ch = "trades:${pair.first}/${pair.second}"),
-                WebSocketMsg(op = "sub", ch = "bar:${getInterval(interval)}:${pair.first}/${pair.second}"),
                 WebSocketMsg(op = "sub", ch = "depth:${pair.first}/${pair.second}"),
                 WebSocketMsg(op = "sub", ch = "order:cash")
             ),
@@ -249,117 +249,82 @@ class BitmaxClient(
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
     }
-}
 
-private fun RestBalance.toBalance(): Balance =
-    Balance(
-        asset,
-        totalBalance.toDouble(),
-        availableBalance.toDouble(),
-        totalBalance.toDouble() - availableBalance.toDouble()
+    private fun RestBalance.toBalance(): Balance =
+        Balance(
+            asset,
+            totalBalance.toBigDecimal(),
+            availableBalance.toBigDecimal(),
+            totalBalance.toBigDecimal() - availableBalance.toBigDecimal()
+        )
+
+
+    private fun BitmaxCandlestick.toCandlestick(): Candlestick = Candlestick(
+        openTime = time,
+        volume = volume!!.toBigDecimal(),
+        close = close!!.toBigDecimal(),
+        high = high!!.toBigDecimal(),
+        low = low!!.toBigDecimal(),
+        open = open!!.toBigDecimal(),
+        closeTime = time + when (BitmaxInterval.from(interval!!)) {
+            BitmaxInterval.ONE_MINUTE -> 60_000L - 1
+            BitmaxInterval.FIVE_MINUTES -> 300_000L - 1
+            BitmaxInterval.FIFTEEN_MINUTES -> 900_000L - 1
+            BitmaxInterval.HALF_HOURLY -> 1_800_000L - 1
+            BitmaxInterval.HOURLY -> 3_600_000L - 1
+            BitmaxInterval.TWO_HOURLY -> 3_600_000L * 2 - 1
+            BitmaxInterval.FOUR_HOURLY -> 3_600_000L * 4 - 1
+            BitmaxInterval.SIX_HOURLY -> 3_600_000L * 6 - 1
+            BitmaxInterval.TWELVE_HOURLY -> 3_600_000L * 12 - 1
+            BitmaxInterval.DAILY -> 3_600_000L * 24 - 1
+            BitmaxInterval.WEEKLY -> 3_600_000L * 7 - 1
+            BitmaxInterval.MONTHLY -> 3_600_000L * 30 - 1
+        }
     )
 
+    private fun RestPlaceOrderRequest.toOrder(resp: PlaceOrCancelOrder): Order = Order(
+        orderId = resp.data!!.info.orderId,
+        pair = TradePair(symbol.replace('/', '_')),
+        price = orderPrice.toBigDecimal(),
+        origQty = orderQty.toBigDecimal(),
+        executedQty = BigDecimal(0),
+        side = when (side) {
+            "buy" -> SIDE.BUY
+            "sell" -> SIDE.SELL
+            else -> SIDE.UNSUPPORTED
+        },
+        type = when (orderType) {
+            "limit" -> TYPE.LIMIT
+            "market" -> TYPE.MARKET
+            else -> TYPE.UNSUPPORTED
+        },
+        status = STATUS.NEW
+    )
 
-fun BitmaxCandlestick.toCandlestick(): Candlestick = Candlestick(
-    openTime = time,
-    volume = volume!!.toDouble(),
-    close = close!!.toDouble(),
-    high = high!!.toDouble(),
-    low = low!!.toDouble(),
-    open = open!!.toDouble(),
-    closeTime = time + when (BitmaxInterval.from(interval!!)) {
-        BitmaxInterval.ONE_MINUTE -> 60_000L - 1
-        BitmaxInterval.FIVE_MINUTES -> 300_000L - 1
-        BitmaxInterval.FIFTEEN_MINUTES -> 900_000L - 1
-        BitmaxInterval.HALF_HOURLY -> 1_800_000L - 1
-        BitmaxInterval.HOURLY -> 3_600_000L - 1
-        BitmaxInterval.TWO_HOURLY -> 3_600_000L * 2 - 1
-        BitmaxInterval.FOUR_HOURLY -> 3_600_000L * 4 - 1
-        BitmaxInterval.SIX_HOURLY -> 3_600_000L * 6 - 1
-        BitmaxInterval.TWELVE_HOURLY -> 3_600_000L * 12 - 1
-        BitmaxInterval.DAILY -> 3_600_000L * 24 - 1
-        BitmaxInterval.WEEKLY -> 3_600_000L * 7 - 1
-        BitmaxInterval.MONTHLY -> 3_600_000L * 30 - 1
-    }
-)
-
-fun String.toInterval(): INTERVAL = when {
-    this == "1m" -> INTERVAL.ONE_MINUTE
-    this == "3m" -> INTERVAL.THREE_MINUTES
-    this == "5m" -> INTERVAL.FIVE_MINUTES
-    this == "15m" -> INTERVAL.FIFTEEN_MINUTES
-    this == "30m" -> INTERVAL.HALF_HOURLY
-    this == "1h" -> INTERVAL.HOURLY
-    this == "2h" -> INTERVAL.TWO_HOURLY
-    this == "4h" -> INTERVAL.FOUR_HOURLY
-    this == "6h" -> INTERVAL.SIX_HOURLY
-    this == "8h" -> INTERVAL.EIGHT_HOURLY
-    this == "12h" -> INTERVAL.TWELVE_HOURLY
-    this == "1d" -> INTERVAL.DAILY
-    this == "3d" -> INTERVAL.THREE_DAILY
-    this == "1w" -> INTERVAL.WEEKLY
-    this == "1M" -> INTERVAL.MONTHLY
-    else -> throw Exception("Not supported CandlestickInterval!")
-}
-
-fun RestPlaceOrderRequest.toOrder(resp: PlaceOrCancelOrder): Order = Order(
-    orderId = resp.data!!.info.orderId,
-    pair = TradePair(symbol.replace('/', '_')),
-    price = orderPrice.toDouble(),
-    origQty = orderQty.toDouble(),
-    executedQty = 0.0,
-    side = when (side) {
-        "buy" -> SIDE.BUY
-        "sell" -> SIDE.SELL
-        else -> SIDE.UNSUPPORTED
-    },
-    type = when (orderType) {
-        "limit" -> TYPE.LIMIT
-        "market" -> TYPE.MARKET
-        else -> TYPE.UNSUPPORTED
-    },
-    status = STATUS.NEW
-)
-
-fun RestOrderDetailsData.toOrder(): Order = Order(
-    orderId = orderId,
-    pair = TradePair(symbol.replace('/', '_')),
-    price = price.toDouble(),
-    origQty = orderQty.toDouble(),
-    executedQty = cumFilledQty.toDouble(),
-    side = when (side) {
-        "Buy" -> SIDE.BUY
-        "Sell" -> SIDE.SELL
-        else -> SIDE.UNSUPPORTED
-    },
-    type = when (orderType) {
-        "Limit" -> TYPE.LIMIT
-        "Market" -> TYPE.MARKET
-        else -> TYPE.UNSUPPORTED
-    },
-    status = when (status) {
-        "PendingNew" -> STATUS.NEW
-        "New" -> STATUS.NEW
-        "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
-        "Filled" -> STATUS.FILLED
-        "Canceled" -> STATUS.CANCELED
-        "Rejected" -> STATUS.REJECTED
-        else -> STATUS.UNSUPPORTED
-    }
-)
-
-
-fun BitmaxInterval.toInterval(): INTERVAL = when (this) {
-    BitmaxInterval.ONE_MINUTE -> INTERVAL.ONE_MINUTE
-    BitmaxInterval.FIVE_MINUTES -> INTERVAL.FIVE_MINUTES
-    BitmaxInterval.FIFTEEN_MINUTES -> INTERVAL.FIFTEEN_MINUTES
-    BitmaxInterval.HALF_HOURLY -> INTERVAL.HALF_HOURLY
-    BitmaxInterval.HOURLY -> INTERVAL.HOURLY
-    BitmaxInterval.TWO_HOURLY -> INTERVAL.TWO_HOURLY
-    BitmaxInterval.FOUR_HOURLY -> INTERVAL.FOUR_HOURLY
-    BitmaxInterval.SIX_HOURLY -> INTERVAL.SIX_HOURLY
-    BitmaxInterval.TWELVE_HOURLY -> INTERVAL.TWELVE_HOURLY
-    BitmaxInterval.DAILY -> INTERVAL.DAILY
-    BitmaxInterval.WEEKLY -> INTERVAL.WEEKLY
-    BitmaxInterval.MONTHLY -> INTERVAL.MONTHLY
+    private fun RestOrderDetailsData.toOrder(): Order = Order(
+        orderId = orderId,
+        pair = TradePair(symbol.replace('/', '_')),
+        price = price.toBigDecimal(),
+        origQty = orderQty.toBigDecimal(),
+        executedQty = cumFilledQty.toBigDecimal(),
+        side = when (side) {
+            "Buy" -> SIDE.BUY
+            "Sell" -> SIDE.SELL
+            else -> SIDE.UNSUPPORTED
+        },
+        type = when (orderType) {
+            "Limit" -> TYPE.LIMIT
+            "Market" -> TYPE.MARKET
+            else -> TYPE.UNSUPPORTED
+        },
+        status = when (status) {
+            "PendingNew" -> STATUS.NEW
+            "New" -> STATUS.NEW
+            "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
+            "Filled" -> STATUS.FILLED
+            "Canceled" -> STATUS.CANCELED
+            "Rejected" -> STATUS.REJECTED
+            else -> STATUS.UNSUPPORTED
+        }
+    )
 }

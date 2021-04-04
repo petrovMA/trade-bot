@@ -13,7 +13,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
  */
 class BitMaxRestApiClientAccount(apiKey: String, secret: String) : BitMaxRestApiClient() {
     private val authClient: Authorization = Authorization(apiKey, secret)
-    val accountGroup: Int
+    private val accountGroup: Int
 
     init {
         accountGroup = userInfo.data.accountGroup
