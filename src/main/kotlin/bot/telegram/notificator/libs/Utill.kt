@@ -17,6 +17,7 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.reflect.Type
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.text.ParseException
@@ -26,7 +27,6 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
 
 
 val format = SimpleDateFormat("yyyy.MM.dd HH:mm:ss").also { it.timeZone = TimeZone.getTimeZone("UTC") }
@@ -92,8 +92,11 @@ fun deleteDirectory(directoryToBeDeleted: File): Boolean {
     return directoryToBeDeleted.delete()
 }
 
+fun BigDecimal.div8(by: BigDecimal): BigDecimal = this.divide(by, 8, RoundingMode.HALF_UP)
+
 fun BigDecimal.percent(amountOfPercents: BigDecimal = 1.0.toBigDecimal()): BigDecimal =
-    this / 100.toBigDecimal() * amountOfPercents
+    this.divide(100.toBigDecimal(), 8, RoundingMode.HALF_UP) * amountOfPercents
+
 
 fun Int.ms(): Duration = Duration.ofMillis(this.toLong())
 fun Long.ms(): Duration = Duration.ofMillis(this)

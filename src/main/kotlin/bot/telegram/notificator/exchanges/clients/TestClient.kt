@@ -8,6 +8,7 @@ import bot.telegram.notificator.exchanges.emulate.libs.UnsupportedStateException
 import bot.telegram.notificator.exchanges.BotEvent
 import bot.telegram.notificator.exchanges.CandlestickListsIterator
 import bot.telegram.notificator.libs.convertTime
+import bot.telegram.notificator.libs.div8
 import bot.telegram.notificator.libs.percent
 import mu.KotlinLogging
 import java.math.BigDecimal
@@ -33,7 +34,7 @@ class TestClient(
 //        addAll(readObjectFromFile(files.component2(), ArrayList::class.java).map { toCandlestick(it) })
 //        addAll(readObjectFromFile(files.component3(), ArrayList::class.java).map { toCandlestick(it) })
 
-        balance.apply { if (firstBalance == BigDecimal(0)) firstBalance = secondBalance / it.first().close }
+        balance.apply { if (firstBalance == BigDecimal(0)) firstBalance = secondBalance.div8(it.first().close) }
     }
 
     val interval = when (candlesticks.first().run { closeTime + 1 - openTime }) {
@@ -124,46 +125,42 @@ class TestClient(
     }
 
     override fun newOrder(
-        pair: TradePair,
-        side: SIDE,
-        type: TYPE,
-        amount: BigDecimal,
-        price: BigDecimal,
+        order: Order,
         isStaticUpdate: Boolean,
         formatCount: String,
         formatPrice: String
     ): Order {
         if (isStaticUpdate) updateStaticOrdersCount++
         ++clientOrderId
-        val order = Order(
-            pair = pair,
-            side = side,
-            type = type,
-            origQty = amount,
+        val newOrder = Order(
+            pair = order.pair,
+            side = order.side,
+            type = order.type,
+            origQty = order.origQty,
+            price = order.price,
             executedQty = BigDecimal(0),
-            price = price,
             status = STATUS.NEW,
             orderId = clientOrderId.toString()
         )
 
-        if (side == SIDE.SELL)
-            balance.firstBalance -= amount
-        else if (side == SIDE.BUY)
-            balance.secondBalance -= amount * price
+        if (order.side == SIDE.SELL)
+            balance.firstBalance -= order.origQty
+        else if (order.side == SIDE.BUY)
+            balance.secondBalance -= order.origQty * order.price
 
         if (firstOrder == null || firstOrder?.status in listOf(STATUS.FILLED, STATUS.CANCELED, STATUS.REJECTED)) {
-            firstOrder = order
+            firstOrder = newOrder
         } else if (secondOrder == null || secondOrder?.status in listOf(
                 STATUS.FILLED,
                 STATUS.CANCELED,
                 STATUS.REJECTED
             )
         ) {
-            secondOrder = order
+            secondOrder = newOrder
         } else
             throw NoEmptyOrdersException("Empty orders not found!")
 
-        return order
+        return newOrder
     }
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {

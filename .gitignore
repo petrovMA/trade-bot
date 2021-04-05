@@ -112,3 +112,4 @@ target/
 /exchange/*
 /logging/
 /copy_files_from_server.sh
+/exchange/

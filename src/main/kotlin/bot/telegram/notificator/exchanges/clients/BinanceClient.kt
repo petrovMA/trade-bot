@@ -178,29 +178,25 @@ class BinanceClient(
         }.first()
 
     override fun newOrder(
-        pair: TradePair,
-        side: SIDE,
-        type: TYPE,
-        amount: BigDecimal,
-        price: BigDecimal,
+        order: Order,
         isStaticUpdate: Boolean,
         formatCount: String,
         formatPrice: String
     ): Order {
-        val typeX = side.toType()
-        val currPair = CurrencyPair(pair.first, pair.second)
+        val typeX = order.side.toType()
+        val currPair = CurrencyPair(order.pair.first, order.pair.second)
         val orderId = tradeService.placeLimitOrder(
             LimitOrder(
                 typeX,
-                String.format(formatCount, amount).toBigDecimal(),
+                String.format(formatCount, order.origQty).toBigDecimal(),
                 currPair,
                 null,
                 Date(),
-                String.format(formatPrice, price).toBigDecimal()
+                String.format(formatPrice, order.price).toBigDecimal()
             )
         )
 
-        return Order(orderId, pair, price, amount, BigDecimal(0), side, type, STATUS.NEW)
+        return Order(orderId, order.pair, order.price, order.origQty, BigDecimal(0), order.side, order.type, STATUS.NEW)
     }
 
 

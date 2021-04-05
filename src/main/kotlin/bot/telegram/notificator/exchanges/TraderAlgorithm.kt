@@ -43,7 +43,8 @@ class TraderAlgorithm(
     private var deltaPercent = conf.getDouble("percent.delta").toBigDecimal()
     private var percentBuyProf = conf.getDouble("percent.buy_prof").toBigDecimal()
     private var percentSellProf = conf.getDouble("percent.sell_prof").toBigDecimal()
-    private var percentCountForPartiallyFilledUpd = conf.getDouble("percent.count_for_partially_filled_upd").toBigDecimal()
+    private var percentCountForPartiallyFilledUpd =
+        conf.getDouble("percent.count_for_partially_filled_upd").toBigDecimal()
     private var intervalCandlesBuy = conf.getInt("interval.candles_buy")
     private var intervalCandlesSell = conf.getInt("interval.candles_sell")
 
@@ -64,7 +65,8 @@ class TraderAlgorithm(
     private val retryGetOrderInterval = conf.getDuration("retry.get_order_interval")
     private val reconnectWaitTime = conf.getDuration("wait_time.reconnect")
     private val exceptionWaitTime = conf.getDuration("wait_time.exception")
-    private val updateCandlestickOrdersTimeInterval = conf.getDuration("update_candlestick_orders_time_interval")
+    private val updateCandlestickOrdersInterval =
+        ActionInterval(conf.getDuration("update_candlestick_orders_time_interval"))
     private val waitBetweenCancelAndUpdateOrders = conf.getDuration("wait_between_cancel_and_update_orders")
 
     //    private val writeEthBalanceToHistoryInterval = conf.getDuration("save.eth_balance_to_history_interval")
@@ -202,8 +204,6 @@ class TraderAlgorithm(
 
             if (!isEmulate) writeLine(balance, File("$path/balance.json"))
 
-            var lastCandlestickOrdersUpdateTime = candlestickList.last().closeTime.ms()
-
             client.nextEvent() /* only for test */
             msg = queue.poll(waitTime)
             while (true) {
@@ -229,9 +229,8 @@ class TraderAlgorithm(
                                         if (kline.first)
                                             candlestickList.add(kline.second)
                                     }
-                                    if (candlestickList.last().closeTime.ms() >= lastCandlestickOrdersUpdateTime + updateCandlestickOrdersTimeInterval) {
-                                        log?.debug("$tradePair Update orders by CandlestickEvent!")
-                                        lastCandlestickOrdersUpdateTime = candlestickList.last().closeTime.ms()
+                                    updateCandlestickOrdersInterval.tryInvoke {
+                                        log?.debug("$tradePair Update orders by Trade!")
                                         calcAveragePrice()
                                         updateOrders()
                                     }
@@ -438,7 +437,7 @@ class TraderAlgorithm(
 
             if (freeSecondBalance > balance.balanceTrade + balance.balanceTrade.percent(minOverheadBalance)) {
                 balance.orderB = sentOrder(
-                    amount = balance.balanceTrade / price,
+                    amount = balance.balanceTrade.div8(price),
                     price = price,
                     orderSide = SIDE.BUY,
                     isStaticUpdate = false
@@ -458,8 +457,10 @@ class TraderAlgorithm(
                             "\nfreeSecondBalance = $freeSecondBalance"
                 )
 
-                if (tryingUpdateOrderBuy >= maxTryingUpdateOrderBuy) interruptThis()
-                else tryingUpdateOrderBuy++
+                if (tryingUpdateOrderBuy >= maxTryingUpdateOrderBuy) {
+                    tryingUpdateOrderBuy = 0
+                    interruptThis()
+                } else tryingUpdateOrderBuy++
 
                 return freeSecondBalance
             }
@@ -509,17 +510,17 @@ class TraderAlgorithm(
 
             freeFirstBalance = client.getAssetBalance(firstSymbol).free
 
-            if (freeFirstBalance > (balance.balanceTrade / price) + (balance.balanceTrade / price).percent(
+            if (freeFirstBalance > (balance.balanceTrade.div8(price)) + (balance.balanceTrade.div8(price)).percent(
                     minOverheadBalance
                 )
             ) {
                 balance.orderS = sentOrder(
-                    amount = balance.balanceTrade / price,
+                    amount = balance.balanceTrade.div8(price),
                     price = price,
                     orderSide = SIDE.SELL,
                     isStaticUpdate = false
                 )
-                freeFirstBalance -= balance.balanceTrade / price
+                freeFirstBalance -= balance.balanceTrade.div8(price)
                 if (!isEmulate) {
                     reWriteObject(balance.orderS!!, File("$path/orderS.json"))
                     writeLine(balance, File("$path/balance.json"))
@@ -529,15 +530,16 @@ class TraderAlgorithm(
                 log?.warn("can't create orderS")
                 sendMessage(
                     "#Cannot_create_orderS_$tradePair:" +
-                            "\n(balance.balanceTrade / price).percent = ${
-                                (balance.balanceTrade / price).percent(minOverheadBalance)
-                            }" +
-                            "\n(balance.balanceTrade / price) = ${(balance.balanceTrade / price)}" +
+                            "\n(balance.balanceTrade / price).percent = " +
+                            (balance.balanceTrade.div8(price)).percent(minOverheadBalance) +
+                            "\n(balance.balanceTrade / price) = ${(balance.balanceTrade.div8(price))}" +
                             "\nfreeFirstBalance = $freeFirstBalance"
                 )
 
-                if (tryingUpdateOrderSell >= maxTryingUpdateOrderSell) interruptThis()
-                else tryingUpdateOrderSell++
+                if (tryingUpdateOrderSell >= maxTryingUpdateOrderSell) {
+                    tryingUpdateOrderSell = 0
+                    interruptThis()
+                } else tryingUpdateOrderSell++
 
                 return freeFirstBalance
             }
@@ -595,7 +597,9 @@ class TraderAlgorithm(
                     if (price != balance.orderB?.price) {
                         cancelOrder(balance.symbols, balance.orderB!!, false)
                         wait(waitBetweenCancelAndUpdateOrders)
-                        if (BigDecimal(100) - (countToBuy / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
+                        if (BigDecimal(100) - (countToBuy.div8(balance.balanceTrade.div8(price))
+                                .percent()) > percentCountForPartiallyFilledUpd
+                        )
                             balance.orderB = sentOrder(
                                 amount = countToBuy,
                                 price = price,
@@ -604,7 +608,7 @@ class TraderAlgorithm(
                             )
                         else
                             balance.orderB = sentOrder(
-                                amount = balance.balanceTrade / price,
+                                amount = balance.balanceTrade.div8(price),
                                 price = price,
                                 orderSide = SIDE.BUY,
                                 isStaticUpdate = false
@@ -685,7 +689,9 @@ class TraderAlgorithm(
                     if (price != balance.orderS?.price) {
                         cancelOrder(balance.symbols, balance.orderS!!, false)
                         wait(waitBetweenCancelAndUpdateOrders)
-                        if (BigDecimal(100) - (countToSell / (balance.balanceTrade / price).percent()) > percentCountForPartiallyFilledUpd)
+                        if (BigDecimal(100) - (countToSell.div8(balance.balanceTrade.div8(price))
+                                .percent()) > percentCountForPartiallyFilledUpd
+                        )
                             balance.orderS = sentOrder(
                                 amount = countToSell,
                                 price = price,
@@ -694,7 +700,7 @@ class TraderAlgorithm(
                             )
                         else
                             balance.orderS = sentOrder(
-                                amount = balance.balanceTrade / price,
+                                amount = balance.balanceTrade.div8(price),
                                 price = price,
                                 orderSide = SIDE.SELL,
                                 isStaticUpdate = false
@@ -767,8 +773,8 @@ class TraderAlgorithm(
             val prevPrice = balance.orderB!!.price
 
             balance.orderB = sentOrder(
-                amount = if (firstBalanceFixed) balance.balanceTrade / prevPrice
-                else balance.balanceTrade / price,
+                amount = if (firstBalanceFixed) balance.balanceTrade.div8(prevPrice)
+                else balance.balanceTrade.div8(price),
                 price = price,
                 orderSide = SIDE.SELL,
                 isStaticUpdate = false
@@ -790,7 +796,7 @@ class TraderAlgorithm(
             log?.info("$tradePair BUY Order FILLED 2:\n${balance.orderB}")
 
             balance.orderB = sentOrder(
-                amount = balance.balanceTrade / price,
+                amount = balance.balanceTrade.div8(price),
                 price = price,
                 orderSide = SIDE.BUY,
                 isStaticUpdate = false
@@ -813,8 +819,8 @@ class TraderAlgorithm(
             val prevPrice = balance.orderS!!.price
 
             balance.orderS = sentOrder(
-                amount = if (firstBalanceFixed) balance.balanceTrade / prevPrice
-                else balance.balanceTrade / price,
+                amount = if (firstBalanceFixed) balance.balanceTrade.div8(prevPrice)
+                else balance.balanceTrade.div8(price),
                 price = price,
                 orderSide = SIDE.BUY,
                 isStaticUpdate = false
@@ -835,7 +841,7 @@ class TraderAlgorithm(
             log?.info("$tradePair SELL Order FILLED 2:\n${balance.orderS}")
 
             balance.orderS = sentOrder(
-                amount = balance.balanceTrade / price,
+                amount = balance.balanceTrade.div8(price),
                 price = price,
                 orderSide = SIDE.SELL,
                 isStaticUpdate = false
@@ -873,20 +879,11 @@ class TraderAlgorithm(
 
         var retryCount = retrySentOrderCount
 
-        var order: Order? = null
-        do {
+        var order = Order("", tradePair, price, amount, BigDecimal(0), orderSide, TYPE.LIMIT, STATUS.NEW)
 
+        do {
             try {
-                order = client.newOrder(
-                    balance.symbols,
-                    orderSide,
-                    TYPE.LIMIT,
-                    amount,
-                    price,
-                    isStaticUpdate,
-                    formatCount,
-                    formatPrice
-                )
+                order = client.newOrder(order, isStaticUpdate, formatCount, formatPrice)
                 log?.debug("$tradePair Order sent: $order")
                 return order
             } catch (e: Exception) {
@@ -904,7 +901,6 @@ class TraderAlgorithm(
                 sendMessage("#Cannot_send_order_$tradePair: $order\nError:\n${printTrace(e, 50)}")
                 log?.error("$tradePair Can't send: $order", e)
 
-                order = null
                 e.printStackTrace()
                 log?.debug("$tradePair Balances:\nBuy = ${balance.orderB}\nSell = ${balance.orderS}")
                 client = newClient(exchangeEnum, api, sec)
@@ -1087,7 +1083,7 @@ class TraderAlgorithm(
                         (balance.orderS!!.price + minPriceDifference).percent(deltaPercent))
 
                 val countToBuy =
-                    balance.orderB!!.origQty * balance.orderB!!.price / priceBuy - balance.orderB!!.executedQty
+                    balance.orderB!!.origQty * balance.orderB!!.price.div8(priceBuy) - balance.orderB!!.executedQty
                 if (countToBuy * priceBuy < minTradeBalance && updateIfAlmostFilled) {
                     sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
                     cancelOrder(balance.symbols, balance.orderB!!, false)
@@ -1096,7 +1092,7 @@ class TraderAlgorithm(
                 }
 
                 val countToSell =
-                    balance.orderS!!.origQty * balance.orderS!!.price / priceSell - balance.orderS!!.executedQty
+                    balance.orderS!!.origQty * balance.orderS!!.price.div8(priceSell) - balance.orderS!!.executedQty
                 if (countToSell * priceSell < minTradeBalance && updateIfAlmostFilled) {
                     sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
                     cancelOrder(balance.symbols, balance.orderS!!, false)
@@ -1232,12 +1228,12 @@ class TraderAlgorithm(
                 else
                     nearSellPrice + nearSellPrice.percent(deltaPercent)
 
-            if (freeFirstBalance > (balance.balanceTrade / priceFirst) + (balance.balanceTrade / priceFirst).percent(
+            if (freeFirstBalance > (balance.balanceTrade.div8(priceFirst)) + (balance.balanceTrade.div8(priceFirst)).percent(
                     minOverheadBalance
                 )
             ) {
                 balance.orderB = sentOrder(
-                    amount = balance.balanceTrade / priceFirst,
+                    amount = balance.balanceTrade.div8(priceFirst),
                     price = priceFirst,
                     orderSide = SIDE.SELL,
                     isStaticUpdate = false
@@ -1245,12 +1241,9 @@ class TraderAlgorithm(
                 if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
             } else {
                 val warnMsg = "#cannot_create_orderB_$tradePair:" +
-                        "\n(balance.balanceTrade / price).percent = ${
-                            (balance.balanceTrade / priceFirst).percent(
-                                minOverheadBalance
-                            )
-                        }" +
-                        "\n(balance.balanceTrade / price) = ${(balance.balanceTrade / priceFirst)}" +
+                        "\n(balance.balanceTrade / price).percent = " +
+                        (balance.balanceTrade.div8(priceFirst)).percent(minOverheadBalance) +
+                        "\n(balance.balanceTrade / price) = ${(balance.balanceTrade.div8(priceFirst))}" +
                         "\nfreeFirstBalance = $freeFirstBalance"
                 log?.warn(warnMsg)
                 sendMessage(warnMsg)
@@ -1267,7 +1260,7 @@ class TraderAlgorithm(
 
             if (freeSecondBalance > balance.balanceTrade + balance.balanceTrade.percent(minOverheadBalance)) {
                 balance.orderS = sentOrder(
-                    amount = balance.balanceTrade / priceSecond,
+                    amount = balance.balanceTrade.div8(priceSecond),
                     price = priceSecond,
                     orderSide = SIDE.BUY,
                     isStaticUpdate = false

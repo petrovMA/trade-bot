@@ -27,18 +27,22 @@ fun calcAveragePriceStatic(
 
     if (candlestickList.isEmpty()) {
         candlestickList = ListLimit(countCandles)
-        candlestickList.addAll(client.getCandlestickBars(symbols, interval, countCandles + 1)
-            .run { subList(0, if (size - 1 < countCandles) size - 1 else countCandles) })
+
+        client.getCandlestickBars(symbols, interval, countCandles + 1)
+            .forEach { candlestickList.add(it) }
+
         log?.info("$symbols Init candlestickList:\n${candlestickList}")
     }
 
     if (!isEmulate)
         for (i in 0 until candlestickList.size - 1) {
             if (candlestickList[i].closeTime + 1 != candlestickList[i + 1].openTime) {
-                log?.warn("$symbols candlestickList not sequence:\n$candlestickList[i]\n${candlestickList[i + 1]}")
+                log?.warn("$symbols candlestickList not sequence:\n${candlestickList[i]}\n${candlestickList[i + 1]}")
                 candlestickList = ListLimit(countCandles)
-                candlestickList.addAll(client.getCandlestickBars(symbols, interval, countCandles + 1)
-                    .run { subList(0, if (size - 1 < countCandles) size - 1 else countCandles) })
+
+                client.getCandlestickBars(symbols, interval, countCandles + 1)
+                    .forEach { candlestickList.add(it) }
+
                 break
             }
         }
@@ -63,7 +67,8 @@ fun calcAveragePriceStatic(
 
 class KlineConstructor(val interval: INTERVAL) {
     private val millsInterval = interval.toMillsTime()
-    private var candlestick = true to Candlestick(0, 0, BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))
+    private var candlestick =
+        true to Candlestick(0, 0, BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))
 
     fun nextKline(trade: Trade): List<Pair<Boolean, Candlestick>> {
 

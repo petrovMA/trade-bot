@@ -1,5 +1,8 @@
 package io.bitmax.api.rest.client
 
+import bot.telegram.notificator.exchanges.clients.INTERVAL
+import bot.telegram.notificator.exchanges.libs.bitmax.BitmaxCandlestick
+import bot.telegram.notificator.libs.NotSupportedIntervalException
 import io.bitmax.api.Mapper.asObject
 import io.bitmax.api.rest.messages.requests.RestCancelOrderRequest
 import io.bitmax.api.rest.messages.requests.RestPlaceOrderRequest
@@ -14,7 +17,7 @@ import java.io.IOException
  * BitMaxRestApiClient public restClient for unauthorized users.
  */
 open class BitMaxRestApiClient {
-    val url = "https://bitmax.io/"
+    val url = "https://ascendex.com/"
     val api = "api/pro/v1/"
     private val pathBars = "barhist"
     private val pathProducts = "products"
@@ -36,16 +39,16 @@ open class BitMaxRestApiClient {
      * @param interval bars interval
      * @param limit max bars count
      */
-    fun getCandlestickBars(symbol: String, interval: BitmaxInterval, limit: Int): Array<RestBarHist> {
+    fun getCandlestickBars(symbol: String, interval: INTERVAL, limit: Int): List<RestBarHist> {
         val between = getFrom(interval, limit)
-        val params = "?symbol=" + symbol + "&interval=" + interval + "&from=" + between[0] + "&to=" + between[1]
+        val params = "?symbol=$symbol&interval=${getInterval(interval)}&n=$limit"
         return try {
             executeRequest(
                 requestBuilder
                     .url(url + api + pathBars + params)
                     .get()
-                    .build(), Array<RestBarHist>::class.java
-            )
+                    .build(), RestBarHists::class.java
+            ).data
         } catch (e: IOException) {
             e.printStackTrace()
             throw RuntimeException(e)
@@ -133,22 +136,41 @@ open class BitMaxRestApiClient {
      * @param interval bars interval
      * @param limit max bars count
      */
-    private fun getFrom(interval: BitmaxInterval, limit: Int): LongArray {
+    private fun getFrom(interval: INTERVAL, limit: Int): Pair<Long, Long> {
         val time = System.currentTimeMillis()
         return when (interval) {
-            BitmaxInterval.ONE_MINUTE -> longArrayOf(time - 60000L * limit, time)
-            BitmaxInterval.FIVE_MINUTES -> longArrayOf(time - 300000L * limit, time)
-            BitmaxInterval.FIFTEEN_MINUTES -> longArrayOf(time - 900000L * limit, time)
-            BitmaxInterval.HALF_HOURLY -> longArrayOf(time - 1800000L * limit, time)
-            BitmaxInterval.HOURLY -> longArrayOf(time - 3600000L * limit, time)
-            BitmaxInterval.TWO_HOURLY -> longArrayOf(time - 3600000L * 2 * limit, time)
-            BitmaxInterval.FOUR_HOURLY -> longArrayOf(time - 3600000L * 4 * limit, time)
-            BitmaxInterval.SIX_HOURLY -> longArrayOf(time - 3600000L * 6 * limit, time)
-            BitmaxInterval.TWELVE_HOURLY -> longArrayOf(time - 3600000L * 12 * limit, time)
-            BitmaxInterval.DAILY -> longArrayOf(time - 3600000L * 24 * limit, time)
-            BitmaxInterval.WEEKLY -> longArrayOf(time - 3600000L * 24 * 7 * limit, time)
-            BitmaxInterval.MONTHLY -> longArrayOf(time - 3600000L * 24 * 31 * limit, time)
+            INTERVAL.ONE_MINUTE -> time - 60000L * limit to time
+            INTERVAL.THREE_MINUTES -> time - 180000L * limit to time
+            INTERVAL.FIVE_MINUTES -> time - 300000L * limit to time
+            INTERVAL.FIFTEEN_MINUTES -> time - 900000L * limit to time
+            INTERVAL.HALF_HOURLY -> time - 1800000L * limit to time
+            INTERVAL.HOURLY -> time - 3600000L * limit to time
+            INTERVAL.TWO_HOURLY -> time - 3600000L * 2 * limit to time
+            INTERVAL.FOUR_HOURLY -> time - 3600000L * 4 * limit to time
+            INTERVAL.SIX_HOURLY -> time - 3600000L * 6 * limit to time
+            INTERVAL.EIGHT_HOURLY -> time - 3600000L * 8 * limit to time
+            INTERVAL.TWELVE_HOURLY -> time - 3600000L * 12 * limit to time
+            INTERVAL.DAILY -> time - 3600000L * 24 * limit to time
+            INTERVAL.THREE_DAILY -> time - 3600000L * 24 * 3 * limit to time
+            INTERVAL.WEEKLY -> time - 3600000L * 24 * 7 * limit to time
+            INTERVAL.MONTHLY -> time - 3600000L * 24 * 31 * limit to time
         }
     }
 
+
+    private fun getInterval(interval: INTERVAL): String = when (interval) {
+        INTERVAL.ONE_MINUTE -> "1"
+        INTERVAL.FIVE_MINUTES -> "5"
+        INTERVAL.FIFTEEN_MINUTES -> "15"
+        INTERVAL.HALF_HOURLY -> "30"
+        INTERVAL.HOURLY -> "60"
+        INTERVAL.TWO_HOURLY -> "120"
+        INTERVAL.FOUR_HOURLY -> "240"
+        INTERVAL.SIX_HOURLY -> "360"
+        INTERVAL.TWELVE_HOURLY -> "720"
+        INTERVAL.DAILY -> "1d"
+        INTERVAL.WEEKLY -> "1w"
+        INTERVAL.MONTHLY -> "1m"
+        else -> throw NotSupportedIntervalException()
+    }
 }

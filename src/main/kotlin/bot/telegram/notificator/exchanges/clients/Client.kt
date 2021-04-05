@@ -13,7 +13,7 @@ interface Client {
     fun getAssetBalance(asset: String): Balance
     fun getOrder(pair: TradePair, orderId: String): Order
     fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick>
-    fun newOrder(pair: TradePair, side: SIDE, type: TYPE, amount: BigDecimal, price: BigDecimal, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order
+    fun newOrder(order: Order, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order
     fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean
 
     /**

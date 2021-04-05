@@ -2,7 +2,6 @@ package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.clients.socket.SocketThread
 import bot.telegram.notificator.exchanges.clients.socket.SocketThreadBitmaxImpl
-import bot.telegram.notificator.exchanges.libs.bitmax.BitmaxCandlestick
 import bot.telegram.notificator.exchanges.libs.bitmax.Product
 import bot.telegram.notificator.libs.*
 import io.bitmax.api.Authorization
@@ -37,7 +36,7 @@ class BitmaxClient(
 
     override fun getAllPairs(): List<TradePair> = client.newCall(
         Request.Builder()
-            .url("https://bitmax.io/api/v1/products")
+            .url(instance.url + "api/v1/products")
             .get()
             .build()
     ).execute().let { resp ->
@@ -87,61 +86,53 @@ class BitmaxClient(
     override fun getOrder(pair: TradePair, orderId: String): Order = instance.getOrder(orderId)
         ?.also { log.debug("instance.getOrder: $it") }?.data?.toOrder() ?: stub()
 
-    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> {
-        val (from, to) = getFrom(interval, countCandles)
+    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
+        instance.getCandlestickBars("${pair.first}/${pair.second}", interval, countCandles)
+            .map { it.toCandlestick() }
 
-        val result = client.newCall(
-            Request.Builder()
-                .url(
-                    "https://bitmax.io/api/v1/barhist?symbol=${"${pair.first}-${pair.second}"}&interval=${
-                        getInterval(
-                            interval
-                        )
-                    }&from=$from&to=$to"
-                )
-                .get()
-                .build()
-        ).execute()
+//        val result = client.newCall(
+//            Request.Builder()
+//                .url(
+//                    instance.url + "api/v1/barhist?symbol=${"${pair.first}-${pair.second}"}&interval=${
+//                        getInterval(
+//                            interval
+//                        )
+//                    }&from=$from&to=$to"
+//                )
+//                .get()
+//                .build()
+//        ).execute()
 
-        return try {
-            Mapper.asObject(result.body!!.string(), Array<BitmaxCandlestick>::class.java)
-                .map { it.toCandlestick() }
-        } catch (t: Throwable) {
-            t.printStackTrace()
-            log.error("Can't parse response:\ncode: ${result.code}\nbody:\n${result.body?.string()}")
-            throw t
-        }
-    }
+//        return try {
+//            Mapper.asObject(result.body!!.string(), Array<BitmaxCandlestick>::class.java)
+//                .map { it.toCandlestick() }
+//        } catch (t: Throwable) {
+//            t.printStackTrace()
+//            log.error("Can't parse response:\ncode: ${result.code}\nbody:\n${result.body?.string()}")
+//            throw t
+//        }
+//    }
 
-    override fun newOrder(
-        pair: TradePair,
-        side: SIDE,
-        type: TYPE,
-        amount: BigDecimal,
-        price: BigDecimal,
-        isStaticUpdate: Boolean,
-        formatCount: String,
-        formatPrice: String
-    ): Order {
+    override fun newOrder(order: Order, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order {
 
-        val formattedCount = java.lang.String.format(formatCount, amount).replace(",", ".")
-        val formattedPrice = java.lang.String.format(formatPrice, price).replace(",", ".")
+        val formattedCount = java.lang.String.format(formatCount, order.origQty).replace(",", ".")
+        val formattedPrice = java.lang.String.format(formatPrice, order.price).replace(",", ".")
 
         val time = System.currentTimeMillis()
         val placeCoid = "coid_$time"
 
-        val order = RestPlaceOrderRequest(
+        val orderRest = RestPlaceOrderRequest(
             time = time,
-            symbol = "${pair.first}/${pair.second}",
+            symbol = "${order.pair.first}/${order.pair.second}",
             id = placeCoid,
             orderPrice = formattedPrice,
             orderQty = formattedCount,
-            orderType = when (type) {
+            orderType = when (order.type) {
                 TYPE.LIMIT -> "limit"
                 TYPE.MARKET -> "market"
                 else -> throw UnsupportedOrderTypeException()
             },
-            side = when (side) {
+            side = when (order.side) {
                 SIDE.BUY -> "buy"
                 SIDE.SELL -> "sell"
                 else -> throw UnsupportedOrderSideException()
@@ -150,10 +141,10 @@ class BitmaxClient(
 
         log.debug("newOrder: $order")
 
-        val resp = instance.placeOrder(order)
+        val resp = instance.placeOrder(orderRest)
 
         if (resp?.code == 0 && resp.data != null)
-            return order.toOrder(resp)
+            return orderRest.toOrder(resp)
         else
             throw RuntimeException(
                 "Error placeOrderResponse:" +
@@ -185,7 +176,7 @@ class BitmaxClient(
 
     override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): SocketThread {
 
-        val url = "wss://bitmax.io/$accountGroup/api/pro/v1/stream"
+        val url = "wss://ascendex.com/$accountGroup/api/pro/v1/stream"
 
         val book = getOrderBook(pair, 10)
 
@@ -210,41 +201,6 @@ class BitmaxClient(
 
     override fun nextEvent() {}
 
-    private fun getInterval(interval: INTERVAL): String = when (interval) {
-        INTERVAL.ONE_MINUTE -> "1"
-        INTERVAL.FIVE_MINUTES -> "5"
-        INTERVAL.FIFTEEN_MINUTES -> "15"
-        INTERVAL.HALF_HOURLY -> "30"
-        INTERVAL.HOURLY -> "60"
-        INTERVAL.TWO_HOURLY -> "120"
-        INTERVAL.FOUR_HOURLY -> "240"
-        INTERVAL.SIX_HOURLY -> "360"
-        INTERVAL.TWELVE_HOURLY -> "720"
-        INTERVAL.DAILY -> "1d"
-        INTERVAL.WEEKLY -> "1w"
-        INTERVAL.MONTHLY -> "1m"
-        else -> throw NotSupportedIntervalException()
-    }
-
-    private fun getFrom(interval: INTERVAL, count: Int): Pair<Long, Long> {
-        val time = System.currentTimeMillis()
-
-        return when (interval) {
-            INTERVAL.ONE_MINUTE -> time - (60_000L * (count)) to time
-            INTERVAL.FIVE_MINUTES -> time - 300_000L * (count) to time
-            INTERVAL.FIFTEEN_MINUTES -> time - 900_000L * (count) to time
-            INTERVAL.HALF_HOURLY -> time - 1_800_000L * (count) to time
-            INTERVAL.HOURLY -> time - 3_600_000L * (count) to time
-            INTERVAL.TWO_HOURLY -> time - 3_600_000L * 2 * (count) to time
-            INTERVAL.FOUR_HOURLY -> time - 3_600_000L * 4 * (count) to time
-            INTERVAL.SIX_HOURLY -> time - 3_600_000L * 6 * (count) to time
-            INTERVAL.TWELVE_HOURLY -> time - 3_600_000L * 12 * (count) to time
-            INTERVAL.DAILY -> time - 3_600_000L * 24 * (count) to time
-            INTERVAL.WEEKLY -> time - 3_600_000L * 24 * 7 * (count) to time
-            else -> throw NotSupportedIntervalException()
-        }
-    }
-
     override fun close() {
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
@@ -259,14 +215,14 @@ class BitmaxClient(
         )
 
 
-    private fun BitmaxCandlestick.toCandlestick(): Candlestick = Candlestick(
-        openTime = time,
-        volume = volume!!.toBigDecimal(),
-        close = close!!.toBigDecimal(),
-        high = high!!.toBigDecimal(),
-        low = low!!.toBigDecimal(),
-        open = open!!.toBigDecimal(),
-        closeTime = time + when (BitmaxInterval.from(interval!!)) {
+    private fun RestBarHist.toCandlestick(): Candlestick = Candlestick(
+        openTime = data!!.time,
+        volume = data!!.volume!!.toBigDecimal(),
+        close = data!!.close!!.toBigDecimal(),
+        high = data!!.high!!.toBigDecimal(),
+        low = data!!.low!!.toBigDecimal(),
+        open = data!!.open!!.toBigDecimal(),
+        closeTime = data!!.time + when (BitmaxInterval.from(data!!.interval!!)) {
             BitmaxInterval.ONE_MINUTE -> 60_000L - 1
             BitmaxInterval.FIVE_MINUTES -> 300_000L - 1
             BitmaxInterval.FIFTEEN_MINUTES -> 900_000L - 1

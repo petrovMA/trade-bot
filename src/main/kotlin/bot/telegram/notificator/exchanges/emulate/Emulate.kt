@@ -62,12 +62,12 @@ class Emulate(
             }
             stmt.close()
 
-            result = tablesPairs.map { tablePair ->
+            result = tablesPairs.asSequence().map { tablePair ->
                 val firstDay = startDate.toLocalDate().atStartOfDay()
 
-//            toEpochSecond(LocalTime.of(0, 0, 0, 0), ZoneOffset.UTC) * 1000
+        //            toEpochSecond(LocalTime.of(0, 0, 0, 0), ZoneOffset.UTC) * 1000
                 val lastDay = endDate.toLocalDate().atStartOfDay()
-//                toEpochSecond(LocalTime.of(0, 0, 0, 0), ZoneOffset.UTC) * 1000
+        //                toEpochSecond(LocalTime.of(0, 0, 0, 0), ZoneOffset.UTC) * 1000
                 calcProfit(TestClient(
                     iterator = CandlestickListsIterator(
                         connect,
