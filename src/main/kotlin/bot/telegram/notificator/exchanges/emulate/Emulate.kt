@@ -153,7 +153,8 @@ class Emulate(
                 client = client,
                 path = "exchange/emulate/data/results/${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}",
                 syncTimeInterval = (-1000).ms(),
-                isLog = logging
+                isLog = logging,
+                isEmulate = true
             ) { }
             trade.start()
             trade.join()

@@ -81,8 +81,8 @@ class TraderAlgorithm(
     private var nearSellPrice: BigDecimal = 0.toBigDecimal()
     private var nearBuyPrice: BigDecimal = 0.toBigDecimal()
     private var lastTradePrice: BigDecimal = 0.toBigDecimal()
-    private var checkBuyOrderTrigger = false to 1.s()
-    private var checkSellOrderTrigger = false to 1.s()
+    private var checkBuyOrderTrigger = false to if (isEmulate) 0.s() else 1.s()
+    private var checkSellOrderTrigger = false to if (isEmulate) 0.s() else  1.s()
     private var lastCheckBuyOrderTime: Duration = 5.s()
     private var lastCheckSellOrderTime: Duration = 5.s()
     private var lastSyncTime: Duration = 0.s()
@@ -228,7 +228,10 @@ class TraderAlgorithm(
                                     klineConstructor.nextKline(msg).forEach { kline ->
                                         if (kline.first) {
                                             candlestickList.add(kline.second)
-                                            if (isEmulate) calcAveragePrice()
+                                            if (isEmulate) {
+                                                calcAveragePrice()
+                                                updateOrders()
+                                            }
                                         }
                                     }
                                     updateCandlestickOrdersInterval.tryInvoke {
@@ -1213,11 +1216,10 @@ class TraderAlgorithm(
         throw Exception("Can't get Order! retry = $retryGetOrderCount; interval = $retryGetOrderInterval")
     }
 
-    private fun strOrder(order: Order?) = if (order == null) "Order is null"
-    else "price = ${String.format("%.8f", order.price)}\n" +
-            "qty = ${order.executedQty}/${order.origQty}\n" +
-            "${order.side} ${order.status}\n"// +
-//            "ordId = ${order.orderId}"
+    private fun strOrder(order: Order?) =
+        if (order == null) "Order is null"
+        else "price = ${String.format("%.8f", order.price)}" +
+                "\nqty = ${order.executedQty}/${order.origQty} | ${order.side} ${order.status}"
 
     private fun createStaticOrdersOnStart() {
         val freeFirstBalance = checkSellOrder() ?: client.getAssetBalance(firstSymbol).free
