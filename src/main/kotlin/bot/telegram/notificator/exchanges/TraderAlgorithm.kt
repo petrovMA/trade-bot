@@ -226,8 +226,10 @@ class TraderAlgorithm(
                                     log?.debug("$tradePair TradeEvent:\n$msg")
 
                                     klineConstructor.nextKline(msg).forEach { kline ->
-                                        if (kline.first)
+                                        if (kline.first) {
                                             candlestickList.add(kline.second)
+                                            if (isEmulate) calcAveragePrice()
+                                        }
                                     }
                                     updateCandlestickOrdersInterval.tryInvoke {
                                         log?.debug("$tradePair Update orders by Trade!")
