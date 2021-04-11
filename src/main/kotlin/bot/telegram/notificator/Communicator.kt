@@ -58,6 +58,7 @@ class Communicator(
         repeatEvery({
             taskQueue.put(CollectCandlestickData(candlestickDataCommand, firstDayForCheck, ExchangeEnum.BINANCE, sendMessage))
             taskQueue.put(CollectCandlestickData(candlestickDataCommand, firstDayForCheck, ExchangeEnum.BITMAX, sendMessage))
+            taskQueue.put(CollectCandlestickData(candlestickDataCommand, firstDayForCheck, ExchangeEnum.HUOBI, sendMessage))
         }, this.intervalCandlestickUpdate, this.timeDifference)
         repeatEvery({ getStatistics() }, this.intervalStatistic, this.timeDifference)
     }

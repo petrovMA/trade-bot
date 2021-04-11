@@ -133,6 +133,7 @@ data class OrderBook(val bids: List<Offer>, val asks: List<Offer>) : CommonExcha
 enum class ExchangeEnum {
     BINANCE,
     BITMAX,
+    HUOBI,
     STUB_TEST
 }
 

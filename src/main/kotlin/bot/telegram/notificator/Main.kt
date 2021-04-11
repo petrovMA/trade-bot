@@ -34,7 +34,8 @@ fun main() {
             candlestickDataCommandStr = propConf.getString("bot_properties.exchange.candlestick_data_command"),
             candlestickDataPath = mapOf(
                 ExchangeEnum.BINANCE to propConf.getString("bot_properties.exchange.binance_emulate_data_path")!!,
-                ExchangeEnum.BITMAX to propConf.getString("bot_properties.exchange.bitmax_emulate_data_path")!!
+                ExchangeEnum.BITMAX to propConf.getString("bot_properties.exchange.bitmax_emulate_data_path")!!,
+                ExchangeEnum.HUOBI to propConf.getString("bot_properties.exchange.huobi_emulate_data_path")!!
             ),
             taskQueue = taskExecutor.getQueue(),
             exchangeFiles = exchangeFile

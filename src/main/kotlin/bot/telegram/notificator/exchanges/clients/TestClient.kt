@@ -111,7 +111,6 @@ class TestClient(
 
         val from = (candlestickNum + 1 - countCandles).let {
             if (it < 0) {
-                log.warn("Can't get full candlesticks list! Need ${it * -1} more candlesticks from start.")
                 0
             } else it
         }

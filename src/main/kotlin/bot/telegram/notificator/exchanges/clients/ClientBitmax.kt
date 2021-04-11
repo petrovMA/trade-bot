@@ -19,7 +19,7 @@ import okhttp3.Request
 import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
-class BitmaxClient(
+class ClientBitmax(
     private val api: String? = null,
     private val sec: String? = null,
     private val instance: BitMaxRestApiClient = newBitmaxClient(api, sec)
@@ -283,4 +283,6 @@ class BitmaxClient(
             else -> STATUS.UNSUPPORTED
         }
     )
+
+    override fun toString(): String = "BITMAX"
 }

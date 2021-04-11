@@ -22,7 +22,7 @@ import java.util.*
 import java.util.concurrent.BlockingQueue
 
 
-class BinanceClient(
+class ClientBinance(
     private val api: String? = null,
     private val sec: String? = null,
     private val instance: Exchange = ExchangeFactory.INSTANCE.createExchange(BinanceExchange::class.java, api, sec)
@@ -247,87 +247,6 @@ class BinanceClient(
         close = kline.closePrice,
         volume = kline.volume
     )
+
+    override fun toString(): String = "BINANCE"
 }
-//
-//fun AssetBalance.toBalance(): Balance = Balance(
-//    asset = asset,
-//    total = free.toDouble() + locked.toDouble(),
-//    free = free.toDouble(),
-//    locked = locked.toDouble()
-//)
-//
-//fun NewOrderResponse.toBinanceOrder(): BinanceOrder = BinanceOrder(
-//    this.symbol,
-//    this.orderId,
-//    this.clientOrderId,
-//    this.price,
-//    this.origQty,
-//    this.executedQty,
-//    this.status,
-//    this.timeInForce,
-//    this.type,
-//    this.side
-//)
-//
-//fun INTERVAL.toCandlestickInterval(): CandlestickInterval = when (this) {
-//    INTERVAL.ONE_MINUTE -> CandlestickInterval.ONE_MINUTE
-//    INTERVAL.THREE_MINUTES -> CandlestickInterval.THREE_MINUTES
-//    INTERVAL.FIVE_MINUTES -> CandlestickInterval.FIVE_MINUTES
-//    INTERVAL.FIFTEEN_MINUTES -> CandlestickInterval.FIFTEEN_MINUTES
-//    INTERVAL.HALF_HOURLY -> CandlestickInterval.HALF_HOURLY
-//    INTERVAL.HOURLY -> CandlestickInterval.HOURLY
-//    INTERVAL.TWO_HOURLY -> CandlestickInterval.TWO_HOURLY
-//    INTERVAL.FOUR_HOURLY -> CandlestickInterval.FOUR_HOURLY
-//    INTERVAL.SIX_HOURLY -> CandlestickInterval.SIX_HOURLY
-//    INTERVAL.EIGHT_HOURLY -> CandlestickInterval.EIGHT_HOURLY
-//    INTERVAL.TWELVE_HOURLY -> CandlestickInterval.TWELVE_HOURLY
-//    INTERVAL.DAILY -> CandlestickInterval.DAILY
-//    INTERVAL.THREE_DAILY -> CandlestickInterval.THREE_DAILY
-//    INTERVAL.WEEKLY -> CandlestickInterval.WEEKLY
-//    INTERVAL.MONTHLY -> CandlestickInterval.MONTHLY
-//}
-//
-//fun BinanceOrder.toOrder(pair: TradePair): Order = Order(
-//    pair = pair,
-//    orderId = this.clientOrderId,
-//    price = this.price.toDouble(),
-//    origQty = this.origQty.toDouble(),
-//    executedQty = this.executedQty.toDouble(),
-//    status = when (this.status) {
-//        OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-//        OrderStatus.FILLED -> STATUS.FILLED
-//        OrderStatus.CANCELED -> STATUS.CANCELED
-//        OrderStatus.NEW -> STATUS.NEW
-//        OrderStatus.REJECTED -> STATUS.REJECTED
-//        else -> STATUS.UNSUPPORTED
-//    },
-//    type = when (this.type) {
-//        OrderType.LIMIT -> TYPE.LIMIT
-//        OrderType.MARKET -> TYPE.MARKET
-//        else -> TYPE.UNSUPPORTED
-//    },
-//    side = when (this.side) {
-//        OrderSide.SELL -> SIDE.SELL
-//        OrderSide.BUY -> SIDE.BUY
-//        else -> SIDE.UNSUPPORTED
-//    }
-//)
-//
-//fun BinanceCandlestick.toCandlestick(): Candlestick = Candlestick(
-//    openTime = openTime.toLong(),
-//    closeTime = closeTime.toLong(),
-//    open = open.toDouble(),
-//    high = high.toDouble(),
-//    low = low.toDouble(),
-//    close = close.toDouble(),
-//    volume = volume.toDouble()
-//)
-//
-//fun BinanceOrderBook.toOrderBook(): OrderBook = OrderBook(
-//    asks = asks.map { OrderEntry(price = it.price.toDouble(), qty = it.qty.toDouble()) },
-//    bids = bids.map { OrderEntry(price = it.price.toDouble(), qty = it.qty.toDouble()) }
-//)
-//
-//fun File.toCandlestick(): List<Candlestick> = readObjectFromFile(this, ArrayList::class.java)
-//        .map { it as BinanceCandlestick }
-//        .map { it.toCandlestick() }

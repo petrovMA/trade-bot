@@ -9,8 +9,9 @@ private val log = KotlinLogging.logger {}
 
 fun newClient(exchangeEnum: ExchangeEnum, api: String? = null, sec: String? = null): Client =
         when (exchangeEnum) {
-            ExchangeEnum.BINANCE -> BinanceClient(api, sec).also { log.info(" !!! Connect !!! ") }
-            ExchangeEnum.BITMAX -> BitmaxClient(api, sec).also { log.info(" !!! Connect !!! ") }
+            ExchangeEnum.BINANCE -> ClientBinance(api, sec).also { log.info(" !!! Connect: $it !!! ") }
+            ExchangeEnum.BITMAX -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }
+            ExchangeEnum.HUOBI -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }
             else -> throw UnsupportedClientException()
         }
 

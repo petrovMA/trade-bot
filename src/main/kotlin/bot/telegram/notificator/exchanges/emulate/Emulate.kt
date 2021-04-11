@@ -191,7 +191,6 @@ class Emulate(
 
             var list = emptyList<String>()
             try {
-                val df = DecimalFormat("#,###.0000");
                 list = listOf(
                     client.balance.tradePair.toString(),
                     String.format("%.4f", firstBalanceA),

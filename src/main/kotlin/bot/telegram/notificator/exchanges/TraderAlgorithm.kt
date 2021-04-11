@@ -39,14 +39,14 @@ class TraderAlgorithm(
     private val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
     private var averageHigh = 0.toBigDecimal()
     private var averageLow = 0.toBigDecimal()
-    private var percent = conf.getDouble("percent.static_orders").toBigDecimal()
-    private var deltaPercent = conf.getDouble("percent.delta").toBigDecimal()
-    private var percentBuyProf = conf.getDouble("percent.buy_prof").toBigDecimal()
-    private var percentSellProf = conf.getDouble("percent.sell_prof").toBigDecimal()
-    private var percentCountForPartiallyFilledUpd =
+    private val percent = conf.getDouble("percent.static_orders").toBigDecimal()
+    private val deltaPercent = conf.getDouble("percent.delta").toBigDecimal()
+    private val percentBuyProf = conf.getDouble("percent.buy_prof").toBigDecimal()
+    private val percentSellProf = conf.getDouble("percent.sell_prof").toBigDecimal()
+    private val percentCountForPartiallyFilledUpd =
         conf.getDouble("percent.count_for_partially_filled_upd").toBigDecimal()
-    private var intervalCandlesBuy = conf.getInt("interval.candles_buy")
-    private var intervalCandlesSell = conf.getInt("interval.candles_sell")
+    private val intervalCandlesBuy = conf.getInt("interval.candles_buy")
+    private val intervalCandlesSell = conf.getInt("interval.candles_sell")
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
@@ -1076,31 +1076,34 @@ class TraderAlgorithm(
                 (balance.orderS!!.status == STATUS.NEW || balance.orderS!!.status == STATUS.PARTIALLY_FILLED)
             ) {
 
-                val priceBuy = ((balance.orderB!!.price - minPriceDifference) -
-                        (balance.orderB!!.price - minPriceDifference).percent(deltaPercent))
-
-                val priceSell = ((balance.orderS!!.price + minPriceDifference) -
+                val priceBuyS = ((balance.orderS!!.price + minPriceDifference) -
                         (balance.orderS!!.price + minPriceDifference).percent(deltaPercent))
 
-                val countToBuy =
-                    balance.orderB!!.origQty * balance.orderB!!.price.div8(priceBuy) - balance.orderB!!.executedQty
-                if (countToBuy * priceBuy < minTradeBalance && updateIfAlmostFilled) {
-                    sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
-                    cancelOrder(balance.symbols, balance.orderB!!, false)
+                val countToBuyS =
+                    balance.orderS!!.origQty * balance.orderS!!.price.div8(priceBuyS) - balance.orderS!!.executedQty
+
+                if (countToBuyS * priceBuyS < minTradeBalance && updateIfAlmostFilled) {
+                    sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
+                    cancelOrder(balance.symbols, balance.orderS!!, false)
                     updateBuyOrder()
                     return
                 }
 
-                val countToSell =
-                    balance.orderS!!.origQty * balance.orderS!!.price.div8(priceSell) - balance.orderS!!.executedQty
-                if (countToSell * priceSell < minTradeBalance && updateIfAlmostFilled) {
-                    sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
-                    cancelOrder(balance.symbols, balance.orderS!!, false)
+
+                val priceSellB = ((balance.orderB!!.price - minPriceDifference) +
+                        (balance.orderB!!.price - minPriceDifference).percent(deltaPercent))
+
+                val countToSellB =
+                    balance.orderB!!.origQty * balance.orderB!!.price.div8(priceSellB) - balance.orderB!!.executedQty
+
+                if (countToSellB * priceSellB < minTradeBalance && updateIfAlmostFilled) {
+                    sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
+                    cancelOrder(balance.symbols, balance.orderB!!, false)
                     updateSellOrder()
                     return
                 }
 
-                if (countToBuy * priceBuy > minTradeBalance && countToSell * priceSell > minTradeBalance) {
+                if (countToBuyS * priceBuyS > minTradeBalance && countToSellB * priceSellB > minTradeBalance) {
                     sendMessage(
                         "#UpdateStatic_$tradePair Orders from:\nB:\n${strOrder(balance.orderB)}\n\nS:\n" +
                                 "${strOrder(balance.orderS)}\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}"
@@ -1111,8 +1114,8 @@ class TraderAlgorithm(
                     wait(waitBetweenCancelAndUpdateOrders)
 
                     balance.orderB = sentOrder(
-                        amount = countToBuy,
-                        price = priceBuy,
+                        amount = countToSellB,
+                        price = priceSellB,
                         orderSide = SIDE.SELL,
                         isStaticUpdate = true
                     )
@@ -1121,8 +1124,8 @@ class TraderAlgorithm(
                     log?.info("$tradePair STATIC BUY Order UPDATED:\n${balance.orderB}")
 
                     balance.orderS = sentOrder(
-                        amount = countToSell,
-                        price = priceSell,
+                        amount = countToBuyS,
+                        price = priceBuyS,
                         orderSide = SIDE.BUY,
                         isStaticUpdate = true
                     )
@@ -1138,7 +1141,7 @@ class TraderAlgorithm(
                                 "\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}"
                     )
                 } else
-                    log?.warn(
+                    log?.info(
                         "$tradePair \nSTATIC Orders update cancelled, orders PARTIALLY_FILLED:" +
                                 "\nBuy = ${balance.orderB}\nSell = ${balance.orderS}"
                     )
@@ -1199,12 +1202,8 @@ class TraderAlgorithm(
             } catch (e: Exception) {
                 log?.warn("$pair getOrder trying ${(retryCount - retryGetOrderCount).absoluteValue}:\n", e)
                 sendMessage(
-                    "#getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n${
-                        printTrace(
-                            e,
-                            0
-                        )
-                    }"
+                    "#getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n" +
+                            printTrace(e, 0)
                 )
                 sleep(retryGetOrderInterval.toMillis())
             }
@@ -1215,8 +1214,8 @@ class TraderAlgorithm(
     private fun strOrder(order: Order?) = if (order == null) "Order is null"
     else "price = ${String.format("%.8f", order.price)}\n" +
             "qty = ${order.executedQty}/${order.origQty}\n" +
-            "${order.side} ${order.status}\n" +
-            "ordId = ${order.orderId}"
+            "${order.side} ${order.status}\n"// +
+//            "ordId = ${order.orderId}"
 
     private fun createStaticOrdersOnStart() {
         val freeFirstBalance = checkSellOrder() ?: client.getAssetBalance(firstSymbol).free

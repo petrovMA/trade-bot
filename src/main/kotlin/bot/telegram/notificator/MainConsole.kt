@@ -30,7 +30,8 @@ fun main() {
                 candlestickDataCommandStr = properties?.getString("bot_properties.exchange.candlestick_data_command"),
                 candlestickDataPath = mapOf(
                         ExchangeEnum.BINANCE to properties?.getString("bot_properties.exchange.binance_emulate_data_path")!!,
-                        ExchangeEnum.BITMAX to properties.getString("bot_properties.exchange.bitmax_emulate_data_path")!!
+                        ExchangeEnum.BITMAX to properties.getString("bot_properties.exchange.bitmax_emulate_data_path")!!,
+//                        ExchangeEnum.HUOBI to properties.getString("bot_properties.exchange.huobi_emulate_data_path")!!
                 ),
                 taskQueue = taskExecutor.getQueue(),
                 exchangeFiles = exchangeFile,
@@ -45,10 +46,10 @@ fun main() {
 //        }
 
 
-//        java.util.Timer("emulate", false).schedule(3.s().toMillis()) {
+        java.util.Timer("emulate", false).schedule(3.s().toMillis()) {
 //            bot.onUpdate("tradePairs init")
-////            bot.onUpdate("Emulate binance QTUM_ETH 2021_01_20 2021_03_29")
-//        }
+            bot.onUpdate("Emulate bitmax FIN_USDT 2021_03_29 2021_04_10")
+        }
 //        java.util.Timer("start2", false).schedule(10.s().toMillis()) {
 //            bot.onUpdate("start all")
 //        }

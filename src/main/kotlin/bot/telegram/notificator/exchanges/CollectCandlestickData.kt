@@ -21,7 +21,7 @@ fun main() {
         command = Command.WRITE_AND_CHECK,
 //            command = Command.WRITE,
 //            command = Command.CHECK,
-        exchangeEnum = ExchangeEnum.BINANCE
+        exchangeEnum = ExchangeEnum.HUOBI
     ) {}.run()
 
 
@@ -47,6 +47,8 @@ class CollectCandlestickData(
                 ?: throw RuntimeException("Can't read Config File!")
             ExchangeEnum.BITMAX -> readConf("collect_bitmax_candlestick.conf")
                 ?: throw RuntimeException("Can't read Config File!")
+            ExchangeEnum.HUOBI -> readConf("collect_huobi_candlestick.conf")
+                ?: throw RuntimeException("Can't read Config File!")
             else -> throw UnsupportedExchangeException()
         }
     } catch (e: Throwable) {
@@ -64,8 +66,9 @@ class CollectCandlestickData(
 
     override fun run() {
         val client = when (exchangeEnum) {
-            ExchangeEnum.BINANCE -> BinanceClient()
-            ExchangeEnum.BITMAX -> BitmaxClient()
+            ExchangeEnum.BINANCE -> ClientBinance()
+            ExchangeEnum.BITMAX -> ClientBitmax()
+            ExchangeEnum.HUOBI -> ClientHuobi()
             else -> throw UnsupportedExchangeException()
         }
         try {
