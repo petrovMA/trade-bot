@@ -187,13 +187,13 @@ class TestClient(
         return true
     }
 
-    override fun nextEvent() {
+    override fun nextEvent(): CommonExchangeData {
         val candlestick = candlesticks[candlestickNum]
 
         when (state) {
             EventState.CANDLESTICK_OPEN -> {
-                queue.put(Trade(price = candlestick.open, qty = candlestick.volume, candlestick.openTime + 1))
                 state = EventState.from(state.number + 1)
+                return Trade(price = candlestick.open, qty = candlestick.volume, candlestick.openTime + 1)
             }
             EventState.FIRST_DEPTH -> {
 
@@ -210,22 +210,22 @@ class TestClient(
                 checkOrderExecuted(lastBuyPrice)
                 checkOrderExecuted(lastSellPrice)
 
-                queue.put(DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0))))
                 state = EventState.from(state.number + 2)
+                return DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0)))
             }
             EventState.SELL_TRADE -> {
                 checkOrderExecuted(lastBuyPrice)
                 checkOrderExecuted(lastSellPrice)
-                queue.put(Trade(price = lastSellPrice, qty = BigDecimal(0), candlestick.openTime + 10))
                 state = EventState.from(state.number + 2)
+                return Trade(price = lastSellPrice, qty = BigDecimal(0), candlestick.openTime + 10)
             }
 //            EventState.BUY_DEPTH -> {
 //                queue.put(DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0))))
 //                state = EventState.from(state.number + 1)
 //            }
             EventState.BUY_TRADE -> {
-                queue.put(Trade(price = lastBuyPrice, qty = BigDecimal(0), candlestick.openTime + 10))
                 state = EventState.from(state.number + 2)
+                return Trade(price = lastBuyPrice, qty = BigDecimal(0), candlestick.openTime + 10)
             }
 //            EventState.SELL_MAX_DEPTH -> {
 //                queue.put(DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(candlestick.low, BigDecimal(0))))
@@ -233,16 +233,16 @@ class TestClient(
 //            }
             EventState.SELL_MAX_TRADE -> {
 //                checkOrderExecuted(candlestick.low)
-                queue.put(Trade(price = candlestick.low, qty = BigDecimal(0), candlestick.openTime + 10))
                 state = EventState.from(state.number + 2)
+                return Trade(price = candlestick.low, qty = BigDecimal(0), candlestick.openTime + 10)
             }
 //            EventState.BUY_MAX_DEPTH -> {
 //                queue.put(DepthEventOrders(Offer(candlestick.high, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0))))
 //                state = EventState.from(state.number + 1)
 //            }
             EventState.BUY_MAX_TRADE -> {
-                queue.put(Trade(price = candlestick.high, qty = BigDecimal(0), candlestick.openTime + 10))
                 state = EventState.from(state.number + 1)
+                return Trade(price = candlestick.high, qty = BigDecimal(0), candlestick.openTime + 10)
             }
             EventState.CANDLESTICK_CLOSE -> {
                 ++candlestickNum
@@ -251,14 +251,14 @@ class TestClient(
                         candlesticks = iterator.next()
                         candlestickNum = 0
                     } else
-                        return queue.put(BotEvent(type = BotEvent.Type.INTERRUPT))
-
-                queue.put(Trade(price = candlestick.close, qty = BigDecimal(0), candlestick.closeTime))
+                        return BotEvent(type = BotEvent.Type.INTERRUPT)
 
                 check(prevCandlestick, candlestick)
                 prevCandlestick = candlestick
 
                 state = EventState.from(0)
+
+                return Trade(price = candlestick.close, qty = BigDecimal(0), candlestick.closeTime)
             }
             else -> {
                 throw UnsupportedStateException()

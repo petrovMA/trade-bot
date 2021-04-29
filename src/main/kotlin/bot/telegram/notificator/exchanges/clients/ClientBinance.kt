@@ -217,7 +217,6 @@ class ClientBinance(
             api = api
         )
 
-    override fun nextEvent() {}
     override fun close() {}
 
     private fun asKlineInterval(interval: INTERVAL): KlineInterval = when (interval) {

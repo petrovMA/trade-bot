@@ -31,7 +31,7 @@ fun main() {
                 candlestickDataPath = mapOf(
                         ExchangeEnum.BINANCE to properties?.getString("bot_properties.exchange.binance_emulate_data_path")!!,
                         ExchangeEnum.BITMAX to properties.getString("bot_properties.exchange.bitmax_emulate_data_path")!!,
-//                        ExchangeEnum.HUOBI to properties.getString("bot_properties.exchange.huobi_emulate_data_path")!!
+                        ExchangeEnum.HUOBI to properties.getString("bot_properties.exchange.huobi_emulate_data_path")!!
                 ),
                 taskQueue = taskExecutor.getQueue(),
                 exchangeFiles = exchangeFile,
@@ -48,10 +48,24 @@ fun main() {
 
         java.util.Timer("emulate", false).schedule(3.s().toMillis()) {
 //            bot.onUpdate("tradePairs init")
-            bot.onUpdate("Emulate bitmax FIN_USDT 2021_03_29 2021_04_10")
+//            bot.onUpdate("Emulate huobi .+ETH 2021_03_23 2021_04_23")
+
+
+//            bot.onUpdate("FindParams huobi RAI_ETH 2021_03_26 2021_04_26")
+
+//            bot.onUpdate("FindParams binance AVA_BNB 2021_03_28 2021_04_28")
+//            bot.onUpdate("FindParams binance AION_ETH 2021_03_28 2021_04_28")
+//            bot.onUpdate("FindParams binance IOTX_ETH 2021_03_28 2021_04_28")
+            bot.onUpdate("FindParams binance HBAR_BNB 2021_03_28 2021_04_28")
+
+//            bot.onUpdate("FindParams binance ETH_BTC 2021_03_27 2021_04_27")
+
+//            bot.onUpdate("FindParams binance BTC_USDT 2021_03_27 2021_04_27")
+//            bot.onUpdate("FindParams huobi BTC_USDT 2021_03_27 2021_04_27")
+//            bot.onUpdate("FindParams bitmax BTC_USDT 2021_03_27 2021_04_27")
         }
-//        java.util.Timer("start2", false).schedule(10.s().toMillis()) {
-//            bot.onUpdate("start all")
+//        java.util.Timer("start2", false).schedule(20.s().toMillis()) {
+//            bot.onUpdate("start AION_ETH")
 //        }
 //        java.util.Timer("TradePairs", false).schedule(5.m().toMillis()) {
 //            bot.taskQueue.put(CollectCandlestickData(bot.candlestickDataCommand, null, ExchangeEnum.BINANCE, bot.sendMessage))

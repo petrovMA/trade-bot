@@ -17,8 +17,6 @@ import org.knowm.xchange.huobi.service.HuobiAccountService
 import org.knowm.xchange.huobi.service.HuobiMarketDataService
 import org.knowm.xchange.huobi.service.HuobiTradeService
 import org.knowm.xchange.service.trade.params.orders.DefaultQueryOrderParamCurrencyPair
-import java.math.BigDecimal
-import java.util.*
 import java.util.concurrent.BlockingQueue
 
 
@@ -222,7 +220,6 @@ class ClientHuobi(
 //            api = api
 //        )
 
-    override fun nextEvent() {}
     override fun close() {}
 
     private fun asKlineInterval(interval: INTERVAL): KlineInterval = when (interval) {

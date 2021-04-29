@@ -32,29 +32,37 @@ class TraderAlgorithm(
     private val syncTimeInterval: Duration = conf.getDuration("sync_interval_time"),
     private val cancelUnknownOrdersInterval: ActionInterval = ActionInterval(conf.getDuration("cancel_unknown_orders_interval")),
     private val retrySentOrderCount: Int = conf.getInt("retry_sent_order_count"),
+    private val waitBalanceUpdate: Duration = conf.getDuration("wait_balance_update"),
     isLog: Boolean = true,
     private val isEmulate: Boolean = false,
+    percentBuyProf: BigDecimal? = null,
+    percentSellProf: BigDecimal? = null,
+    intervalCandlesBuy: Int? = null,
+    intervalCandlesSell: Int? = null,
+    updStaticOrders: BigDecimal? = null,
     val sendMessage: (String) -> Unit
 ) : Thread() {
     private val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
     private var averageHigh = 0.toBigDecimal()
     private var averageLow = 0.toBigDecimal()
-    private val percent = conf.getDouble("percent.static_orders").toBigDecimal()
+    private val updStaticOrdersPercent = updStaticOrders ?: conf.getDouble("percent.static_orders").toBigDecimal()
     private val deltaPercent = conf.getDouble("percent.delta").toBigDecimal()
-    private val percentBuyProf = conf.getDouble("percent.buy_prof").toBigDecimal()
-    private val percentSellProf = conf.getDouble("percent.sell_prof").toBigDecimal()
+
+    private val percentBuyProf = percentBuyProf ?: conf.getDouble("percent.buy_prof").toBigDecimal()
+    private val percentSellProf = percentSellProf ?: conf.getDouble("percent.sell_prof").toBigDecimal()
+    private val intervalCandlesBuy = intervalCandlesBuy ?: conf.getInt("interval.candles_buy")
+    private val intervalCandlesSell = intervalCandlesSell ?: conf.getInt("interval.candles_sell")
+
     private val percentCountForPartiallyFilledUpd =
         conf.getDouble("percent.count_for_partially_filled_upd").toBigDecimal()
-    private val intervalCandlesBuy = conf.getInt("interval.candles_buy")
-    private val intervalCandlesSell = conf.getInt("interval.candles_sell")
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
     private val countCandles =
-        if (intervalCandlesBuy > intervalCandlesSell)
-            intervalCandlesBuy
+        if (this.intervalCandlesBuy > this.intervalCandlesSell)
+            this.intervalCandlesBuy
         else
-            intervalCandlesSell
+            this.intervalCandlesSell
 
     private val waitTime = conf.getDuration("interval.wait_socket_time")
     private val mainBalance = 0.0.toBigDecimal()
@@ -82,7 +90,7 @@ class TraderAlgorithm(
     private var nearBuyPrice: BigDecimal = 0.toBigDecimal()
     private var lastTradePrice: BigDecimal = 0.toBigDecimal()
     private var checkBuyOrderTrigger = false to if (isEmulate) 0.s() else 1.s()
-    private var checkSellOrderTrigger = false to if (isEmulate) 0.s() else  1.s()
+    private var checkSellOrderTrigger = false to if (isEmulate) 0.s() else 1.s()
     private var lastCheckBuyOrderTime: Duration = 5.s()
     private var lastCheckSellOrderTime: Duration = 5.s()
     private var lastSyncTime: Duration = 0.s()
@@ -94,6 +102,21 @@ class TraderAlgorithm(
     private var tryingUpdateOrderBuy: Int = 0
     private var candlestickList = ListLimit<Candlestick>(limit = countCandles)
     private val klineConstructor = KlineConstructor(interval)
+
+    var firstCandlestick: Candlestick? = null
+        set(value) {
+            field = field?.let {
+                if (it.openTime > value?.openTime ?: Long.MAX_VALUE) value
+                else it
+            } ?: value
+        }
+    var lastCandlestick: Candlestick? = null
+        set(value) {
+            field = field?.let {
+                if (it.openTime < value?.openTime ?: 0) value
+                else it
+            } ?: value
+        }
 
     val balance = BalanceInfo(
         symbols = tradePair,
@@ -123,7 +146,9 @@ class TraderAlgorithm(
             val orders = client.getOpenOrders(tradePair)
 
             log?.info("All $tradePair open orders: " + orders.joinToString(prefix = "\n", separator = "\n"))
-            println("All $tradePair open orders: " + orders.joinToString(prefix = "\n", separator = "\n"))
+
+            if (!isEmulate)
+                println("All $tradePair open orders: " + orders.joinToString(prefix = "\n", separator = "\n"))
 
             if (printOrdersAndOff) return
 
@@ -133,9 +158,11 @@ class TraderAlgorithm(
             socket.run()
 
             calcAveragePrice()
+            firstCandlestick = candlestickList.first()
 
-            client.nextEvent() /* only for test */
-            var msg = queue.poll(waitTime)
+            var msg = if (isEmulate) client.nextEvent() /* only for test */
+            else queue.poll(waitTime)
+
             do {
                 if (stopThread) return
                 try {
@@ -144,6 +171,7 @@ class TraderAlgorithm(
                             nearBuyPrice = msg.bid.price
                             nearSellPrice = msg.ask.price
                             log?.debug("$tradePair First DepthEvent:\n$msg")
+                            break
                         }
                         is Trade -> {
                             lastTradePrice = msg.price
@@ -167,15 +195,16 @@ class TraderAlgorithm(
 
                                     candlestickList.add(kline.second)
                                     calcAveragePrice()
+                                    lastCandlestick = candlestickList.last()
 
                                 }
                             }
                         }
                     }
 
-                    client.nextEvent() /* only for test */
+                    msg = if (isEmulate) client.nextEvent() /* only for test */
+                    else queue.poll(waitTime)
 
-                    msg = queue.poll(waitTime)
                 } catch (e: InterruptedException) {
                     log?.error("$tradePair ${e.message}", e)
                     sendMessage("#Error_$tradePair: \n${printTrace(e)}")
@@ -184,7 +213,7 @@ class TraderAlgorithm(
 
                     socket.start()
                 }
-            } while (msg !is DepthEventOrders)
+            } while (true)
 
             createStaticOrdersOnStart()
 
@@ -202,10 +231,9 @@ class TraderAlgorithm(
 
             if (stopThread) return
 
-            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
+            msg = if (isEmulate) client.nextEvent() /* only for test */
+            else queue.poll(waitTime)
 
-            client.nextEvent() /* only for test */
-            msg = queue.poll(waitTime)
             while (true) {
                 if (stopThread) return
                 try {
@@ -230,6 +258,7 @@ class TraderAlgorithm(
                                             candlestickList.add(kline.second)
                                             if (isEmulate) {
                                                 calcAveragePrice()
+                                                lastCandlestick = candlestickList.last()
                                                 updateOrders()
                                             }
                                         }
@@ -410,9 +439,9 @@ class TraderAlgorithm(
                         log?.info("$tradePair Try to reconnect...")
                     }
 
-                    client.nextEvent() /* only for test */
+                    msg = if (isEmulate) client.nextEvent() /* only for test */
+                    else queue.poll(waitTime)
 
-                    msg = queue.poll(waitTime)
                 } catch (e: InterruptedException) {
                     log?.error("$tradePair ${e.message}", e)
                     sendMessage("#Error_$tradePair: \n${printTrace(e)}")
@@ -438,7 +467,8 @@ class TraderAlgorithm(
                 else
                     nearBuyPrice - nearBuyPrice.percent(deltaPercent)
 
-            freeSecondBalance = freeSecondBalance ?: client.getAssetBalance(secondSymbol).free
+            sleep(waitBalanceUpdate.toMillis())
+            freeSecondBalance = client.getAssetBalance(secondSymbol).free
 
             if (freeSecondBalance > balance.balanceTrade + balance.balanceTrade.percent(minOverheadBalance)) {
                 balance.orderB = sentOrder(
@@ -448,13 +478,12 @@ class TraderAlgorithm(
                     isStaticUpdate = false
                 )
                 freeSecondBalance -= balance.balanceTrade
-                if (!isEmulate) {
-                    reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-                    writeLine(balance, File("$path/balance.json"))
-                }
+
+                if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
+
                 tryingUpdateOrderBuy = 0
             } else {
-                log?.warn("can't create orderB")
+                log?.warn("$tradePair can't create orderB")
                 sendMessage(
                     "#Cannot_create_orderB_$tradePair:" +
                             "\nbalanceTrade.percent = ${balance.balanceTrade.percent(minOverheadBalance)}" +
@@ -485,6 +514,7 @@ class TraderAlgorithm(
 
                 if (balance.orderB!!.status == STATUS.FILLED) {
                     sendMessage("#$tradePair OrderB #FILLED:\n${strOrder(balance.orderB)}")
+                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                     updateBuyOrder()
                     lastCheckBuyOrderTime = 0.s()
                 } else log?.info("$tradePair Order BUY:\n${balance.orderB}\nnot filled, but tradePrice in orderPrice")
@@ -513,6 +543,7 @@ class TraderAlgorithm(
                 else
                     nearSellPrice + nearSellPrice.percent(deltaPercent)
 
+            sleep(waitBalanceUpdate.toMillis())
             freeFirstBalance = client.getAssetBalance(firstSymbol).free
 
             if (freeFirstBalance > (balance.balanceTrade.div8(price)) + (balance.balanceTrade.div8(price)).percent(
@@ -526,10 +557,9 @@ class TraderAlgorithm(
                     isStaticUpdate = false
                 )
                 freeFirstBalance -= balance.balanceTrade.div8(price)
-                if (!isEmulate) {
-                    reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                    writeLine(balance, File("$path/balance.json"))
-                }
+
+                if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
+
                 tryingUpdateOrderSell = 0
             } else {
                 log?.warn("can't create orderS")
@@ -565,6 +595,7 @@ class TraderAlgorithm(
 
                 if (status == STATUS.FILLED) {
                     sendMessage("#$tradePair OrderS #FILLED:\n${strOrder(balance.orderS)}")
+                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                     updateSellOrder()
                     lastCheckSellOrderTime = 0.s()
                 } else log?.info("$tradePair Order SELL:\n${balance.orderS}\nnot filled, but tradePrice in orderPrice")
@@ -621,10 +652,8 @@ class TraderAlgorithm(
                     } else
                         log?.debug("No need update! OrderB has same price!")
 
-                    if (!isEmulate) {
+                    if (!isEmulate)
                         reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-                        writeLine(balance, File("$path/balance.json"))
-                    }
 
                     log?.info("$tradePair BUY Order UPDATED:\n${balance.orderB}")
                 }
@@ -646,10 +675,8 @@ class TraderAlgorithm(
                                 isStaticUpdate = false
                             )
 
-                            if (!isEmulate) {
+                            if (!isEmulate)
                                 reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-                                writeLine(balance, File("$path/balance.json"))
-                            }
 
                             log?.info("$tradePair BUY PARTIALLY_FILLED Order UPDATED:\n${balance.orderB}")
                         } else
@@ -660,6 +687,7 @@ class TraderAlgorithm(
                     } else {
                         if (updateIfAlmostFilled) {
                             sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
+                            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                             cancelOrder(balance.symbols, balance.orderB!!, false)
                             updateBuyOrder()
                         } else
@@ -669,6 +697,7 @@ class TraderAlgorithm(
             }
             STATUS.FILLED -> {
                 sendMessage("#$tradePair OrderB #Update #FILLED:\n${strOrder(balance.orderB)}")
+                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                 log?.info("$tradePair Create new BUY order, instead update")
                 updateBuyOrder()
             }
@@ -713,10 +742,7 @@ class TraderAlgorithm(
                     } else
                         log?.debug("No need update! OrderS has same price!")
 
-                    if (!isEmulate) {
-                        reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                        writeLine(balance, File("$path/balance.json"))
-                    }
+                    if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
 
                     log?.info("$tradePair SELL Order UPDATED:\n${balance.orderS}")
                 }
@@ -738,10 +764,7 @@ class TraderAlgorithm(
                                 isStaticUpdate = false
                             )
 
-                            if (!isEmulate) {
-                                reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                                writeLine(balance, File("$path/balance.json"))
-                            }
+                            if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
 
                             log?.info("$tradePair SELL PARTIALLY_FILLED Order UPDATED:\n${balance.orderS}")
                         } else
@@ -752,6 +775,7 @@ class TraderAlgorithm(
                     } else {
                         if (updateIfAlmostFilled) {
                             sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
+                            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                             cancelOrder(balance.symbols, balance.orderS!!, false)
                             updateSellOrder()
                         } else
@@ -761,6 +785,7 @@ class TraderAlgorithm(
             }
             STATUS.FILLED -> {
                 sendMessage("#$tradePair OrderS #Update #FILLED:\n${strOrder(balance.orderS)}")
+                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                 log?.info("$tradePair Create new SELL order, instead update")
                 updateSellOrder()
             }
@@ -785,10 +810,7 @@ class TraderAlgorithm(
                 isStaticUpdate = false
             )
 
-            if (!isEmulate) {
-                reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-                writeLine(balance, File("$path/balance.json"))
-            }
+            if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
 
             log?.info("$tradePair new BUY Order 2:\n${balance.orderB}")
         } else {
@@ -807,10 +829,8 @@ class TraderAlgorithm(
                 isStaticUpdate = false
             )
 
-            if (!isEmulate) {
-                reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-                writeLine(balance, File("$path/balance.json"))
-            }
+            if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
+
             log?.info("$tradePair new BUY Order 1:\n${balance.orderB}")
         }
     }
@@ -831,10 +851,8 @@ class TraderAlgorithm(
                 isStaticUpdate = false
             )
 
-            if (!isEmulate) {
-                reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                writeLine(balance, File("$path/balance.json"))
-            }
+            if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
+
             log?.info("$tradePair new SELL Order 2:\n${balance.orderS}")
         } else {
             val price =
@@ -852,10 +870,7 @@ class TraderAlgorithm(
                 isStaticUpdate = false
             )
 
-            if (!isEmulate) {
-                reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                writeLine(balance, File("$path/balance.json"))
-            }
+            if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
 
             log?.info("$tradePair new SELL Order 1:\n${balance.orderS}")
         }
@@ -994,6 +1009,7 @@ class TraderAlgorithm(
 
         if ((balance.orderB!!.origQty - balance.orderB!!.executedQty) * balance.orderB!!.price < minTradeBalance && updateIfAlmostFilled) {
             sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
+            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
             cancelOrder(balance.symbols, balance.orderB!!, false)
             updateBuyOrder()
             return
@@ -1001,6 +1017,7 @@ class TraderAlgorithm(
 
         if ((balance.orderS!!.origQty - balance.orderS!!.executedQty) * balance.orderS!!.price < minTradeBalance && updateIfAlmostFilled) {
             sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
+            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
             cancelOrder(balance.symbols, balance.orderS!!, false)
             updateSellOrder()
             return
@@ -1057,11 +1074,14 @@ class TraderAlgorithm(
                 sellPrice - nearSellPrice
 
         log?.trace(
-            "$tradePair Update static IF: $minPriceDifference > ${sellPrice.percent(percent)} &&" +
-                    " $minPriceDifference > ${buyPrice.percent(percent)}"
+            "$tradePair Update static IF: $minPriceDifference > ${sellPrice.percent(updStaticOrdersPercent)} &&" +
+                    " $minPriceDifference > ${buyPrice.percent(updStaticOrdersPercent)}"
         )
 
-        if (minPriceDifference > sellPrice.percent(percent) && minPriceDifference > buyPrice.percent(percent)) {
+        if (
+            minPriceDifference > sellPrice.percent(updStaticOrdersPercent) &&
+            minPriceDifference > buyPrice.percent(updStaticOrdersPercent)
+        ) {
 
             log?.info("$tradePair Update STATIC Orders from:\nB:\n${balance.orderB}\n\nS:\n${balance.orderS}")
 
@@ -1072,7 +1092,6 @@ class TraderAlgorithm(
             if (!isEmulate) {
                 reWriteObject(balance.orderB!!, File("$path/orderB.json"))
                 reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                writeLine(balance, File("$path/balance.json"))
             }
 
             log?.debug("$tradePair StatusOrderB: ${balance.orderB!!.status}, StatusOrderS: ${balance.orderS!!.status}")
@@ -1089,6 +1108,7 @@ class TraderAlgorithm(
 
                 if (countToBuyS * priceBuyS < minTradeBalance && updateIfAlmostFilled) {
                     sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
+                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                     cancelOrder(balance.symbols, balance.orderS!!, false)
                     updateBuyOrder()
                     return
@@ -1103,6 +1123,7 @@ class TraderAlgorithm(
 
                 if (countToSellB * priceSellB < minTradeBalance && updateIfAlmostFilled) {
                     sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
+                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                     cancelOrder(balance.symbols, balance.orderB!!, false)
                     updateSellOrder()
                     return
@@ -1137,7 +1158,6 @@ class TraderAlgorithm(
 
                     if (!isEmulate) {
                         reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                        writeLine(balance, File("$path/balance.json"))
                     }
 
                     log?.info("$tradePair STATIC SELL Order UPDATED:\n${balance.orderS}")
@@ -1163,8 +1183,10 @@ class TraderAlgorithm(
 
             balance.orderB = getOrder(balance.symbols, oldOrder.orderId)
 
-            if (balance.orderB?.status == STATUS.FILLED)
+            if (balance.orderB?.status == STATUS.FILLED) {
                 sendMessage("#$tradePair OrderB sync #FILLED:\n${strOrder(balance.orderB)}")
+                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
+            }
 
             log?.info("$tradePair OrderB status: ${balance.orderB}")
 
@@ -1183,8 +1205,10 @@ class TraderAlgorithm(
 
             balance.orderS = getOrder(balance.symbols, oldOrder.orderId)
 
-            if (balance.orderS?.status == STATUS.FILLED)
+            if (balance.orderS?.status == STATUS.FILLED) {
                 sendMessage("#$tradePair OrderS sync #FILLED:\n${strOrder(balance.orderS)}")
+                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
+            }
 
             log?.info("$tradePair orderS status: ${balance.orderS}")
 

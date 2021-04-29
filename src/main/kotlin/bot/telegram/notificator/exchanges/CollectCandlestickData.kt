@@ -10,6 +10,7 @@ import java.math.BigDecimal
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
+import java.sql.Timestamp
 import java.time.*
 
 
@@ -18,7 +19,7 @@ fun main() {
     PropertyConfigurator.configure("log4j.properties")
 
     CollectCandlestickData(
-        command = Command.WRITE_AND_CHECK,
+        command = Command.WRITE,
 //            command = Command.WRITE,
 //            command = Command.CHECK,
         exchangeEnum = ExchangeEnum.HUOBI
@@ -88,6 +89,9 @@ class CollectCandlestickData(
                     checkCandlesticks(pathDB)
                     sendMessage("#CollectCandlestickData #$exchangeEnum check from date $firstDay done")
                 }
+                Command.CUSTOM -> {
+                    deleteAllEmpty(pathDB, client)
+                }
             }
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -96,7 +100,7 @@ class CollectCandlestickData(
         }
     }
 
-    fun checkCandlesticks(path: String) {
+    private fun checkCandlesticks(path: String) {
 
         val connect = connect(path, log)
 
@@ -154,24 +158,83 @@ class CollectCandlestickData(
     }
 
 
-    private fun writeCandlesToDB(pathDB: String, client: Client) = client
-        .getAllPairs()
-        .minus(ignorePairs)
-        .forEach { tradePair ->
+    private fun writeCandlesToDB(pathDB: String, client: Client) {
+        var pairCounter = 0
+        client
+            .getAllPairs()
+            .minus(ignorePairs)
+            .run {
+                forEach { tradePair ->
 
-            log.trace { "Write pair: $tradePair" }
+                    log.debug {
+                        val s = "Write pair: $size/${++pairCounter}"
+                        "$s${".".repeat(24 - s.length)}$tradePair"
+                    }
 
-            try {
-                writeCandlesDB(
-                    candlesticks = client.getCandlestickBars(tradePair, INTERVAL.FIVE_MINUTES, maxLimit),
-                    pair = tradePair,
-                    pathDB = pathDB
-                )
-            } catch (t: Throwable) {
-                sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
-                log.warn("Can't write pair: $tradePair Error:", t)
+                    try {
+                        writeCandlesDB(
+                            candlesticks = client.getCandlestickBars(tradePair, INTERVAL.FIVE_MINUTES, maxLimit)
+                                .filter { it.volume > BigDecimal(0) },
+                            pair = tradePair,
+                            pathDB = pathDB
+                        )
+                    } catch (t: Throwable) {
+                        sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
+                        log.warn("Can't write pair: $tradePair Error:", t)
+                    }
+                }
             }
-        }
+    }
+
+
+    private fun deleteAllEmpty(pathDB: String, client: Client) {
+
+        val connect = connect(pathDB, log)
+        var pairCounter = 0
+
+        client
+            .getAllPairs()
+            .run {
+                forEach { tradePair ->
+                    pairCounter++
+
+                    try {
+
+                        val iterator = CandlestickListsIterator(
+                            connect,
+                            tableName = "CANDLESTICK_$tradePair",
+                            listSize = 500,
+                            startDateTime = Timestamp.valueOf("2017-10-02 00:00:00.000000"),
+                            endDateTime = Timestamp.valueOf("2022-10-02 00:00:00.000000"),
+                            interval = INTERVAL.FIVE_MINUTES,
+                            fillGaps = false
+                        )
+
+                        val stmt = connect.createStatement()
+                        var counter = 0
+
+                        iterator.forEach { candles ->
+                            candles.forEach {
+                                if (it.volume <= BigDecimal.ZERO) {
+                                    stmt.executeUpdate("""DELETE FROM CANDLESTICK_$tradePair WHERE ID_OPEN_TIME = ${it.openTime};""")
+                                    counter++
+                                }
+                            }
+                        }
+
+                        log.info {
+                            val s1 = "for $tradePair"
+                            val s2 = "$counter removed!"
+                            s1 + ".".repeat(20 - s1.length) + s2 + ".".repeat(15 - s2.length) + "....$size/$pairCounter"
+                        }
+
+                    } catch (t: Throwable) {
+                        sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
+                        log.warn("Can't write pair: $tradePair Error:", t)
+                    }
+                }
+            }
+    }
 
 
     private fun writeCandlesDB(candlesticks: List<Candlestick>, pair: TradePair, pathDB: String) {
@@ -243,8 +306,8 @@ class CollectCandlestickData(
             log.info("Error:\n", t)
         } finally {
             stmt.close()
-            return lastCandlestick
         }
+        return lastCandlestick
     }
 
 
@@ -271,34 +334,56 @@ class CandlestickListsIterator(
     connect: Connection,
     private val tableName: String,
     private val listSize: Int,
-    startDateTime: LocalDateTime,
-    endDateTime: LocalDateTime
+    startDateTime: Timestamp,
+    endDateTime: Timestamp,
+    private val fillGaps: Boolean,
+    private val interval: INTERVAL
 ) : Iterator<List<Candlestick>> {
 
     private val stmt = connect.createStatement()
     private val resultSet: ResultSet = stmt.executeQuery(
         """SELECT * FROM $tableName WHERE 
-          ID_OPEN_TIME > ${startDateTime.atZone(ZoneOffset.UTC).toInstant().toEpochMilli()} AND
-          ID_OPEN_TIME < ${endDateTime.atZone(ZoneOffset.UTC).toInstant().toEpochMilli()} ORDER BY ID_OPEN_TIME"""
+          ID_OPEN_TIME > ${startDateTime.time} AND
+          ID_OPEN_TIME < ${endDateTime.time} ORDER BY ID_OPEN_TIME"""
     )
     private val log = KotlinLogging.logger {}
     private var hasNext = true
+    private var current: Candlestick? = null
+    private var previous: Candlestick? = null
+    private var next = true
 
     override fun hasNext(): Boolean = hasNext
 
     override fun next(): List<Candlestick> {
         val resultList = ArrayList<Candlestick>()
-        var i = 0
         try {
-            var next: Boolean
-            while (resultSet.next().apply { next = this } && i++ < listSize)
-                resultList.add(getCandle(resultSet).toCandlestick())
+
+            if (fillGaps && previous?.let { it.closeTime + 1 != current!!.openTime } == true) {
+                next = resultSet.next()
+                current = getCandle(resultSet).toCandlestick()
+            }
+
+            while (resultList.size < listSize) {
+
+                if (fillGaps && previous?.let { it.closeTime + 1 != current!!.openTime } == true) {
+                    previous = nextEmptyCandlestick(previous!!, interval)
+                    resultList.add(previous!!)
+
+                } else {
+                    current?.let { resultList.add(it) }
+
+                    if (resultSet.next().apply { next = this }.not()) break
+                    else {
+                        previous = current
+                        current = getCandle(resultSet).toCandlestick()
+                    }
+                }
+            }
 
             if (!next) {
                 stmt.close()
                 hasNext = false
-            } else
-                resultList.add(getCandle(resultSet).toCandlestick())
+            }
 
         } catch (t: Throwable) {
             log.error("Table: $tableName can't read!", t)
@@ -307,6 +392,17 @@ class CandlestickListsIterator(
 
         return resultList
     }
+
+
+    private fun nextEmptyCandlestick(previous: Candlestick, interval: INTERVAL): Candlestick = Candlestick(
+        openTime = previous.openTime + interval.toMillsTime(),
+        closeTime = previous.closeTime + interval.toMillsTime(),
+        open = previous.close,
+        close = previous.close,
+        high = previous.close,
+        low = previous.close,
+        volume = BigDecimal.ZERO
+    )
 }
 
 
@@ -353,5 +449,6 @@ enum class Command {
     CHECK,
     WRITE,
     WRITE_AND_CHECK,
+    CUSTOM,
     NONE
 }

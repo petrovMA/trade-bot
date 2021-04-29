@@ -194,12 +194,10 @@ class ClientBitmax(
             ),
             interval = interval,
             queue = queue,
-            asks = book.asks.map { it.price to it.qty }.toMap().toMutableMap(),
-            bids = book.bids.map { it.price to it.qty }.toMap().toMutableMap()
+            asks = book.asks.associate { it.price to it.qty }.toMutableMap(),
+            bids = book.bids.associate { it.price to it.qty }.toMutableMap()
         )
     }
-
-    override fun nextEvent() {}
 
     override fun close() {
         client.dispatcher.executorService.shutdown()

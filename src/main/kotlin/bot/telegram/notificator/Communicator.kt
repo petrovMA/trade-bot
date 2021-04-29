@@ -100,7 +100,20 @@ class Communicator(
             cmd.commandEmulate.matches(message) -> {
                 val params = message.split("\\s+".toRegex())
                 try {
-                    taskQueue.put(Emulate(sendFile, sendMessage, params[2].toRegex(), params[3], params[4], candlestickDataPath, ExchangeEnum.valueOf(params[1].toUpperCase())))
+                    taskQueue.put(Emulate(sendFile, sendMessage, params[2], params[3], params[4], candlestickDataPath, ExchangeEnum.valueOf(params[1].toUpperCase())))
+                    msg = "Emulate process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}"
+                    log.info("Emulate process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}")
+                } catch (t: Throwable) {
+                    msg = "Can't parse command:\n$message"
+
+                    log.warn("Can't parse command:\n$message", t)
+                    t.printStackTrace()
+                }
+            }
+            cmd.commandFindParams.matches(message) -> {
+                val params = message.split("\\s+".toRegex())
+                try {
+                    taskQueue.put(Emulate(sendFile, sendMessage, params[2], params[3], params[4], candlestickDataPath, ExchangeEnum.valueOf(params[1].toUpperCase()), false))
                     msg = "Emulate process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}"
                     log.info("Emulate process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}")
                 } catch (t: Throwable) {

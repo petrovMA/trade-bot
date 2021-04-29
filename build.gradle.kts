@@ -9,7 +9,7 @@ version = "1.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
-//    mavenLocal()
+    mavenLocal()
 }
 
 dependencies {
@@ -25,9 +25,11 @@ dependencies {
     implementation("org.apache.poi:poi:5.0.0") // exel table
 
     // exchanges
-    implementation("org.knowm.xchange:xchange-core:5.0.6")
-    implementation("org.knowm.xchange:xchange-binance:5.0.6")
-    implementation("org.knowm.xchange:xchange-stream-binance:5.0.6")
+    implementation("org.knowm.xchange:xchange-core:5.0.7")
+    implementation("org.knowm.xchange:xchange-binance:5.0.7")
+    implementation("org.knowm.xchange:xchange-stream-binance:5.0.7")
+    implementation("org.knowm.xchange:xchange-huobi:5.0.8-SNAPSHOT") // todo:: local repo!!!
+    implementation("org.knowm.xchange:xchange-stream-huobi:5.0.7")
 
     implementation("org.slf4j:slf4j-api:1.8.0-beta4")
 

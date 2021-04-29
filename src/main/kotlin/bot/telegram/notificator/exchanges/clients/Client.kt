@@ -1,7 +1,7 @@
 package bot.telegram.notificator.exchanges.clients
 
+import bot.telegram.notificator.exchanges.BotEvent
 import bot.telegram.notificator.exchanges.clients.socket.SocketThread
-import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 interface Client {
@@ -28,7 +28,7 @@ interface Client {
      * This method only for tests (emulate) trading
      * Adds Event to socket queue
      * */
-    fun nextEvent()
+    fun nextEvent(): CommonExchangeData = BotEvent(type = BotEvent.Type.INTERRUPT)
 
     /**
      * close OkHttpClient
