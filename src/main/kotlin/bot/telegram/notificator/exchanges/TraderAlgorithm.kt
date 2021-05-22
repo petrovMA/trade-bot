@@ -33,6 +33,7 @@ class TraderAlgorithm(
     private val cancelUnknownOrdersInterval: ActionInterval = ActionInterval(conf.getDuration("cancel_unknown_orders_interval")),
     private val retrySentOrderCount: Int = conf.getInt("retry_sent_order_count"),
     private val waitBalanceUpdate: Duration = conf.getDuration("wait_balance_update"),
+    private val timeBetweenTryingGetOrder: Duration = 1.m(),
     isLog: Boolean = true,
     private val isEmulate: Boolean = false,
     percentBuyProf: BigDecimal? = null,
@@ -327,9 +328,9 @@ class TraderAlgorithm(
 
                                 }
                                 is Order -> {
-                                    log?.debug("$tradePair OrderUpdate:\n$msg")
+                                    log?.info("$tradePair OrderUpdate:\n$msg")
 
-                                    if (msg.pair.first == tradePair.first && msg.pair.second == tradePair.second) // todo DELETE IT WHEN socket will be one for all Pairs
+                                    if (msg.pair == tradePair) // todo DELETE IT WHEN socket will be one for all Pairs
 
                                         if (msg.status == STATUS.FILLED || msg.status == STATUS.PARTIALLY_FILLED)
                                             if (msg.orderId == balance.orderB?.orderId) {
@@ -517,7 +518,7 @@ class TraderAlgorithm(
                     if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                     updateBuyOrder()
                     lastCheckBuyOrderTime = 0.s()
-                } else log?.info("$tradePair Order BUY:\n${balance.orderB}\nnot filled, but tradePrice in orderPrice")
+                } else log?.info("$tradePair Order BUY:\n${balance.orderB}\nnot filled, but checkBuyOrder() was called")
             } else {
                 if (!checkBuyOrderTrigger.first) {
                     checkBuyOrderTrigger = true to time() + pauseBetweenCheckOrder
@@ -598,7 +599,7 @@ class TraderAlgorithm(
                     if (!isEmulate) writeLine(balance, File("$path/balance.json"))
                     updateSellOrder()
                     lastCheckSellOrderTime = 0.s()
-                } else log?.info("$tradePair Order SELL:\n${balance.orderS}\nnot filled, but tradePrice in orderPrice")
+                } else log?.info("$tradePair Order SELL:\n${balance.orderS}\nnot filled, but checkSellOrder() was called")
             } else {
                 if (!checkSellOrderTrigger.first) {
                     checkSellOrderTrigger = true to time() + pauseBetweenCheckOrder

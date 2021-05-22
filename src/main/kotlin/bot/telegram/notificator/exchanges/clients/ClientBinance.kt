@@ -1,25 +1,34 @@
 package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.clients.socket.SocketThreadBinanceImpl
+import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import mu.KotlinLogging
 import org.knowm.xchange.Exchange
 import org.knowm.xchange.ExchangeFactory
+import org.knowm.xchange.ExchangeSpecification
+import org.knowm.xchange.binance.Binance
 import org.knowm.xchange.binance.BinanceExchange
+import org.knowm.xchange.binance.BinanceTimestampFactory
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.marketdata.KlineInterval
+import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.binance.service.BinanceAccountService
 import org.knowm.xchange.binance.service.BinanceMarketDataService
 import org.knowm.xchange.binance.service.BinanceTradeService
+import org.knowm.xchange.client.ResilienceRegistries
 import org.knowm.xchange.currency.Currency
 import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.dto.account.AccountInfo
 import org.knowm.xchange.dto.account.Wallet
 import org.knowm.xchange.dto.trade.LimitOrder
 import org.knowm.xchange.service.trade.params.orders.DefaultQueryOrderParamCurrencyPair
+import java.io.IOException
 import java.math.BigDecimal
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.BlockingQueue
+import java.util.concurrent.TimeUnit
 
 
 class ClientBinance(
@@ -33,8 +42,90 @@ class ClientBinance(
     private val accountService: BinanceAccountService = instance.accountService as BinanceAccountService
     private val accountInfo: AccountInfo? = if (sec == null) null else accountService.accountInfo
     private val wallet: Wallet? = if (sec == null) null else accountInfo!!.wallet
+//    private val timestampFactory: BinanceTimestampFactory
+    private val exchange: BinanceExchange
 
     private val log = KotlinLogging.logger {}
+
+    // todo STUB 'timestampFactory' begin
+    private val serverInterval: Long = 15000
+//
+    init {
+        instance.exchangeSpecification.exchangeSpecificParameters["recvWindow"] = serverInterval * 2
+
+//        val exchange: BinanceExchange = tradeService.getPrivateProperty("exchange") as BinanceExchange
+
+        exchange =
+            BinanceTradeService::class.java.superclass.superclass.superclass.superclass.getDeclaredField("exchange")
+                .let { field ->
+                    field.isAccessible = true
+                    field.get(tradeService) as BinanceExchange
+                }
+
+//        timestampFactory = BinanceExchange::class.java.getDeclaredField("timestampFactory").let { field ->
+//            field.isAccessible = true
+//            field.get(exchange) as BinanceTimestampFactory
+//        }
+
+//        log.warn { "Binance time: = ${timestampFactory.deltaServerTime()}" }
+    val oldFactory = exchange.timestampFactory as BinanceTimestampFactory
+
+        exchange.timestampFactory = TimestampFactory(oldFactory.binance, oldFactory.resilienceSpecification,oldFactory.resilienceRegistries, serverInterval)
+
+    }
+
+    fun <T : Any> T.setAndReturnPrivateProperty(variableName: String, data: Any): Any? {
+        return javaClass.getDeclaredField(variableName).let { field ->
+            field.isAccessible = true
+            field.set(this, data)
+            return@let field.get(this)
+        }
+    }
+
+    private class TimestampFactory(
+        binance: Binance?,
+        resilienceSpecification: ExchangeSpecification.ResilienceSpecification?,
+        resilienceRegistries: ResilienceRegistries?,
+        private val serverInterval: Long
+    ) : BinanceTimestampFactory(binance, resilienceSpecification, resilienceRegistries) {
+        override fun createValue(): Long =
+            System.currentTimeMillis() - serverInterval
+
+        @Throws(IOException::class)
+        override fun deltaServerTime(): Long {
+            if (deltaServerTime == null || deltaServerTimeExpire <= System.currentTimeMillis()) {
+
+                // Do a little warm up
+                val serverTime = Date(binanceTime().serverTime.time)
+
+                // Assume that we are closer to the server time when we get the repose
+                val systemTime = Date(System.currentTimeMillis())
+
+                // Expire every 10min
+                deltaServerTimeExpire = systemTime.time + TimeUnit.MINUTES.toMillis(1)
+                deltaServerTime = serverTime.time - systemTime.time
+                val df = SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS")
+                LOG.info(
+                    "deltaServerTime: {} - {} => {}",
+                    df.format(serverTime),
+                    df.format(systemTime),
+                    deltaServerTime
+                )
+
+                // Assume that we are closer to the server time when we get the repose
+                val systemTime2 = Date(createValue())
+                deltaServerTime = serverTime.time - systemTime2.time
+                LOG.info(
+                    "createValue deltaServerTime: {} - {} => {}",
+                    df.format(serverTime),
+                    df.format(systemTime2),
+                    deltaServerTime
+                )
+            }
+            return deltaServerTime
+        }
+    }
+    // todo STUB 'timestampFactory' end
 
     override fun getAllPairs(): List<TradePair> =
         instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
@@ -147,8 +238,9 @@ class ClientBinance(
     )
 
 
-    override fun getOrder(pair: TradePair, orderId: String): Order =
-        tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
+    override fun getOrder(pair: TradePair, orderId: String): Order {
+        println((exchange.timestampFactory as BinanceTimestampFactory).deltaServerTime())
+        return tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
             it as LimitOrder
             Order(
                 price = it.limitPrice,
@@ -170,12 +262,70 @@ class ClientBinance(
                     org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
                     org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
 
-                    org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
-                    org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
-                }
-            )
-        }.first()
+                        org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
+                        org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+                        else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+                    }
+                )
+            }.first()
+
+
+//        val ids = orderId.split('|')
+//
+//        if (ids.size > 1)
+//            return tradeService.orderStatus(pair.toCurrencyPair(), ids[0].toLong(), ids[1]).let {
+//                Order(
+//                    price = it.price,
+//                    pair = pair,
+//                    orderId = "${it.orderId}|${it.clientOrderId}",
+//                    origQty = it.origQty,
+//                    executedQty = it.executedQty,
+//                    side = fromBinanceSide(it.side),
+//                    type = TYPE.LIMIT,
+//                    status = when (it.status) {
+//                        org.knowm.xchange.binance.dto.trade.OrderStatus.NEW -> STATUS.NEW
+//
+//                        org.knowm.xchange.binance.dto.trade.OrderStatus.CANCELED -> STATUS.CANCELED
+//                        org.knowm.xchange.binance.dto.trade.OrderStatus.PENDING_CANCEL -> STATUS.CANCELED
+//                        org.knowm.xchange.binance.dto.trade.OrderStatus.REJECTED -> STATUS.CANCELED
+//                        org.knowm.xchange.binance.dto.trade.OrderStatus.EXPIRED -> STATUS.CANCELED
+//
+//                        org.knowm.xchange.binance.dto.trade.OrderStatus.FILLED -> STATUS.FILLED
+//                        org.knowm.xchange.binance.dto.trade.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+//                        else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+//                    }
+//                )
+//            }
+//        else
+//            return tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
+//                it as LimitOrder
+//                Order(
+//                    price = it.limitPrice,
+//                    pair = (it.instrument as CurrencyPair).run { TradePair(base.currencyCode, counter.currencyCode) },
+//                    orderId = it.id,
+//                    origQty = it.originalAmount,
+//                    executedQty = it.cumulativeAmount,
+//                    side = SIDE.valueOf(it.type),
+//                    type = TYPE.LIMIT,
+//                    status = when (it.status) {
+//                        org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
+//                        org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
+//                        org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
+//
+//                        org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
+//                        org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
+//                        org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
+//                        org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
+//                        org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
+//                        org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
+//
+//                        org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
+//                        org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+//                        else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+//                    }
+//                )
+//            }.first()
+    }
 
     override fun newOrder(
         order: Order,
@@ -197,11 +347,55 @@ class ClientBinance(
         )
 
         return Order(orderId, order.pair, order.price, order.origQty, BigDecimal(0), order.side, order.type, STATUS.NEW)
+
+
+//        return tradeService.newOrder(
+//            order.pair.toCurrencyPair(),
+//            toBinanceSide(order.side),
+//            OrderType.LIMIT,
+//            TimeInForce.GTC,
+//            String.format(formatCount, order.origQty).toBigDecimal(),
+//            String.format(formatPrice, order.price).toBigDecimal(),
+//            "${System.currentTimeMillis()}_${order.pair}",
+//            null,
+//            null
+//        ).let {
+//            Order(
+//                price = it.price,
+//                pair = order.pair,
+//                orderId = "${it.orderId}|${it.clientOrderId}",
+//                origQty = it.origQty,
+//                executedQty = it.executedQty,
+//                side = fromBinanceSide(it.side),
+//                type = TYPE.LIMIT,
+//                status = when (it.status) {
+//                    org.knowm.xchange.binance.dto.trade.OrderStatus.NEW -> STATUS.NEW
+//
+//                    org.knowm.xchange.binance.dto.trade.OrderStatus.CANCELED -> STATUS.CANCELED
+//                    org.knowm.xchange.binance.dto.trade.OrderStatus.PENDING_CANCEL -> STATUS.CANCELED
+//                    org.knowm.xchange.binance.dto.trade.OrderStatus.REJECTED -> STATUS.CANCELED
+//                    org.knowm.xchange.binance.dto.trade.OrderStatus.EXPIRED -> STATUS.CANCELED
+//
+//                    org.knowm.xchange.binance.dto.trade.OrderStatus.FILLED -> STATUS.FILLED
+//                    org.knowm.xchange.binance.dto.trade.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+//                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+//                }
+//            )
+//        }
     }
 
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean = try {
         tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
+
+
+//        val ids = orderId.split('|')
+//
+//        if (ids.size > 1)
+//            tradeService.cancelOrder(pair.toCurrencyPair(), ids[0].toLong(), ids[1], null)
+//        else
+//            tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
+
         true
     } catch (e: Exception) {
         log.warn("Cancel order Error: ", e)
@@ -248,4 +442,16 @@ class ClientBinance(
     )
 
     override fun toString(): String = "BINANCE"
+
+    private fun fromBinanceSide(side: OrderSide): SIDE = when (side) {
+        OrderSide.BUY -> SIDE.BUY
+        OrderSide.SELL -> SIDE.SELL
+        else -> SIDE.UNSUPPORTED
+    }
+
+    private fun toBinanceSide(side: SIDE): OrderSide = when (side) {
+        SIDE.BUY -> OrderSide.BUY
+        SIDE.SELL -> OrderSide.SELL
+        else -> throw UnknownOrderSide("Unsupported Order side!")
+    }
 }

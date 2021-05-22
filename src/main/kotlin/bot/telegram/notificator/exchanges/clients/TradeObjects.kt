@@ -134,6 +134,7 @@ enum class ExchangeEnum {
     BINANCE,
     BITMAX,
     HUOBI,
+    GATE,
     STUB_TEST
 }
 

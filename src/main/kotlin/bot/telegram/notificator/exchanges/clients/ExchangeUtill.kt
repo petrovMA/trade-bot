@@ -12,6 +12,7 @@ fun newClient(exchangeEnum: ExchangeEnum, api: String? = null, sec: String? = nu
             ExchangeEnum.BINANCE -> ClientBinance(api, sec).also { log.info(" !!! Connect: $it !!! ") }
             ExchangeEnum.BITMAX -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }
             ExchangeEnum.HUOBI -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }
+            ExchangeEnum.GATE -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }
             else -> throw UnsupportedClientException()
         }
 

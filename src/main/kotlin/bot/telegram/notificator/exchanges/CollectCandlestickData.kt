@@ -22,7 +22,7 @@ fun main() {
         command = Command.WRITE,
 //            command = Command.WRITE,
 //            command = Command.CHECK,
-        exchangeEnum = ExchangeEnum.HUOBI
+        exchangeEnum = ExchangeEnum.BINANCE
     ) {}.run()
 
 
@@ -50,6 +50,8 @@ class CollectCandlestickData(
                 ?: throw RuntimeException("Can't read Config File!")
             ExchangeEnum.HUOBI -> readConf("collect_huobi_candlestick.conf")
                 ?: throw RuntimeException("Can't read Config File!")
+            ExchangeEnum.GATE -> readConf("collect_gate_candlestick.conf")
+                ?: throw RuntimeException("Can't read Config File!")
             else -> throw UnsupportedExchangeException()
         }
     } catch (e: Throwable) {
@@ -70,6 +72,7 @@ class CollectCandlestickData(
             ExchangeEnum.BINANCE -> ClientBinance()
             ExchangeEnum.BITMAX -> ClientBitmax()
             ExchangeEnum.HUOBI -> ClientHuobi()
+            ExchangeEnum.GATE -> ClientGate()
             else -> throw UnsupportedExchangeException()
         }
         try {

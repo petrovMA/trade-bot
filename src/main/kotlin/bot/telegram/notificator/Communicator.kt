@@ -59,6 +59,7 @@ class Communicator(
             taskQueue.put(CollectCandlestickData(candlestickDataCommand, firstDayForCheck, ExchangeEnum.BINANCE, sendMessage))
             taskQueue.put(CollectCandlestickData(candlestickDataCommand, firstDayForCheck, ExchangeEnum.BITMAX, sendMessage))
             taskQueue.put(CollectCandlestickData(candlestickDataCommand, firstDayForCheck, ExchangeEnum.HUOBI, sendMessage))
+            taskQueue.put(CollectCandlestickData(candlestickDataCommand, firstDayForCheck, ExchangeEnum.GATE, sendMessage))
         }, this.intervalCandlestickUpdate, this.timeDifference)
         repeatEvery({ getStatistics() }, this.intervalStatistic, this.timeDifference)
     }
@@ -114,8 +115,8 @@ class Communicator(
                 val params = message.split("\\s+".toRegex())
                 try {
                     taskQueue.put(Emulate(sendFile, sendMessage, params[2], params[3], params[4], candlestickDataPath, ExchangeEnum.valueOf(params[1].toUpperCase()), false))
-                    msg = "Emulate process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}"
-                    log.info("Emulate process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}")
+                    msg = "FindParams process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}"
+                    log.info("FindParams process add to task queue! Symbol = ${params[2]}; Exchange = ${params[1]}")
                 } catch (t: Throwable) {
                     msg = "Can't parse command:\n$message"
 

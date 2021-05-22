@@ -170,11 +170,11 @@ class Emulate(
                     )
                 }
 
-            val buyProfStart = 4.0
-            val sellProfStart = 4.0
-            val staticOrdersStart = 7.0
-            val candlesBuyStart = 20
-            val candlesSellStart = 20
+            val buyProfStart = 2.0
+            val sellProfStart = 2.0
+            val staticOrdersStart = 3.0
+            val candlesBuyStart = 15
+            val candlesSellStart = 15
 
             var staticOrders = staticOrdersStart
             var buyProf = buyProfStart
@@ -183,14 +183,15 @@ class Emulate(
             var candlesSell = candlesSellStart
             val calculatedProf = ArrayList<EmulateResult?>()
 
-            while (buyProf <= 7.0) {
-                while (sellProf <= 7.0) {
-                    while (candlesBuy <= 80 && candlesSell <= 80) {
-                        while (staticOrders <= 15.0) {
+            while (buyProf <= 4.0) {
+                while (sellProf <= 4.0) {
+                    while (candlesBuy <= 30 && candlesSell <= 30) {
+                        while (staticOrders <= 8.0) {
 
-                            calculatedProf.add(func(buyProf, sellProf, candlesBuy, candlesSell, staticOrders))
+                            if (buyProf < staticOrders && sellProf < staticOrders)
+                                calculatedProf.add(func(buyProf, sellProf, candlesBuy, candlesSell, staticOrders))
 
-                            staticOrders += 2.0
+                            staticOrders += 0.2
                         }
 
                         staticOrders = staticOrdersStart
@@ -203,7 +204,7 @@ class Emulate(
                     candlesSell = candlesSellStart
                     sellProf += 0.2
 
-                    log.info { "$buyProf $sellProf" }
+                    log.info { "buyProf=$buyProf\t sellProf=$sellProf" }
                 }
 
                 staticOrders = staticOrdersStart
@@ -328,19 +329,6 @@ class Emulate(
 
             var result: EmulateResult? = null
             try {
-//                list = listOf(
-//                    client.balance.tradePair.toString(),
-//                    String.format("%.4f", secondBalanceByLastPrice - allStartSecondBalance), // Profit ByLastPrice
-//                    String.format("%.4f", secondBalanceByFirstPrice - allStartSecondBalance), // Profit ByFirstPrice
-//                    "${client.executedOrdersCount}",
-//                    "${client.updateStaticOrdersCount}",
-//                    String.format("%.4f", firstBalanceA),
-//                    String.format("%.4f", secondBalanceA),
-//                    String.format("%.4f", secondBalanceByFirstPrice),
-//                    String.format("%.4f", secondBalanceByLastPrice),
-//                    convertTime(trade.firstCandlestick?.openTime ?: 0),
-//                    convertTime(trade.lastCandlestick?.openTime ?: 0)
-//                )
                 result = EmulateResult(
                     pair = client.balance.tradePair.toString(),
                     profitByLastPrice = String.format("%.4f", secondBalanceByLastPrice - allStartSecondBalance)
