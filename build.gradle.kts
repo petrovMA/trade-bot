@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.4.31"
+    kotlin("jvm") version "1.6.0"
 }
 
 group = "bot.exchange"
@@ -20,8 +20,8 @@ dependencies {
     implementation("com.typesafe:config:1.4.1")
     implementation("com.google.code.gson:gson:2.8.9")
     implementation("com.squareup.retrofit2:converter-jackson:2.9.0")
-    implementation("org.telegram:telegrambots-spring-boot-starter:5.0.1.1")
-    implementation("com.neovisionaries:nv-websocket-client:2.12")
+    implementation("org.telegram:telegrambots-spring-boot-starter:5.4.0.1")
+    implementation("com.neovisionaries:nv-websocket-client:2.14")
     implementation("org.apache.poi:poi:5.0.0") // exel table
 
     // exchanges
@@ -30,11 +30,12 @@ dependencies {
     implementation("org.knowm.xchange:xchange-stream-binance:5.0.12")
     implementation("org.knowm.xchange:xchange-huobi:5.0.12")
     implementation("org.knowm.xchange:xchange-gateio:5.0.12")
+//    implementation("org.knowm.xchange:xchange-bybit:5.0.12")
     implementation("org.knowm.xchange:xchange-stream-huobi:5.0.12")
 
     implementation("org.slf4j:slf4j-api:1.8.0-beta4")
 
-    implementation("io.github.microutils:kotlin-logging-jvm:2.1.0")
+    implementation("io.github.microutils:kotlin-logging-jvm:2.1.21")
 
 
     // todo  Instruction https://gist.github.com/rppowell-lasfs/f0e3b2d18c3be03ada38a3e367eaf1b8

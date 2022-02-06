@@ -6,29 +6,22 @@ import bot.telegram.notificator.libs.UnknownOrderStatus
 import mu.KotlinLogging
 import org.knowm.xchange.Exchange
 import org.knowm.xchange.ExchangeFactory
-import org.knowm.xchange.ExchangeSpecification
-import org.knowm.xchange.binance.Binance
 import org.knowm.xchange.binance.BinanceExchange
-import org.knowm.xchange.binance.BinanceTimestampFactory
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.marketdata.KlineInterval
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.binance.service.BinanceAccountService
 import org.knowm.xchange.binance.service.BinanceMarketDataService
 import org.knowm.xchange.binance.service.BinanceTradeService
-import org.knowm.xchange.client.ResilienceRegistries
 import org.knowm.xchange.currency.Currency
 import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.dto.account.AccountInfo
 import org.knowm.xchange.dto.account.Wallet
 import org.knowm.xchange.dto.trade.LimitOrder
 import org.knowm.xchange.service.trade.params.orders.DefaultQueryOrderParamCurrencyPair
-import java.io.IOException
 import java.math.BigDecimal
-import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.BlockingQueue
-import java.util.concurrent.TimeUnit
 
 
 class ClientBinance(
@@ -42,90 +35,11 @@ class ClientBinance(
     private val accountService: BinanceAccountService = instance.accountService as BinanceAccountService
     private val accountInfo: AccountInfo? = if (sec == null) null else accountService.accountInfo
     private val wallet: Wallet? = if (sec == null) null else accountInfo!!.wallet
-//    private val timestampFactory: BinanceTimestampFactory
-    private val exchange: BinanceExchange
 
     private val log = KotlinLogging.logger {}
 
     // todo STUB 'timestampFactory' begin
-    private val serverInterval: Long = 15000
-//
-    init {
-        instance.exchangeSpecification.exchangeSpecificParameters["recvWindow"] = serverInterval * 2
 
-//        val exchange: BinanceExchange = tradeService.getPrivateProperty("exchange") as BinanceExchange
-
-        exchange =
-            BinanceTradeService::class.java.superclass.superclass.superclass.superclass.getDeclaredField("exchange")
-                .let { field ->
-                    field.isAccessible = true
-                    field.get(tradeService) as BinanceExchange
-                }
-
-//        timestampFactory = BinanceExchange::class.java.getDeclaredField("timestampFactory").let { field ->
-//            field.isAccessible = true
-//            field.get(exchange) as BinanceTimestampFactory
-//        }
-
-//        log.warn { "Binance time: = ${timestampFactory.deltaServerTime()}" }
-    val oldFactory = exchange.timestampFactory as BinanceTimestampFactory
-
-        exchange.timestampFactory = TimestampFactory(oldFactory.binance, oldFactory.resilienceSpecification,oldFactory.resilienceRegistries, serverInterval)
-
-    }
-
-    fun <T : Any> T.setAndReturnPrivateProperty(variableName: String, data: Any): Any? {
-        return javaClass.getDeclaredField(variableName).let { field ->
-            field.isAccessible = true
-            field.set(this, data)
-            return@let field.get(this)
-        }
-    }
-
-    private class TimestampFactory(
-        binance: Binance?,
-        resilienceSpecification: ExchangeSpecification.ResilienceSpecification?,
-        resilienceRegistries: ResilienceRegistries?,
-        private val serverInterval: Long
-    ) : BinanceTimestampFactory(binance, resilienceSpecification, resilienceRegistries) {
-        override fun createValue(): Long =
-            System.currentTimeMillis() - serverInterval
-
-        @Throws(IOException::class)
-        override fun deltaServerTime(): Long {
-            if (deltaServerTime == null || deltaServerTimeExpire <= System.currentTimeMillis()) {
-
-                // Do a little warm up
-                val serverTime = Date(binanceTime().serverTime.time)
-
-                // Assume that we are closer to the server time when we get the repose
-                val systemTime = Date(System.currentTimeMillis())
-
-                // Expire every 10min
-                deltaServerTimeExpire = systemTime.time + TimeUnit.MINUTES.toMillis(1)
-                deltaServerTime = serverTime.time - systemTime.time
-                val df = SimpleDateFormat("yyyy-MM-dd HH:mm:ss:SSS")
-                LOG.info(
-                    "deltaServerTime: {} - {} => {}",
-                    df.format(serverTime),
-                    df.format(systemTime),
-                    deltaServerTime
-                )
-
-                // Assume that we are closer to the server time when we get the repose
-                val systemTime2 = Date(createValue())
-                deltaServerTime = serverTime.time - systemTime2.time
-                LOG.info(
-                    "createValue deltaServerTime: {} - {} => {}",
-                    df.format(serverTime),
-                    df.format(systemTime2),
-                    deltaServerTime
-                )
-            }
-            return deltaServerTime
-        }
-    }
-    // todo STUB 'timestampFactory' end
 
     override fun getAllPairs(): List<TradePair> =
         instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
@@ -239,7 +153,6 @@ class ClientBinance(
 
 
     override fun getOrder(pair: TradePair, orderId: String): Order {
-        println((exchange.timestampFactory as BinanceTimestampFactory).deltaServerTime())
         return tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
             it as LimitOrder
             Order(
