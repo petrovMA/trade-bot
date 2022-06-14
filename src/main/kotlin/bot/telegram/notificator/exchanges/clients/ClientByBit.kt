@@ -32,16 +32,6 @@ class ClientByBit(
     // todo STUB 'timestampFactory' begin
     private val serverInterval: Long = 15000
 
-
-
-    fun <T : Any> T.setAndReturnPrivateProperty(variableName: String, data: Any): Any? {
-        return javaClass.getDeclaredField(variableName).let { field ->
-            field.isAccessible = true
-            field.set(this, data)
-            return@let field.get(this)
-        }
-    }
-
     override fun getAllPairs(): List<TradePair> =
         TODO("getAllPairs NOT IMPLEMENTED")
 //        instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
