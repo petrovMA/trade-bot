@@ -37,10 +37,25 @@ fun main() {
         val createOrder = orderCreate(
             side = "Buy",
             symbol = "BTCUSD",
-            order_type = "Market",
+            orderType = "Market",
             qty = "10",
-            time_in_force = "GoodTillCancel"
+            timeInForce = "GoodTillCancel"
         )
         println(createOrder)
+
+        val orderList = getOrderList(
+            symbol = "BTCUSD",
+            orderStatus = "Filled",
+            direction = null,
+            limit = null,
+            cursor = null
+        )
+        println(orderList)
+
+        val orderCancel = orderCancel(
+            symbol = "BTCUSD",
+            orderLinkId = "123456"
+        )
+        println(orderCancel)
     }
 }

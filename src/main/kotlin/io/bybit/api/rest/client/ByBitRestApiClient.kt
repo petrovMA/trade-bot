@@ -3,14 +3,16 @@ package io.bybit.api.rest.client
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.bitmax.api.Mapper
 import io.bybit.api.rest.messages.balance.BalanceResponse
+import io.bybit.api.rest.messages.cancel_order.CancelOrderRequest
+import io.bybit.api.rest.messages.cancel_order.CancelOrderResponse
 import io.bybit.api.rest.messages.create_order.CreateOrderRequest
 import io.bybit.api.rest.messages.create_order.CreateOrderResponse
 import io.bybit.api.rest.messages.kline.KlineResponse
 import io.bybit.api.rest.messages.order_book.OrderBookResponse
+import io.bybit.api.rest.messages.order_list.OrderListResponse
 import io.bybit.api.rest.messages.time.TimeResponse
 import mu.KotlinLogging
 import okhttp3.HttpUrl
-import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -29,7 +31,6 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     private val private = "private"
     private val client: OkHttpClient = OkHttpClient()
     private val objectMapper: ObjectMapper = ObjectMapper()
-    private val JSON: MediaType? = "application/json".toMediaTypeOrNull()
 
     private val log = KotlinLogging.logger {}
 
@@ -72,28 +73,54 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         return executeRequest(request, BalanceResponse::class.java)
     }
 
+    fun getOrderList(
+        symbol: String,
+        orderStatus: String? = null,
+        direction: String? = null,
+        limit: String? = null,
+        cursor: String? = null
+    ): OrderListResponse {
+
+        val requestParams = createMapParams(TreeMap<String, String>().apply {
+            put("symbol", symbol)
+            orderStatus?.let { put("order_status", it) }
+            direction?.let { put("direction", it) }
+            limit?.let { put("limit", it) }
+            cursor?.let { put("cursor", it) }
+        })
+
+        val builder = private().apply {
+            addPathSegment("order")
+            addPathSegment("list")
+            requestParams.forEach { (key, value) -> addQueryParameter(key, value) }
+        }.build()
+
+        val request: Request = Request.Builder().url(builder).build()
+        return executeRequest(request, OrderListResponse::class.java)
+    }
+
     fun orderCreate(
         side: String,
         symbol: String,
-        order_type: String,
+        orderType: String,
         qty: String,
-        time_in_force: String
+        timeInForce: String
     ): CreateOrderResponse {
 
         val requestParams = createMapParams(TreeMap<String, String>().apply {
             put("side", side)
             put("symbol", symbol)
-            put("order_type", order_type)
+            put("order_type", orderType)
             put("qty", qty)
-            put("time_in_force", time_in_force)
+            put("time_in_force", timeInForce)
         })
 
         val requestBody = CreateOrderRequest(
             side = side,
             symbol = symbol,
-            order_type = order_type,
+            order_type = orderType,
             qty = qty,
-            time_in_force = time_in_force,
+            time_in_force = timeInForce,
             timestamp = requestParams["timestamp"]!!,
             sign = requestParams["sign"]!!,
             api_key = requestParams["api_key"]!!,
@@ -107,6 +134,36 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         }.build()
 
         return executeRequest(Request.Builder().url(builder).post(body).build(), CreateOrderResponse::class.java)
+    }
+
+    fun orderCancel(symbol: String, orderId: String? = null, orderLinkId: String? = null): CancelOrderResponse {
+
+        if (orderId.isNullOrEmpty() && orderLinkId.isNullOrEmpty())
+            throw java.lang.RuntimeException("'orderId' or 'orderLinkId' must not be null!")
+
+        val requestParams = createMapParams(TreeMap<String, String>().apply {
+            put("symbol", symbol)
+            orderId?.let { put("order_id", it) }
+            orderLinkId?.let { put("order_link_id", it) }
+        })
+
+        val requestBody = CancelOrderRequest(
+            symbol = symbol,
+            order_id = orderId,
+            order_link_id = orderLinkId,
+            timestamp = requestParams["timestamp"]!!,
+            sign = requestParams["sign"]!!,
+            api_key = requestParams["api_key"]!!,
+        )
+
+        val body = body(requestBody)
+
+        val builder = private().apply {
+            addPathSegment("order")
+            addPathSegment("cancel")
+        }.build()
+
+        return executeRequest(Request.Builder().url(builder).post(body).build(), CancelOrderResponse::class.java)
     }
 
     fun getTime(): TimeResponse {
@@ -141,7 +198,8 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     private fun public() = HttpUrl.Builder().scheme("https").host(url)
         .addPathSegment(version).addPathSegment(public)
 
-    private fun body(obj: Any) = objectMapper.writeValueAsString(obj).toRequestBody(JSON)
+    private fun body(obj: Any) =
+        objectMapper.writeValueAsString(obj).toRequestBody("application/json".toMediaTypeOrNull()!!)
 
     private fun createMapParams(params: TreeMap<String, String> = TreeMap()): TreeMap<String, String> = params.apply {
         put("api_key", apikey)
