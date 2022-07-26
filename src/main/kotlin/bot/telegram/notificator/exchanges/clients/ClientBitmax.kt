@@ -5,7 +5,7 @@ import bot.telegram.notificator.exchanges.clients.socket.SocketThreadBitmaxImpl
 import bot.telegram.notificator.exchanges.libs.bitmax.Product
 import bot.telegram.notificator.libs.*
 import io.bitmax.api.Authorization
-import io.bitmax.api.Mapper
+import utils.mapper.Mapper
 import io.bitmax.api.rest.client.BitMaxRestApiClient
 import io.bitmax.api.rest.client.BitmaxInterval
 import io.bitmax.api.rest.messages.requests.RestCancelOrderRequest

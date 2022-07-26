@@ -1,8 +1,8 @@
 package io.bitmax.api.websocket
 
 import com.neovisionaries.ws.client.*
-import io.bitmax.api.Mapper.asObject
-import io.bitmax.api.Mapper.asString
+import utils.mapper.Mapper.asObject
+import utils.mapper.Mapper.asString
 import io.bitmax.api.websocket.messages.requests.WebSocketAuth
 import io.bitmax.api.websocket.messages.requests.WebSocketMsg
 import io.bitmax.api.websocket.messages.responses.*

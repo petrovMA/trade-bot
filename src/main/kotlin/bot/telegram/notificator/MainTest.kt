@@ -3,6 +3,8 @@ package bot.telegram.notificator
 import bot.telegram.notificator.libs.m
 import bot.telegram.notificator.libs.readConf
 import io.bybit.api.rest.client.ByBitRestApiClient
+import io.bybit.api.websocket.ByBitApiWebSocketListener
+import io.bybit.api.websocket.messages.requests.WebSocketMsg
 import mu.KotlinLogging
 import org.apache.log4j.PropertyConfigurator
 
@@ -17,6 +19,19 @@ fun main() {
     val api = conf.getString("api")
     val sec = conf.getString("sec")
 
+
+// api webSocket
+    ByBitApiWebSocketListener(
+        api,
+        sec,
+        "wss://stream.bytick.com/realtime",
+        5000,
+        true,
+        WebSocketMsg("subscribe", listOf("order")),
+        WebSocketMsg("subscribe", listOf("orderBookL2_25.BTCUSD"))
+    )
+
+// api rest
     ByBitRestApiClient(api, sec).apply {
         val resultOrderBook = getOrderBook("BTCUSD")
         println(resultOrderBook)

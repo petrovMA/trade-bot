@@ -1,7 +1,8 @@
 package io.bybit.api.rest.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.bitmax.api.Mapper
+import io.bybit.api.Authorization
+import utils.mapper.Mapper
 import io.bybit.api.rest.messages.balance.BalanceResponse
 import io.bybit.api.rest.messages.cancel_order.CancelOrderRequest
 import io.bybit.api.rest.messages.cancel_order.CancelOrderResponse
@@ -20,8 +21,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.Buffer
 import java.io.IOException
 import java.util.*
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 
 class ByBitRestApiClient(private val apikey: String, private val secret: String) {
@@ -204,33 +203,8 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     private fun createMapParams(params: TreeMap<String, String> = TreeMap()): TreeMap<String, String> = params.apply {
         put("api_key", apikey)
         put("timestamp", System.currentTimeMillis().toString())
-        put("sign", sign(this, secret))
+        put("sign", Authorization.signForRest(this, secret))
     }
-
-
-    private fun sign(params: TreeMap<String, String>, secret: String): String {
-        val keySet: Set<String> = params.keys
-        val iter = keySet.iterator()
-        val sb = StringBuilder()
-        while (iter.hasNext()) {
-            val key = iter.next()
-            sb.append(key + "=" + params[key])
-            sb.append("&")
-        }
-        sb.deleteCharAt(sb.length - 1)
-        val sha256_HMAC = Mac.getInstance("HmacSHA256")
-        val secret_key = SecretKeySpec(secret.toByteArray(), "HmacSHA256")
-        sha256_HMAC.init(secret_key)
-        return bytesToHex(sha256_HMAC.doFinal(sb.toString().toByteArray()))
-    }
-
-    private fun bytesToHex(hash: ByteArray) = StringBuffer().also { hexString ->
-        for (i in hash.indices) {
-            val hex = Integer.toHexString(0xff and hash[i].toInt())
-            if (hex.length == 1) hexString.append('0')
-            hexString.append(hex)
-        }
-    }.toString()
 
     enum class INTERVAL(val time: String) {
         ONE_MINUTE("1"),

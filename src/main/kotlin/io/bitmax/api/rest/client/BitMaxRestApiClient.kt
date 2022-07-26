@@ -1,9 +1,8 @@
 package io.bitmax.api.rest.client
 
 import bot.telegram.notificator.exchanges.clients.INTERVAL
-import bot.telegram.notificator.exchanges.libs.bitmax.BitmaxCandlestick
 import bot.telegram.notificator.libs.NotSupportedIntervalException
-import io.bitmax.api.Mapper.asObject
+import utils.mapper.Mapper.asObject
 import io.bitmax.api.rest.messages.requests.RestCancelOrderRequest
 import io.bitmax.api.rest.messages.requests.RestPlaceOrderRequest
 import io.bitmax.api.rest.messages.responses.*

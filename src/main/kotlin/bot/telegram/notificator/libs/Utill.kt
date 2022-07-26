@@ -6,10 +6,10 @@ import bot.telegram.notificator.exchanges.clients.INTERVAL
 import bot.telegram.notificator.exchanges.clients.Order
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
-import io.bitmax.api.Mapper.asFile
-import io.bitmax.api.Mapper.asListObjects
-import io.bitmax.api.Mapper.asObject
-import io.bitmax.api.Mapper.asString
+import utils.mapper.Mapper.asFile
+import utils.mapper.Mapper.asListObjects
+import utils.mapper.Mapper.asObject
+import utils.mapper.Mapper.asString
 import mu.KotlinLogging
 import java.io.File
 import java.io.IOException

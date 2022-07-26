@@ -1,4 +1,4 @@
-package io.bitmax.api
+package utils.mapper
 
 import com.google.gson.Gson
 import java.io.File

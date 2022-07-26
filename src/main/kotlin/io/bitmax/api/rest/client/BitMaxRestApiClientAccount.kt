@@ -1,7 +1,7 @@
 package io.bitmax.api.rest.client
 
 import io.bitmax.api.Authorization
-import io.bitmax.api.Mapper.asString
+import utils.mapper.Mapper.asString
 import io.bitmax.api.rest.messages.requests.RestCancelOrderRequest
 import io.bitmax.api.rest.messages.requests.RestPlaceOrderRequest
 import io.bitmax.api.rest.messages.responses.*
