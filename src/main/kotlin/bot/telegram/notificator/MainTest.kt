@@ -22,14 +22,30 @@ fun main() {
 
 // api webSocket
     ByBitApiWebSocketListener(
-        api,
-        sec,
+//        api,
+//        sec,
         "wss://stream.bytick.com/realtime",
-        5000,
+        500000,
         true,
         WebSocketMsg("subscribe", listOf("order")),
-        WebSocketMsg("subscribe", listOf("orderBookL2_25.BTCUSD"))
+        WebSocketMsg(
+            "subscribe",
+            listOf(
+                "orderBook_200.100ms.BTCUSD",
+                "trade",
+                "insurance",
+                "instrument_info.100ms.BTCUSD",
+                "klineV2.1.BTCUSD",
+                "liquidation"
+            )
+        )
     )
+        .setOrderBookCallback { println("OrderBook -> $it") }
+        .setTradeCallback { println("Trade -> $it") }
+        .setKlineCallback { println("Kline -> $it") }
+        .setInsuranceCallback { println("Insurance -> $it") }
+        .setInstrumentInfoCallback { println("InstrumentInfo -> $it") }
+        .setLiquidationCallback { println("Liquidation -> $it") }
 
 // api rest
     ByBitRestApiClient(api, sec).apply {

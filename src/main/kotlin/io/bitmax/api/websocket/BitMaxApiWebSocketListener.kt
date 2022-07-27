@@ -7,7 +7,6 @@ import io.bitmax.api.websocket.messages.requests.WebSocketAuth
 import io.bitmax.api.websocket.messages.requests.WebSocketMsg
 import io.bitmax.api.websocket.messages.responses.*
 import mu.KotlinLogging
-import java.util.regex.Pattern
 
 /**
  * Represents a Listener of webSocket channels
@@ -23,13 +22,13 @@ class BitMaxApiWebSocketListener {
     /**
      * patterns to determine type of message
      */
-    private val pingPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"ping\"\\s*")
-    private val summaryPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"summary\"\\s*")
-    private val depthPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"depth\"\\s*")
-    private val marketTradesPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"trades\"\\s*")
-    private val barPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"bar\"\\s*")
-    private val pongPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"pong\"\\s*}")
-    private val orderPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"order\"\\s*")
+    private val pingPattern = Regex("\\s*\\{\\s*\"m\"\\s*:\\s*\"ping\"\\s*")
+    private val summaryPattern = Regex("\\s*\\{\\s*\"m\"\\s*:\\s*\"summary\"\\s*")
+    private val depthPattern = Regex("\\s*\\{\\s*\"m\"\\s*:\\s*\"depth\"\\s*")
+    private val marketTradesPattern = Regex("\\s*\\{\\s*\"m\"\\s*:\\s*\"trades\"\\s*")
+    private val barPattern = Regex("\\s*\\{\\s*\"m\"\\s*:\\s*\"bar\"\\s*")
+    private val pongPattern = Regex("\\s*\\{\\s*\"m\"\\s*:\\s*\"pong\"\\s*}")
+    private val orderPattern = Regex("\\s*\\{\\s*\"m\"\\s*:\\s*\"order\"\\s*")
 
     /**
      * callBacks or every message type
@@ -109,18 +108,18 @@ class BitMaxApiWebSocketListener {
     private fun onMessage(message: String) {
         log.trace("Receive message <<< $message")
         when {
-            pingPattern.matcher(message).find() -> {
+            pingPattern.matches(message) -> {
                 if (keepConnection) sendText("{ \"op\": \"pong\" }")
             }
-            summaryPattern.matcher(message).find() ->
+            summaryPattern.matches(message) ->
                 summaryCallback?.invoke(asObject(message, WebSocketSummary::class.java))
-            depthPattern.matcher(message).find() ->
+            depthPattern.matches(message) ->
                 depthCallback?.invoke(asObject(message, WebSocketDepth::class.java))
-            marketTradesPattern.matcher(message).find() ->
+            marketTradesPattern.matches(message) ->
                 marketTradesCallback?.invoke(asObject(message, WebSocketMarketTrades::class.java))
-            barPattern.matcher(message).find() ->
+            barPattern.matches(message) ->
                 barCallback?.invoke(asObject(message, WebSocketBar::class.java))
-            orderPattern.matcher(message).find() ->
+            orderPattern.matches(message) ->
                 orderCallback?.invoke(asObject(message, WebSocketOrder::class.java))
         }
     }

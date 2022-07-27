@@ -5,9 +5,13 @@ import io.bybit.api.Authorization
 import utils.mapper.Mapper.asObject
 import utils.mapper.Mapper.asString
 import io.bybit.api.websocket.messages.requests.WebSocketMsg
-//import io.bybit.api.websocket.messages.responses.*
+import io.bybit.api.websocket.messages.response.instrument_info.InstrumentInfo
+import io.bybit.api.websocket.messages.response.insurance.Insurance
+import io.bybit.api.websocket.messages.response.kline.Kline
+import io.bybit.api.websocket.messages.response.liquidation.Liquidation
+import io.bybit.api.websocket.messages.response.order_book.OrderBook
+import io.bybit.api.websocket.messages.response.trade.Trade
 import mu.KotlinLogging
-import java.util.regex.Pattern
 
 /**
  * Represents a Listener of webSocket channels
@@ -23,22 +27,23 @@ class ByBitApiWebSocketListener {
     /**
      * patterns to determine type of message
      */
-    private val pingPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"ping\"\\s*")
-    private val summaryPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"summary\"\\s*")
-    private val depthPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"depth\"\\s*")
-    private val marketTradesPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"trades\"\\s*")
-    private val barPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"bar\"\\s*")
-    private val pongPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"pong\"\\s*}")
-    private val orderPattern = Pattern.compile("\\s*\\{\\s*\"m\"\\s*:\\s*\"order\"\\s*")
+    private val orderBookPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"orderBook")
+    private val orderBookSnapshotPattern = Regex("\\s*\"type\"\\s*:\\s*\"snapshot\"")
+    private val tradePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"trade\\.")
+    private val insurancePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"insurance")
+    private val instrumentInfoPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"instrument_info")
+    private val klinePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"klineV2")
+    private val liquidationPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"liquidation")
 
     /**
      * callBacks or every message type
      */
-//    private var summaryCallback: ((WebSocketSummary) -> Unit)? = null
-//    private var depthCallback: ((WebSocketDepth) -> Unit)? = null
-//    private var marketTradesCallback: ((WebSocketMarketTrades) -> Unit)? = null
-//    private var barCallback: ((WebSocketBar) -> Unit)? = null
-//    private var orderCallback: ((WebSocketOrder) -> Unit)? = null
+    private var orderBookCallback: ((OrderBook) -> Unit)? = null
+    private var tradeCallback: ((Trade) -> Unit)? = null
+    private var insuranceCallback: ((Insurance) -> Unit)? = null
+    private var instrumentInfoCallback: ((InstrumentInfo) -> Unit)? = null
+    private var klineCallback: ((Kline) -> Unit)? = null
+    private var liquidationCallback: ((Liquidation) -> Unit)? = null
 
     /**
      * Initialize listener for authorized user
@@ -127,46 +132,54 @@ class ByBitApiWebSocketListener {
 
     private fun onMessage(message: String) {
         log.trace("Receive message <<< $message")
-//        when {
+        try {
+            when {
 //            pingPattern.matcher(message).find() -> {
 //                if (keepConnection) sendText("{ \"op\": \"pong\" }")
 //            }
-//            summaryPattern.matcher(message).find() ->
-//                summaryCallback?.invoke(asObject(message, WebSocketSummary::class.java))
-//            depthPattern.matcher(message).find() ->
-//                depthCallback?.invoke(asObject(message, WebSocketDepth::class.java))
-//            marketTradesPattern.matcher(message).find() ->
-//                marketTradesCallback?.invoke(asObject(message, WebSocketMarketTrades::class.java))
-//            barPattern.matcher(message).find() ->
-//                barCallback?.invoke(asObject(message, WebSocketBar::class.java))
-//            orderPattern.matcher(message).find() ->
-//                orderCallback?.invoke(asObject(message, WebSocketOrder::class.java))
-//        }
+                orderBookPattern.containsMatchIn(message) ->
+                    if (orderBookSnapshotPattern.containsMatchIn(message))
+
+                    else
+                        orderBookCallback?.invoke(asObject(message, OrderBook::class.java))
+                tradePattern.containsMatchIn(message) ->
+                    tradeCallback?.invoke(asObject(message, Trade::class.java))
+                insurancePattern.containsMatchIn(message) ->
+                    insuranceCallback?.invoke(asObject(message, Insurance::class.java))
+                instrumentInfoPattern.containsMatchIn(message) ->
+                    instrumentInfoCallback?.invoke(asObject(message, InstrumentInfo::class.java))
+                klinePattern.containsMatchIn(message) ->
+                    klineCallback?.invoke(asObject(message, Kline::class.java))
+                liquidationPattern.containsMatchIn(message) ->
+                    liquidationCallback?.invoke(asObject(message, Liquidation::class.java))
+                else -> log.warn { "Not found pattern for message: $message" }
+            }
+        } catch (t: Throwable) {
+            log.error("Can't deserialize message: $message", t)
+        }
     }
 
     fun close() {
         webSocket!!.disconnect()
     }
 
-//    fun setSummaryCallback(summaryCallback: (WebSocketSummary) -> Unit) {
-//        this.summaryCallback = summaryCallback
-//    }
-//
-//    fun setDepthCallback(depthCallback: (WebSocketDepth) -> Unit) {
-//        this.depthCallback = depthCallback
-//    }
-//
-//    fun setMarketTradesCallback(marketTradesCallback: (WebSocketMarketTrades) -> Unit) {
-//        this.marketTradesCallback = marketTradesCallback
-//    }
-//
-//    fun setBarCallback(barCallback: (WebSocketBar) -> Unit) {
-//        this.barCallback = barCallback
-//    }
-//
-//    fun setOrderCallback(orderCallback: (WebSocketOrder) -> Unit) {
-//        this.orderCallback = orderCallback
-//    }
+    fun setOrderBookCallback(orderBookCallback: (OrderBook) -> Unit) =
+        apply { this.orderBookCallback = orderBookCallback }
+
+    fun setTradeCallback(tradeCallback: (Trade) -> Unit) =
+        apply { this.tradeCallback = tradeCallback }
+
+    fun setInsuranceCallback(insuranceCallback: (Insurance) -> Unit) =
+        apply { this.insuranceCallback = insuranceCallback }
+
+    fun setInstrumentInfoCallback(instrumentInfoCallback: (InstrumentInfo) -> Unit) =
+        apply { this.instrumentInfoCallback = instrumentInfoCallback }
+
+    fun setKlineCallback(klineCallback: (Kline) -> Unit) =
+        apply { this.klineCallback = klineCallback }
+
+    fun setLiquidationCallback(liquidationCallback: (Liquidation) -> Unit) =
+        apply { this.liquidationCallback = liquidationCallback }
 
     companion object {
         /**
