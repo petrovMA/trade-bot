@@ -9,7 +9,9 @@ import io.bybit.api.websocket.messages.response.instrument_info.InstrumentInfo
 import io.bybit.api.websocket.messages.response.insurance.Insurance
 import io.bybit.api.websocket.messages.response.kline.Kline
 import io.bybit.api.websocket.messages.response.liquidation.Liquidation
+import io.bybit.api.websocket.messages.response.order_book.Data
 import io.bybit.api.websocket.messages.response.order_book.OrderBook
+import io.bybit.api.websocket.messages.response.order_book.OrderBookSnapshot
 import io.bybit.api.websocket.messages.response.trade.Trade
 import mu.KotlinLogging
 
@@ -138,9 +140,22 @@ class ByBitApiWebSocketListener {
 //                if (keepConnection) sendText("{ \"op\": \"pong\" }")
 //            }
                 orderBookPattern.containsMatchIn(message) ->
-                    if (orderBookSnapshotPattern.containsMatchIn(message))
-
-                    else
+                    if (orderBookSnapshotPattern.containsMatchIn(message)) {
+                        asObject(message, OrderBookSnapshot::class.java).run {
+                            OrderBook(
+                                cross_seq = cross_seq,
+                                timestamp_e6 = timestamp_e6,
+                                topic = topic,
+                                type = type,
+                                data = Data(
+                                    insert = data,
+                                    update = emptyList(),
+                                    delete = emptyList(),
+                                    transactTimeE6 = timestamp_e6
+                                )
+                            ).let { orderBookCallback?.invoke(it) }
+                        }
+                    } else
                         orderBookCallback?.invoke(asObject(message, OrderBook::class.java))
                 tradePattern.containsMatchIn(message) ->
                     tradeCallback?.invoke(asObject(message, Trade::class.java))

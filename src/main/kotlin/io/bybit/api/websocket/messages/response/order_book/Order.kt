@@ -1,9 +1,9 @@
 package io.bybit.api.websocket.messages.response.order_book
 
-data class Insert(
+data class Order(
     val id: Int,
     val price: String,
     val side: String,
-    val size: Int,
+    val size: Int? = null,
     val symbol: String
 )
