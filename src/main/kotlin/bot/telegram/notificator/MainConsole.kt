@@ -30,9 +30,9 @@ fun main() {
                 candlestickDataCommandStr = properties?.getString("bot_properties.exchange.candlestick_data_command"),
                 candlestickDataPath = mapOf(
                         ExchangeEnum.BINANCE to properties?.getString("bot_properties.exchange.binance_emulate_data_path")!!,
-                        ExchangeEnum.BITMAX to properties.getString("bot_properties.exchange.bitmax_emulate_data_path")!!,
-                        ExchangeEnum.HUOBI to properties.getString("bot_properties.exchange.huobi_emulate_data_path")!!,
-                        ExchangeEnum.GATE to properties.getString("bot_properties.exchange.gate_emulate_data_path")!!
+//                        ExchangeEnum.BITMAX to properties.getString("bot_properties.exchange.bitmax_emulate_data_path")!!,
+//                        ExchangeEnum.HUOBI to properties.getString("bot_properties.exchange.huobi_emulate_data_path")!!,
+//                        ExchangeEnum.GATE to properties.getString("bot_properties.exchange.gate_emulate_data_path")!!
                 ),
                 taskQueue = taskExecutor.getQueue(),
                 exchangeFiles = exchangeFile,
@@ -47,10 +47,10 @@ fun main() {
 //        }
 
 
-        java.util.Timer("emulate", false).schedule(3.s().toMillis()) {
+//        java.util.Timer("emulate", false).schedule(3.s().toMillis()) {
 //            bot.onUpdate("Collect gate WRITE")
 
-            bot.onUpdate("tradePairs init")
+//            bot.onUpdate("tradePairs init")
 //            bot.onUpdate("Emulate binance HBAR_BNB 2021_04_21 2021_05_03")
 
 //            bot.onUpdate("FindParams binance HBAR_BNB 2021_04_03 2021_05_03")
@@ -69,9 +69,9 @@ fun main() {
 //            bot.onUpdate("FindParams binance BTC_USDT 2021_03_27 2021_04_27")
 //            bot.onUpdate("FindParams huobi BTC_USDT 2021_03_27 2021_04_27")
 //            bot.onUpdate("FindParams bitmax BTC_USDT 2021_03_27 2021_04_27")
-        }
-        java.util.Timer("start2", false).schedule(30.s().toMillis()) {
-            bot.onUpdate("start AION_ETH")
+//        }
+        java.util.Timer("start2", false).schedule(10.s().toMillis()) {
+            bot.onUpdate("start|name name|pair BTC_USDT|ordersType LImit|tradingRange 100 101|orderQuantity 10|triggerDistance 2000|maxTriggerDistance 4000|startDate 2022_07_28|endDate 2022_08_01|exchange binance")
         }
 //        java.util.Timer("TradePairs", false).schedule(5.m().toMillis()) {
 //            bot.taskQueue.put(CollectCandlestickData(bot.candlestickDataCommand, null, ExchangeEnum.BINANCE, bot.sendMessage))

@@ -147,3 +147,13 @@ data class Candlestick(
     val close: BigDecimal,
     val volume: BigDecimal
 ) : CommonExchangeData
+
+data class BotSettings(
+    val name: String,
+    val pair: String,
+    val ordersType: TYPE,
+    val tradingRange: Pair<Double, Double>,
+    val orderQuantity: Int,
+    val triggerDistance: Double,
+    val maxTriggerDistance: Double
+)

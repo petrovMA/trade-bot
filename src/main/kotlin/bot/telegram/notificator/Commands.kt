@@ -1,6 +1,10 @@
 package bot.telegram.notificator
 
 data class Commands(
+        val commandHelp: Regex = "/?help\\s+[A-z,\\d]+".toRegex(),
+        val commandStartBot: Regex = "/?start[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
+
+
         val commandStatus: Regex = "/?status".toRegex(),
         val commandScan: Regex = "/?scan".toRegex(),
         val commandCreateAll: Regex = "/?create all".toRegex(),
