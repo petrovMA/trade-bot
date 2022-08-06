@@ -18,14 +18,14 @@ import kotlin.math.absoluteValue
 class TraderAlgorithmNew(
     conf: Config,
     val queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
+    private val botSettings: BotSettings,
     private val exchangeEnum: ExchangeEnum = conf.getEnum(ExchangeEnum::class.java, "exchange"),
     private val api: String = conf.getString("api"),
     private val sec: String = conf.getString("sec"),
     private var client: Client = newClient(exchangeEnum, api, sec),
     private val firstSymbol: String = conf.getString("symbol.first")!!,
     private val secondSymbol: String = conf.getString("symbol.second")!!,
-    private val tradePair: TradePair = TradePair(firstSymbol, secondSymbol),
-    private val path: String = "exchange/${tradePair}",
+//    private val tradePair: TradePair = TradePair(firstSymbol, secondSymbol),
     balanceTrade: BigDecimal = conf.getDouble("balance_trade").toBigDecimal(),
     private val minTradeBalance: BigDecimal = conf.getDouble("min_balance_trade").toBigDecimal(),
     private val minOverheadBalance: BigDecimal = conf.getDouble("min_overhead_balance").toBigDecimal(),
@@ -36,37 +36,26 @@ class TraderAlgorithmNew(
     private val timeBetweenTryingGetOrder: Duration = 1.m(),
     isLog: Boolean = true,
     private val isEmulate: Boolean = false,
-    percentBuyProf: BigDecimal? = null,
-    percentSellProf: BigDecimal? = null,
-    intervalCandlesBuy: Int? = null,
-    intervalCandlesSell: Int? = null,
-    updStaticOrders: BigDecimal? = null,
     val sendMessage: (String) -> Unit
 ) : Thread() {
+    private val minRange = botSettings.tradingRange.first
+    private val maxRange = botSettings.tradingRange.second
+
+    private val tradePair = TradePair(botSettings.pair)
     private val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
     private var averageHigh = 0.toBigDecimal()
     private var averageLow = 0.toBigDecimal()
-    private val updStaticOrdersPercent = updStaticOrders ?: conf.getDouble("percent.static_orders").toBigDecimal()
     private val deltaPercent = conf.getDouble("percent.delta").toBigDecimal()
-
-    private val percentBuyProf = percentBuyProf ?: conf.getDouble("percent.buy_prof").toBigDecimal()
-    private val percentSellProf = percentSellProf ?: conf.getDouble("percent.sell_prof").toBigDecimal()
-    private val intervalCandlesBuy = intervalCandlesBuy ?: conf.getInt("interval.candles_buy")
-    private val intervalCandlesSell = intervalCandlesSell ?: conf.getInt("interval.candles_sell")
+    private val path: String = "exchange/${tradePair}"
 
     private val percentCountForPartiallyFilledUpd =
         conf.getDouble("percent.count_for_partially_filled_upd").toBigDecimal()
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
-    private val countCandles =
-        if (this.intervalCandlesBuy > this.intervalCandlesSell)
-            this.intervalCandlesBuy
-        else
-            this.intervalCandlesSell
+    private val mainBalance = 0.0.toBigDecimal()
 
     private val waitTime = conf.getDuration("interval.wait_socket_time")
-    private val mainBalance = 0.0.toBigDecimal()
     private val firstBalanceFixed: Boolean = conf.getBoolean("first_balance_fixed")
     private val formatCount = conf.getString("format.count")
     private val formatPrice = conf.getString("format.price")
@@ -101,7 +90,7 @@ class TraderAlgorithmNew(
     private var tryingUpdateOrderSell: Int = 0
     private val maxTryingUpdateOrderBuy: Int = 3
     private var tryingUpdateOrderBuy: Int = 0
-    private var candlestickList = ListLimit<Candlestick>(limit = countCandles)
+//    private var candlestickList = ListLimit<Candlestick>(limit = countCandles)
     private val klineConstructor = KlineConstructor(interval)
 
     var firstCandlestick: Candlestick? = null
@@ -126,7 +115,7 @@ class TraderAlgorithmNew(
         balanceTrade = balanceTrade
     )
 
-    private var socket: SocketThread = client.socket(TradePair(firstSymbol, secondSymbol), interval, queue)
+    private var socket: SocketThread = client.socket(tradePair, interval, queue)
 
     fun interruptThis(msg: String? = null) {
         socket.interrupt()
@@ -158,9 +147,6 @@ class TraderAlgorithmNew(
 
             socket.run()
 
-            calcAveragePrice()
-            firstCandlestick = candlestickList.first()
-
             var msg = if (isEmulate) client.nextEvent() /* only for test */
             else queue.poll(waitTime)
 
@@ -168,38 +154,16 @@ class TraderAlgorithmNew(
                 if (stopThread) return
                 try {
                     when (msg) {
-                        is DepthEventOrders -> {
-                            nearBuyPrice = msg.bid.price
-                            nearSellPrice = msg.ask.price
-                            log?.debug("$tradePair First DepthEvent:\n$msg")
-                            break
-                        }
                         is Trade -> {
                             lastTradePrice = msg.price
                             log?.debug("$tradePair TradeEvent:\n$msg")
 
-                            klineConstructor.nextKline(msg).forEach { kline ->
-                                if (kline.first) {
+                            if (lastTradePrice > minRange && lastTradePrice < maxRange) {
+                                
+                            } else
+                                log?.warn("Price not in range: ${botSettings.tradingRange}")
 
-                                    log?.info("$tradePair First CandlestickEvent:\n${kline.second}")
-                                    val closePrice = kline.second.close
-                                    val openPrice = kline.second.open
-                                    log?.info("$tradePair ClosePrice = $closePrice, OpenPrice = $openPrice")
-
-                                    if (closePrice > openPrice) {
-                                        nearBuyPrice = closePrice
-                                        nearSellPrice = openPrice
-                                    } else {
-                                        nearBuyPrice = openPrice
-                                        nearSellPrice = closePrice
-                                    }
-
-                                    candlestickList.add(kline.second)
-                                    calcAveragePrice()
-                                    lastCandlestick = candlestickList.last()
-
-                                }
-                            }
+                            break
                         }
                     }
 

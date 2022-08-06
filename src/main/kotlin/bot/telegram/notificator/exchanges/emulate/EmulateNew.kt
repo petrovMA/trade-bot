@@ -16,7 +16,7 @@ import kotlin.text.toDouble
 class EmulateNew(
     val sendFile: (File) -> Unit,
     val sendMessage: (String) -> Unit,
-    private val settings: BotSettings,
+    private val botSettings: BotSettings,
     private val startDate: String,
     private val endDate: String,
     candlestickDataPath: Map<ExchangeEnum, String>,
@@ -31,7 +31,7 @@ class EmulateNew(
 
     override fun run() {
         try {
-            sendFile(findParams(TradePair(settings.pair), startDate, endDate, emulateDataPath))
+            sendFile(findParams(TradePair(botSettings.pair), startDate, endDate, emulateDataPath))
         } catch (t: Throwable) {
             t.printStackTrace()
             log.error { "Emulate error:\n$t" }
@@ -129,20 +129,16 @@ class EmulateNew(
             val trade = TraderAlgorithmNew(
                 conf = conf,
                 queue = client.queue,
-                firstSymbol = client.balance.tradePair.first,
-                secondSymbol = client.balance.tradePair.second,
+                botSettings = botSettings,
+//                firstSymbol = client.balance.tradePair.first,
+//                secondSymbol = client.balance.tradePair.second,
                 balanceTrade = client.balance.balanceTrade,
                 exchangeEnum = ExchangeEnum.STUB_TEST,
-                client = client,
-                path = "exchange/emulate/data/results/${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}",
-                syncTimeInterval = (-1000).ms(),
+//                client = client,
+//                path = "exchange/emulate/data/results/${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}",
+//                syncTimeInterval = (-1000).ms(),
                 isLog = logging,
-                isEmulate = true,
-                percentBuyProf = buyProf?.toBigDecimal(),
-                percentSellProf = sellProf?.toBigDecimal(),
-                intervalCandlesBuy = candlesBuy,
-                intervalCandlesSell = candlesSell,
-                updStaticOrders = updStaticOrders?.toBigDecimal()
+                isEmulate = true
             ) { }
 
             trade.start()

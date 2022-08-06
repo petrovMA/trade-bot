@@ -60,6 +60,7 @@ enum class SIDE {
 }
 
 enum class TYPE { LIMIT, MARKET, UNSUPPORTED }
+enum class DIRECTION { LONG, SHORT }
 enum class STATUS {
     PARTIALLY_FILLED,
     FILLED,
@@ -151,8 +152,9 @@ data class Candlestick(
 data class BotSettings(
     val name: String,
     val pair: String,
+    val direction: DIRECTION,
     val ordersType: TYPE,
-    val tradingRange: Pair<Double, Double>,
+    val tradingRange: Pair<BigDecimal, BigDecimal>,
     val orderQuantity: Int,
     val triggerDistance: Double,
     val maxTriggerDistance: Double

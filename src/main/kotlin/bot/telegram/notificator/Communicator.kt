@@ -8,6 +8,7 @@ import bot.telegram.notificator.libs.*
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
+import java.math.BigDecimal
 import java.time.Duration
 import java.time.LocalDate
 import java.util.*
@@ -107,8 +108,9 @@ class Communicator(
                 val (startDate, msg7) = getBotStartParam(params, "startDate", msg6)
                 val (endDate, msg8) = getBotStartParam(params, "endDate", msg7)
                 val (exchange, msg9) = getBotStartParam(params, "exchange", msg8)
+                val (directionStr, msg10) = getBotStartParam(params, "direction", msg9)
 
-                msg += msg9
+                msg += msg10
 
                 if (msg.isEmpty()) {
 
@@ -120,8 +122,16 @@ class Communicator(
                         null
                     }
 
-                    val tradingRange: Pair<Double, Double>? = try {
-                        tradingRangeStr.split("[-\\s,]+".toRegex()).let { it[0].toDouble() to it[1].toDouble() }
+                    val direction: DIRECTION? = try {
+                        DIRECTION.valueOf(directionStr.uppercase())
+                    } catch (t: Throwable) {
+                        msg += "Incorrect value 'direction': $directionStr"
+                        log.warn("Incorrect value 'direction': $directionStr", t)
+                        null
+                    }
+
+                    val tradingRange: Pair<BigDecimal, BigDecimal>? = try {
+                        tradingRangeStr.split("[-\\s,]+".toRegex()).let { it[0].toBigDecimal() to it[1].toBigDecimal() }
                     } catch (t: Throwable) {
                         msg += "Incorrect value 'tradingRange': $tradingRangeStr"
                         log.warn("Incorrect value 'tradingRange': $tradingRangeStr", t)
@@ -155,6 +165,7 @@ class Communicator(
                     if (name.isNotBlank()
                         && pair.isNotBlank()
                         && ordersType != null
+                        && direction != null
                         && tradingRange != null
                         && orderQuantity != null
                         && triggerDistance != null
@@ -163,6 +174,7 @@ class Communicator(
                         val tradeBotSettings = BotSettings(
                             name = name,
                             pair = pair,
+                            direction = direction,
                             ordersType = ordersType,
                             tradingRange = tradingRange,
                             orderQuantity = orderQuantity,
