@@ -134,10 +134,10 @@ class EmulateNew(
 //                secondSymbol = client.balance.tradePair.second,
                 balanceTrade = client.balance.balanceTrade,
                 exchangeEnum = ExchangeEnum.STUB_TEST,
-//                client = client,
+                client = client,
 //                path = "exchange/emulate/data/results/${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}",
 //                syncTimeInterval = (-1000).ms(),
-                isLog = logging,
+//                isLog = logging,
                 isEmulate = true
             ) { }
 

@@ -7,7 +7,8 @@ import java.math.BigDecimal
 
 interface CommonExchangeData
 
-data class Balance(val asset: String, val total: BigDecimal, val free: BigDecimal, val locked: BigDecimal) : CommonExchangeData
+data class Balance(val asset: String, val total: BigDecimal, val free: BigDecimal, val locked: BigDecimal) :
+    CommonExchangeData
 
 data class Order(
     val orderId: String,
@@ -17,7 +18,9 @@ data class Order(
     var executedQty: BigDecimal,
     val side: SIDE,
     val type: TYPE,
-    var status: STATUS
+    var status: STATUS,
+    var stopPrice: BigDecimal? = null,
+    var lastBorderPrice: BigDecimal? = null
 ) : CommonExchangeData
 
 data class TradePair(val first: String, val second: String) {
@@ -155,7 +158,8 @@ data class BotSettings(
     val direction: DIRECTION,
     val ordersType: TYPE,
     val tradingRange: Pair<BigDecimal, BigDecimal>,
-    val orderQuantity: Int,
-    val triggerDistance: Double,
-    val maxTriggerDistance: Double
+    val orderQuantity: BigDecimal, // Order Quantity:: order size
+    val orderDistance: BigDecimal, // Order Distance:: distance between every order
+    val triggerDistance: BigDecimal, // Trigger Distance:: distance between order and stop-order
+    val orderMaxQuantity: Int // Max Trigger count:: max amount of orders
 )

@@ -22,8 +22,7 @@ class TestClient(
     private val fee: BigDecimal = BigDecimal(0.15)
 ) : Client {
     private val log = KotlinLogging.logger {}
-    private var firstOrder: Order? = null
-    private var secondOrder: Order? = null
+    private var orders: MutableMap<String, Order> = HashMap()
     var lastSellPrice: BigDecimal = BigDecimal(0)
         private set
     private var lastBuyPrice: BigDecimal = BigDecimal(0)
@@ -66,10 +65,7 @@ class TestClient(
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
-    override fun getOpenOrders(pair: TradePair): List<Order> = ArrayList<Order>().apply {
-        firstOrder?.let { add(it) }
-        secondOrder?.let { add(it) }
-    }
+    override fun getOpenOrders(pair: TradePair): List<Order> = orders.map { it.value }
 
     override fun getBalances(): List<Balance> = listOf(
         Balance(
@@ -129,61 +125,61 @@ class TestClient(
         formatCount: String,
         formatPrice: String
     ): Order {
-        if (isStaticUpdate) updateStaticOrdersCount++
-        ++clientOrderId
-        val newOrder = Order(
-            pair = order.pair,
-            side = order.side,
-            type = order.type,
-            origQty = order.origQty,
-            price = order.price,
-            executedQty = BigDecimal(0),
-            status = STATUS.NEW,
-            orderId = clientOrderId.toString()
-        )
+        when (order.type) {
+            TYPE.MARKET -> {
+                val candlestick = candlesticks[candlestickNum]
+                if (order.side == SIDE.BUY) {
+                    balance.secondBalance = balance.secondBalance - (order.origQty * candlestick.high)
+                    executedOrdersCount++
+                    balance.firstBalance += (order.origQty - order.origQty.percent(fee))
+                }
+                else if (order.side == SIDE.SELL) {
+                    executedOrdersCount++
+                    var profit = order.origQty * candlestick.low
+                    profit = (profit - profit.percent(fee))
 
-        if (order.side == SIDE.SELL)
-            balance.firstBalance -= order.origQty
-        else if (order.side == SIDE.BUY)
-            balance.secondBalance -= order.origQty * order.price
+                    balance.secondBalance += profit
+                }
+                return order
+            }
+            TYPE.LIMIT -> {
+                if (isStaticUpdate) updateStaticOrdersCount++
+                ++clientOrderId
+                val newOrder = Order(
+                    pair = order.pair,
+                    side = order.side,
+                    type = order.type,
+                    origQty = order.origQty,
+                    price = order.price,
+                    executedQty = BigDecimal(0),
+                    status = STATUS.NEW,
+                    orderId = clientOrderId.toString()
+                )
 
-        if (firstOrder == null || firstOrder?.status in listOf(STATUS.FILLED, STATUS.CANCELED, STATUS.REJECTED)) {
-            firstOrder = newOrder
-        } else if (secondOrder == null || secondOrder?.status in listOf(
-                STATUS.FILLED,
-                STATUS.CANCELED,
-                STATUS.REJECTED
-            )
-        ) {
-            secondOrder = newOrder
-        } else
-            throw NoEmptyOrdersException("Empty orders not found!")
+                if (order.side == SIDE.SELL)
+                    balance.firstBalance -= order.origQty
+                else if (order.side == SIDE.BUY)
+                    balance
+                        .secondBalance -= order.origQty * order.price
 
-        return newOrder
+                orders[newOrder.orderId] = newOrder
+
+                return newOrder
+            }
+            else -> return order
+        }
     }
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {
-        when (orderId) {
-            firstOrder?.orderId -> {
-                if (firstOrder!!.status != STATUS.NEW) return true
-                firstOrder!!.status = STATUS.CANCELED
+        orders[orderId]?.let { order ->
+            if (order.status != STATUS.NEW) return true
+            order.status = STATUS.CANCELED
 
-                if (firstOrder!!.side == SIDE.SELL)
-                    balance.firstBalance += firstOrder!!.origQty
-                else if (firstOrder!!.side == SIDE.BUY)
-                    balance.secondBalance += firstOrder!!.origQty * firstOrder!!.price
-            }
-            secondOrder?.orderId -> {
-                if (secondOrder!!.status != STATUS.NEW) return true
-                secondOrder!!.status = STATUS.CANCELED
-
-                if (secondOrder!!.side == SIDE.SELL)
-                    balance.firstBalance += secondOrder!!.origQty
-                else if (secondOrder!!.side == SIDE.BUY)
-                    balance.secondBalance += secondOrder!!.origQty * secondOrder!!.price
-            }
-            else -> log.info("Order: id = $orderId Not found!")
-        }
+            if (order.side == SIDE.SELL)
+                balance.firstBalance += order.origQty
+            else if (order.side == SIDE.BUY)
+                balance.secondBalance += order.origQty * order.price
+        } ?: log.info("Order: id = $orderId Not found!")
         return true
     }
 
@@ -332,8 +328,7 @@ class TestClient(
             } else order
         }
 
-        firstOrder = firstOrder?.let { checkOrder(it) }
-        secondOrder = secondOrder?.let { checkOrder(it) }
+        orders = orders.filter { checkOrder(it.value).status != STATUS.FILLED }.toMutableMap()
     }
 
     override fun getAllPairs(): List<TradePair> {

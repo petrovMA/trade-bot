@@ -103,14 +103,15 @@ class Communicator(
                 val (ordersTypeStr, msg2) = getBotStartParam(params, "ordersType", msg1)
                 val (tradingRangeStr, msg3) = getBotStartParam(params, "tradingRange", msg2)
                 val (orderQuantityStr, msg4) = getBotStartParam(params, "orderQuantity", msg3)
-                val (triggerDistanceStr, msg5) = getBotStartParam(params, "triggerDistance", msg4)
-                val (maxTriggerDistanceStr, msg6) = getBotStartParam(params, "maxTriggerDistance", msg5)
-                val (startDate, msg7) = getBotStartParam(params, "startDate", msg6)
-                val (endDate, msg8) = getBotStartParam(params, "endDate", msg7)
-                val (exchange, msg9) = getBotStartParam(params, "exchange", msg8)
-                val (directionStr, msg10) = getBotStartParam(params, "direction", msg9)
+                val (orderDistanceStr, msg5) = getBotStartParam(params, "orderDistance", msg4)
+                val (triggerDistanceStr, msg6) = getBotStartParam(params, "triggerDistance", msg5)
+                val (orderMaxQuantityStr, msg7) = getBotStartParam(params, "orderMaxQuantity", msg6)
+                val (startDate, msg8) = getBotStartParam(params, "startDate", msg7)
+                val (endDate, msg9) = getBotStartParam(params, "endDate", msg8)
+                val (exchange, msg10) = getBotStartParam(params, "exchange", msg9)
+                val (directionStr, msg11) = getBotStartParam(params, "direction", msg10)
 
-                msg += msg10
+                msg += msg11
 
                 if (msg.isEmpty()) {
 
@@ -138,27 +139,35 @@ class Communicator(
                         null
                     }
 
-                    val orderQuantity: Int? = try {
-                        orderQuantityStr.toInt()
+                    val orderQuantity: BigDecimal? = try {
+                        orderQuantityStr.toBigDecimal()
                     } catch (t: Throwable) {
                         msg += "Incorrect value 'orderQuantity': $orderQuantityStr"
                         log.warn("Incorrect value 'orderQuantity': $orderQuantityStr", t)
                         null
                     }
 
-                    val triggerDistance: Double? = try {
-                        triggerDistanceStr.toDouble()
+                    val orderDistance: BigDecimal? = try {
+                        orderDistanceStr.toBigDecimal()
+                    } catch (t: Throwable) {
+                        msg += "Incorrect value 'orderDistance': $orderDistanceStr"
+                        log.warn("Incorrect value 'orderDistance': $orderDistanceStr", t)
+                        null
+                    }
+
+                    val triggerDistance: BigDecimal? = try {
+                        triggerDistanceStr.toBigDecimal()
                     } catch (t: Throwable) {
                         msg += "Incorrect value 'triggerDistance': $triggerDistanceStr"
                         log.warn("Incorrect value 'triggerDistance': $triggerDistanceStr", t)
                         null
                     }
 
-                    val maxTriggerDistance: Double? = try {
-                        maxTriggerDistanceStr.toDouble()
+                    val orderMaxQuantity: Int? = try {
+                        orderMaxQuantityStr.toInt()
                     } catch (t: Throwable) {
-                        msg += "Incorrect value 'maxTriggerDistance': $maxTriggerDistanceStr"
-                        log.warn("Incorrect value 'maxTriggerDistance': $maxTriggerDistanceStr", t)
+                        msg += "Incorrect value 'orderMaxQuantity': $orderMaxQuantityStr"
+                        log.warn("Incorrect value 'orderMaxQuantity': $orderMaxQuantityStr", t)
                         null
                     }
 
@@ -168,8 +177,9 @@ class Communicator(
                         && direction != null
                         && tradingRange != null
                         && orderQuantity != null
+                        && orderDistance != null
                         && triggerDistance != null
-                        && maxTriggerDistance != null
+                        && orderMaxQuantity != null
                     ) {
                         val tradeBotSettings = BotSettings(
                             name = name,
@@ -178,8 +188,9 @@ class Communicator(
                             ordersType = ordersType,
                             tradingRange = tradingRange,
                             orderQuantity = orderQuantity,
+                            orderDistance = orderDistance,
                             triggerDistance = triggerDistance,
-                            maxTriggerDistance = maxTriggerDistance,
+                            orderMaxQuantity = orderMaxQuantity,
                         )
 
                         taskQueue.put(
