@@ -4,5 +4,5 @@ import java.lang.RuntimeException
 
 class NoEmptyOrdersException(msg: String) : RuntimeException(msg)
 class NotSupportedCandlestickIntervalException : RuntimeException()
-class UnsupportedStateException : RuntimeException()
+class UnsupportedStateException(msg: String) : RuntimeException(msg)
 class UnsupportedDataException(msg: String) : RuntimeException(msg)

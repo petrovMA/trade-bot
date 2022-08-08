@@ -102,7 +102,7 @@ class Communicator(
                 val (pair, msg1) = getBotStartParam(params, "pair", msg0)
                 val (ordersTypeStr, msg2) = getBotStartParam(params, "ordersType", msg1)
                 val (tradingRangeStr, msg3) = getBotStartParam(params, "tradingRange", msg2)
-                val (orderQuantityStr, msg4) = getBotStartParam(params, "orderQuantity", msg3)
+                val (orderSizeStr, msg4) = getBotStartParam(params, "orderSize", msg3)
                 val (orderDistanceStr, msg5) = getBotStartParam(params, "orderDistance", msg4)
                 val (triggerDistanceStr, msg6) = getBotStartParam(params, "triggerDistance", msg5)
                 val (orderMaxQuantityStr, msg7) = getBotStartParam(params, "orderMaxQuantity", msg6)
@@ -110,8 +110,10 @@ class Communicator(
                 val (endDate, msg9) = getBotStartParam(params, "endDate", msg8)
                 val (exchange, msg10) = getBotStartParam(params, "exchange", msg9)
                 val (directionStr, msg11) = getBotStartParam(params, "direction", msg10)
+                val (firstBalanceStr, msg12) = getBotStartParam(params, "firstBalance", msg11)
+                val (secondBalanceStr, msg13) = getBotStartParam(params, "secondBalance", msg12)
 
-                msg += msg11
+                msg += msg13
 
                 if (msg.isEmpty()) {
 
@@ -139,11 +141,11 @@ class Communicator(
                         null
                     }
 
-                    val orderQuantity: BigDecimal? = try {
-                        orderQuantityStr.toBigDecimal()
+                    val orderSize: BigDecimal? = try {
+                        orderSizeStr.toBigDecimal()
                     } catch (t: Throwable) {
-                        msg += "Incorrect value 'orderQuantity': $orderQuantityStr"
-                        log.warn("Incorrect value 'orderQuantity': $orderQuantityStr", t)
+                        msg += "Incorrect value 'orderSize': $orderSizeStr"
+                        log.warn("Incorrect value 'orderSize': $orderSizeStr", t)
                         null
                     }
 
@@ -163,6 +165,22 @@ class Communicator(
                         null
                     }
 
+                    val firstBalance: BigDecimal? = try {
+                        firstBalanceStr.toBigDecimal()
+                    } catch (t: Throwable) {
+                        msg += "Incorrect value 'firstBalance': $firstBalanceStr"
+                        log.warn("Incorrect value 'firstBalance': $firstBalanceStr", t)
+                        null
+                    }
+
+                    val secondBalance: BigDecimal? = try {
+                        secondBalanceStr.toBigDecimal()
+                    } catch (t: Throwable) {
+                        msg += "Incorrect value 'secondBalance': $secondBalanceStr"
+                        log.warn("Incorrect value 'secondBalance': $secondBalanceStr", t)
+                        null
+                    }
+
                     val orderMaxQuantity: Int? = try {
                         orderMaxQuantityStr.toInt()
                     } catch (t: Throwable) {
@@ -176,10 +194,12 @@ class Communicator(
                         && ordersType != null
                         && direction != null
                         && tradingRange != null
-                        && orderQuantity != null
+                        && orderSize != null
                         && orderDistance != null
                         && triggerDistance != null
                         && orderMaxQuantity != null
+                        && firstBalance != null
+                        && secondBalance != null
                     ) {
                         val tradeBotSettings = BotSettings(
                             name = name,
@@ -187,10 +207,12 @@ class Communicator(
                             direction = direction,
                             ordersType = ordersType,
                             tradingRange = tradingRange,
-                            orderQuantity = orderQuantity,
+                            orderSize = orderSize,
                             orderDistance = orderDistance,
                             triggerDistance = triggerDistance,
                             orderMaxQuantity = orderMaxQuantity,
+                            firstBalance = firstBalance,
+                            secondBalance = secondBalance,
                         )
 
                         taskQueue.put(

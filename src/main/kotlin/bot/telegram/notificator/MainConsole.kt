@@ -71,7 +71,7 @@ fun main() {
 //            bot.onUpdate("FindParams bitmax BTC_USDT 2021_03_27 2021_04_27")
 //        }
         java.util.Timer("start2", false).schedule(10.s().toMillis()) {
-            bot.onUpdate("start|name name|pair BTC_USDT|ordersType Market|direction LONG|tradingRange 32000.5 16000.123|orderQuantity 1000|orderDistance 1000|triggerDistance 3000|orderMaxQuantity 10|startDate 2022_05_28|endDate 2022_08_01|exchange binance")
+            bot.onUpdate("start|name name|pair ETH_USDT|ordersType Market|direction LONG|tradingRange 600.123 2000.5|orderSize 0.01|orderDistance 5|triggerDistance 10|orderMaxQuantity 200|firstBalance 1.2|secondBalance 2000|startDate 2022_06_19|endDate 2022_08_06|exchange binance")
         }
 //        java.util.Timer("TradePairs", false).schedule(5.m().toMillis()) {
 //            bot.taskQueue.put(CollectCandlestickData(bot.candlestickDataCommand, null, ExchangeEnum.BINANCE, bot.sendMessage))

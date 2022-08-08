@@ -29,9 +29,15 @@ class EmulateNew(
 
     private val emulateDataPath = candlestickDataPath.getValue(exchangeEnum)
 
+    private val testBalance = TestBalance(
+        firstBalance = botSettings.firstBalance,
+        secondBalance = botSettings.secondBalance,
+        tradePair = TradePair(botSettings.pair)
+    )
+
     override fun run() {
         try {
-            sendFile(findParams(TradePair(botSettings.pair), startDate, endDate, emulateDataPath))
+            sendFile(findParams(testBalance.tradePair, startDate, endDate, emulateDataPath))
         } catch (t: Throwable) {
             t.printStackTrace()
             log.error { "Emulate error:\n$t" }
@@ -63,11 +69,7 @@ class EmulateNew(
                         interval = INTERVAL.FIVE_MINUTES,
                         fillGaps = true
                     ),
-                    balance = TestBalance(
-                        secondBalance = BigDecimal(100),
-                        balanceTrade = BigDecimal(50),
-                        tradePair = pair
-                    ),
+                    balance = testBalance,
                     startCandleNum = (conf.getInt("interval.candles_buy") to conf.getInt("interval.candles_sell"))
                         .run { if (first > second) first else second }
                 ),
