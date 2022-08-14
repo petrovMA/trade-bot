@@ -51,7 +51,7 @@ class TestClient(
 
     private var candlestickNum: Int = startCandleNum
     private var prevCandlestick: Candlestick = candlesticks[candlestickNum - 1]
-    private var state = EventState.FIRST_DEPTH
+    private var state = EventState.CANDLESTICK_OPEN
     private var clientOrderId = 0
 
     var updateStaticOrdersCount: Int = 0
@@ -134,6 +134,7 @@ class TestClient(
                     balance.firstBalance += (order.origQty - order.origQty.percent(fee))
                 }
                 else if (order.side == SIDE.SELL) {
+                    balance.firstBalance = balance.firstBalance - order.origQty
                     executedOrdersCount++
                     var profit = order.origQty * candlestick.low
                     profit = (profit - profit.percent(fee))
@@ -188,11 +189,8 @@ class TestClient(
 
         when (state) {
             EventState.CANDLESTICK_OPEN -> {
-                state = EventState.from(state.number + 1)
-                return Trade(price = candlestick.open, qty = candlestick.volume, candlestick.openTime + 1)
-            }
-            EventState.FIRST_DEPTH -> {
-
+                state = EventState.from(state.number + 3)
+//
                 val openPrice = candlestick.open
                 val closePrice = candlestick.close
 
@@ -206,8 +204,7 @@ class TestClient(
                 checkOrderExecuted(lastBuyPrice)
                 checkOrderExecuted(lastSellPrice)
 
-                state = EventState.from(state.number + 2)
-                return DepthEventOrders(Offer(lastBuyPrice, BigDecimal(0)), Offer(lastSellPrice, BigDecimal(0)))
+                return Trade(price = candlestick.open, qty = candlestick.volume, candlestick.openTime + 1)
             }
             EventState.SELL_TRADE -> {
                 checkOrderExecuted(lastBuyPrice)
@@ -257,7 +254,7 @@ class TestClient(
                 return Trade(price = candlestick.close, qty = BigDecimal(0), candlestick.closeTime)
             }
             else -> {
-                throw UnsupportedStateException()
+                throw UnsupportedStateException("State: $state unsupported")
             }
         }
     }

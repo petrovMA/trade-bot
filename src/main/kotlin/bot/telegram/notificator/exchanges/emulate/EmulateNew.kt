@@ -29,9 +29,15 @@ class EmulateNew(
 
     private val emulateDataPath = candlestickDataPath.getValue(exchangeEnum)
 
+    private val testBalance = TestBalance(
+        firstBalance = botSettings.firstBalance,
+        secondBalance = botSettings.secondBalance,
+        tradePair = TradePair(botSettings.pair)
+    )
+
     override fun run() {
         try {
-            sendFile(findParams(TradePair(botSettings.pair), startDate, endDate, emulateDataPath))
+            sendFile(findParams(testBalance.tradePair, startDate, endDate, emulateDataPath))
         } catch (t: Throwable) {
             t.printStackTrace()
             log.error { "Emulate error:\n$t" }
@@ -63,11 +69,7 @@ class EmulateNew(
                         interval = INTERVAL.FIVE_MINUTES,
                         fillGaps = true
                     ),
-                    balance = TestBalance(
-                        secondBalance = BigDecimal(100),
-                        balanceTrade = BigDecimal(50),
-                        tradePair = pair
-                    ),
+                    balance = testBalance,
                     startCandleNum = (conf.getInt("interval.candles_buy") to conf.getInt("interval.candles_sell"))
                         .run { if (first > second) first else second }
                 ),
@@ -95,22 +97,16 @@ class EmulateNew(
             ),
             head = listOf(
                 "pair",
-                "Profit\nByLast\nPrice",
-                "Profit\nByFirst\nPrice",
+                "Profit\nin ${pair.second}\nBy Last\nPrice",
+                "Profit\nin ${pair.second}\nByFirst\nPrice",
                 "Execute\norder\ncount",
                 "Update\nstatic\norder\ncount",
-                "first\nBalance",
-                "second\nBalance",
-                "second\nBalance\nByFirst\nPrice",
-                "second\nBalance\nByLast\nPrice",
+                "${pair.first}\nBalance",
+                "${pair.second}\nBalance",
+                "${pair.second}\nBalance\nByFirst\nPrice",
+                "${pair.second}\nBalance\nByLast\nPrice",
                 "from",
                 "to",
-                "",
-                "buy_prof",
-                "sell_prof",
-                "buy_candles",
-                "sell_candles",
-                "upd_static\norders"
             ),
             lines = result
         )
@@ -195,8 +191,8 @@ class EmulateNew(
                         .toDouble(),
                     secondBalanceByLastPrice = String.format("%.4f", secondBalanceByLastPrice).replace(',', '.')
                         .toDouble(),
-                    from = convertTime(trade.firstCandlestick?.openTime ?: 0).removePrefix("20"),
-                    to = convertTime(trade.lastCandlestick?.openTime ?: 0).removePrefix("20"),
+                    from = convertTime(trade.from).removePrefix("20"),
+                    to = convertTime(trade.to).removePrefix("20"),
                     buyProfitPercent = buyProf,
                     sellProfitPercent = sellProf,
                     candlesBuyInterval = candlesBuy?.toDouble(),

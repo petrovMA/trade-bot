@@ -39,7 +39,10 @@ class TelegramBot(
             sendFile = { sendFile(it) }
     ) { sendMessage(it) }
 
-    override fun onUpdateReceived(update: Update) = bot.onUpdate(update.message.text)
+    override fun onUpdateReceived(update: Update) {
+        log.info("Income update message: $update")
+        bot.onUpdate(update.message.text)
+    }
 
     override fun getBotUsername(): String = botUsername
 

@@ -10,7 +10,10 @@ import java.io.File
 import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 import kotlin.math.absoluteValue
 
 class TraderAlgorithmNew(
@@ -32,7 +35,8 @@ class TraderAlgorithmNew(
 ) : Thread() {
     private val minRange = botSettings.tradingRange.first
     private val maxRange = botSettings.tradingRange.second
-    private val orders: HashMap<BigDecimal, Order> = HashMap()
+    private val orders: HashMap<String, Order> = HashMap()
+    private val ordersListForRemove: MutableList<String> = mutableListOf()
 
 
     private val tradePair = TradePair(botSettings.pair)
@@ -54,23 +58,8 @@ class TraderAlgorithmNew(
     private var stopThread = false
     private var currentPrice: BigDecimal = 0.toBigDecimal()
 
-    //    private var candlestickList = ListLimit<Candlestick>(limit = countCandles)
-    private val klineConstructor = KlineConstructor(interval)
-
-    var firstCandlestick: Candlestick? = null
-        set(value) {
-            field = field?.let {
-                if (it.openTime > (value?.openTime ?: Long.MAX_VALUE)) value
-                else it
-            } ?: value
-        }
-    var lastCandlestick: Candlestick? = null
-        set(value) {
-            field = field?.let {
-                if (it.openTime < (value?.openTime ?: 0)) value
-                else it
-            } ?: value
-        }
+    var from: Long = Long.MAX_VALUE
+    var to: Long = Long.MIN_VALUE
 
     val balance = BalanceInfo(
         symbols = tradePair,
@@ -115,66 +104,153 @@ class TraderAlgorithmNew(
                             currentPrice = msg.price
                             log?.debug("$tradePair TradeEvent:\n$msg")
 
+                            from = if (from > msg.time) msg.time else from
+                            to = if (to < msg.time) msg.time else to
+
                             if (currentPrice > minRange && currentPrice < maxRange) {
-                                orders[currentPrice - (currentPrice % botSettings.triggerDistance)]?.let {
+                                orders[String.format(
+                                    Locale.US,
+                                    "%.8f",
+                                    currentPrice - (currentPrice % botSettings.orderDistance)
+                                )]?.let {
                                     log?.trace("Order already exist: $it")
                                 } ?: run {
                                     if (orders.size < botSettings.orderMaxQuantity) {
-                                        orders[currentPrice - (currentPrice % botSettings.triggerDistance)] =
+                                        orders[String.format(
+                                            Locale.US,
+                                            "%.8f",
+                                            currentPrice - (currentPrice % botSettings.orderDistance)
+                                        )] =
                                             sentMarketOrder(
-                                                amount = botSettings.orderQuantity,
+                                                amount = botSettings.orderSize,
                                                 orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
                                                 else SIDE.SELL
                                             ).also {
-                                                if (botSettings.direction == DIRECTION.LONG) it.lastBorderPrice =
-                                                    BigDecimal.ZERO
+                                                if (botSettings.direction == DIRECTION.LONG)
+                                                    it.lastBorderPrice = BigDecimal.ZERO
                                                 else it.lastBorderPrice = BigDecimal(999999999999999999L)
                                             }
                                     }
                                 }
                             } else
-                                log?.warn("Price not in range: ${botSettings.tradingRange}")
+                                log?.warn(
+                                    "Price ${
+                                        String.format(
+                                            "%.8f",
+                                            currentPrice
+                                        )
+                                    }, not in range: ${botSettings.tradingRange}"
+                                )
 
                             when (botSettings.direction) {
                                 DIRECTION.LONG -> {
                                     orders.forEach {
-                                        if(it.value.lastBorderPrice!! < currentPrice) {
-                                            it.value.lastBorderPrice = currentPrice
-                                        }
-                                        if (it.value.stopPrice!! >= currentPrice) {
-                                            log?.debug("Order close: ${it.value}")
-                                            sentMarketOrder(it.value.origQty, SIDE.SELL)
-                                        }
                                         if (it.value.lastBorderPrice!! < currentPrice) {
                                             it.value.lastBorderPrice = currentPrice
-                                            it.value.stopPrice = currentPrice - botSettings.triggerDistance
+
+                                            if (it.value.stopPrice?.run { this < currentPrice - botSettings.triggerDistance } == true || it.value.stopPrice == null && it.key.toBigDecimal() < (currentPrice - botSettings.triggerDistance)) {
+                                                it.value.stopPrice = currentPrice - botSettings.triggerDistance
+                                            }
+                                        }
+                                        if (it.value.stopPrice?.run { this >= currentPrice } == true) {
+                                            log?.debug("Order close: ${it.value}")
+                                            sentMarketOrder(it.value.origQty, SIDE.SELL)
+                                            ordersListForRemove.add(it.key)
                                         }
                                     }
                                 }
                                 DIRECTION.SHORT -> {
                                     orders.forEach {
-                                        if(it.value.lastBorderPrice!! > currentPrice) {
-                                            it.value.lastBorderPrice = currentPrice
-                                        }
-                                        if (it.value.stopPrice!! <= currentPrice) {
-                                            log?.debug("Order close: ${it.value}")
-                                            sentMarketOrder(it.value.origQty, SIDE.BUY)
-                                        }
                                         if (it.value.lastBorderPrice!! > currentPrice) {
                                             it.value.lastBorderPrice = currentPrice
-                                            it.value.stopPrice = currentPrice + botSettings.triggerDistance
                                         }
+//                                        if (it.value.stopPrice?.run { this <= currentPrice } == true) {
+//                                            log?.debug("Order close: ${it.value}")
+//                                            sentMarketOrder(it.value.origQty, SIDE.BUY)
+//                                            orders.remove(it.key)
+//                                        }
+//                                        if (it.value.lastBorderPrice?.run { this > currentPrice } == true) {
+//                                            it.value.lastBorderPrice = currentPrice
+//                                            it.value.stopPrice = currentPrice + botSettings.triggerDistance
+//                                        }
                                     }
                                 }
                             }
-
-
-
-                            break
+                            ordersListForRemove.forEach { orders.remove(it) }
+                            ordersListForRemove.clear()
                         }
-                    }
+                        is BotEvent -> {
+                            when (msg.type) {
+                                BotEvent.Type.GET_PAIR_OPEN_ORDERS -> {
+                                    val symbols = msg.message.split("[^a-zA-Z]+".toRegex())
+                                        .filter { it.isNotBlank() }
 
-                    if (stopThread) return
+                                    sendMessage(
+                                        client.getOpenOrders(TradePair(symbols[0], symbols[1]))
+                                            .joinToString("\n\n")
+                                    )
+                                }
+                                BotEvent.Type.GET_ALL_OPEN_ORDERS -> {
+                                    val pairs = msg.message
+                                        .split("\\s+".toRegex())
+                                        .filter { it.isNotBlank() }
+                                        .map { pair ->
+                                            val symbols = pair.split("[^a-zA-Z]+".toRegex())
+                                                .filter { it.isNotBlank() }
+                                            TradePair(symbols[0], symbols[1])
+                                        }
+
+                                    client.getAllOpenOrders(pairs)
+                                        .forEach { sendMessage("${it.key}\n${it.value.joinToString("\n\n")}") }
+                                }
+//                                        SHOW_ALL_BALANCES -> {
+//                                            sendMessage(
+//                                                    "#AllBalances " +
+//                                                            client.getBalances()
+//                                                                    .joinToString(prefix = "\n", separator = "\n")
+//                                            )
+//                                        }
+                                BotEvent.Type.SHOW_BALANCES -> {
+                                    sendMessage(
+                                        "#AllBalances " +
+                                                client.getBalances()
+                                                    .joinToString(prefix = "\n", separator = "\n")
+                                    )
+                                }
+//                                        SHOW_FREE_BALANCES -> {
+//                                            sendMessage(
+//                                                    "#FreeBalances " +
+//                                                            getFreeBalances(client,
+//                                                                    msg.message
+//                                                                            .split("\\s+".toRegex())
+//                                                                            .let { it.subList(1, it.size) }
+//                                                            )
+//                                                                    .sortedBy { it.first }
+//                                                                    .joinToString(prefix = "\n", separator = "\n") { "${it.first} ${it.second}" }
+//                                            )
+//                                        }
+                                BotEvent.Type.SHOW_GAP -> {
+                                    if (balance.orderB != null && balance.orderS != null)
+                                        sendMessage(
+                                            "#Gap $tradePair\n${
+                                                calcGapPercent(
+                                                    balance.orderB!!,
+                                                    balance.orderS!!
+                                                )
+                                            }"
+                                        )
+                                    else
+                                        sendMessage("#orderB_or_orderS_is_NULL_Cannot_calc_Gap.")
+                                }
+                                BotEvent.Type.INTERRUPT -> {
+                                    socket.interrupt()
+                                    return
+                                }
+                                else -> sendMessage("Unsupported command: ${msg.type}")
+                            }
+                        }
+                        else -> log?.warn("Unsupported message: $msg")
+                    }
 
                     msg = if (isEmulate) client.nextEvent() /* only for test */
                     else queue.poll(waitTime)
@@ -182,10 +258,7 @@ class TraderAlgorithmNew(
                 } catch (e: InterruptedException) {
                     log?.error("$tradePair ${e.message}", e)
                     sendMessage("#Error_$tradePair: \n${printTrace(e)}")
-
-                    socket = client.socket(TradePair(firstSymbol, secondSymbol), interval, queue)
-
-                    socket.start()
+                    if (stopThread) return
                 }
             } while (true)
 

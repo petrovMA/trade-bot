@@ -158,8 +158,10 @@ data class BotSettings(
     val direction: DIRECTION,
     val ordersType: TYPE,
     val tradingRange: Pair<BigDecimal, BigDecimal>,
-    val orderQuantity: BigDecimal, // Order Quantity:: order size
+    val orderSize: BigDecimal, // Order Quantity:: order size
     val orderDistance: BigDecimal, // Order Distance:: distance between every order
     val triggerDistance: BigDecimal, // Trigger Distance:: distance between order and stop-order
-    val orderMaxQuantity: Int // Max Trigger count:: max amount of orders
+    val orderMaxQuantity: Int, // Max Trigger count:: max amount of orders
+    val firstBalance: BigDecimal, // for example, pair BTC_USDT => BTC balance
+    val secondBalance: BigDecimal // for example, pair BTC_USDT => USDT balance
 )
