@@ -163,16 +163,16 @@ class TraderAlgorithmNew(
                                     orders.forEach {
                                         if (it.value.lastBorderPrice!! > currentPrice) {
                                             it.value.lastBorderPrice = currentPrice
+
+                                            if (it.value.stopPrice?.run { this > currentPrice - botSettings.triggerDistance } == true || it.value.stopPrice == null && it.key.toBigDecimal() < (currentPrice - botSettings.triggerDistance)) {
+                                                it.value.stopPrice = currentPrice - botSettings.triggerDistance
+                                            }
                                         }
-//                                        if (it.value.stopPrice?.run { this <= currentPrice } == true) {
-//                                            log?.debug("Order close: ${it.value}")
-//                                            sentMarketOrder(it.value.origQty, SIDE.BUY)
-//                                            orders.remove(it.key)
-//                                        }
-//                                        if (it.value.lastBorderPrice?.run { this > currentPrice } == true) {
-//                                            it.value.lastBorderPrice = currentPrice
-//                                            it.value.stopPrice = currentPrice + botSettings.triggerDistance
-//                                        }
+                                        if (it.value.stopPrice?.run { this <= currentPrice } == true) {
+                                            log?.debug("Order close: ${it.value}")
+                                            sentMarketOrder(it.value.origQty, SIDE.BUY)
+                                            orders.remove(it.key)
+                                        }
                                     }
                                 }
                             }
