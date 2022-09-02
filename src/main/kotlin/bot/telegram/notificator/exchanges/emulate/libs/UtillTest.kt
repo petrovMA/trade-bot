@@ -54,6 +54,19 @@ fun writeIntoExcelNew(file: File, lines: Iterable<EmulateNew.EmulateResult>, hea
 
     it.createSheet("sheet").let { sheet ->
 
+        sheet.setColumnWidth(0, 3000)
+        sheet.setColumnWidth(1, 4000)
+        sheet.setColumnWidth(2, 4000)
+        sheet.setColumnWidth(3, 4000)
+        sheet.setColumnWidth(4, 4000)
+        sheet.setColumnWidth(5, 4000)
+        sheet.setColumnWidth(6, 4000)
+        sheet.setColumnWidth(7, 4000)
+        sheet.setColumnWidth(8, 4000)
+        sheet.setColumnWidth(9, 4000)
+        sheet.setColumnWidth(10, 4000)
+        sheet.setColumnWidth(11, 4000)
+
         val writeRov = { result: EmulateNew.EmulateResult, s: HSSFSheet, rowNum: Int ->
             val row = s.createRow(rowNum)
             var cell = -1
@@ -79,7 +92,10 @@ fun writeIntoExcelNew(file: File, lines: Iterable<EmulateNew.EmulateResult>, hea
 
         val row = sheet.createRow(0)
         for (j in head.indices) {
-            row.createCell(j).setCellValue(head[j])
+            row.apply {
+                height = 1100
+                createCell(j).setCellValue(head[j])
+            }
         }
 
         for (i in lines.iterator())

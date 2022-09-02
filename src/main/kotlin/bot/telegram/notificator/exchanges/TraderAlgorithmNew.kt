@@ -12,7 +12,6 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
-import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.math.absoluteValue
 
@@ -108,19 +107,16 @@ class TraderAlgorithmNew(
                             to = if (to < msg.time) msg.time else to
 
                             if (currentPrice > minRange && currentPrice < maxRange) {
-                                orders[String.format(
+
+                                val price = String.format(
                                     Locale.US,
                                     "%.8f",
                                     currentPrice - (currentPrice % botSettings.orderDistance)
-                                )]?.let {
-                                    log?.trace("Order already exist: $it")
-                                } ?: run {
+                                )
+
+                                orders[price]?.let { log?.trace("Order already exist: $it") } ?: run {
                                     if (orders.size < botSettings.orderMaxQuantity) {
-                                        orders[String.format(
-                                            Locale.US,
-                                            "%.8f",
-                                            currentPrice - (currentPrice % botSettings.orderDistance)
-                                        )] =
+                                        orders[price] =
                                             sentMarketOrder(
                                                 amount = botSettings.orderSize,
                                                 orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
@@ -128,7 +124,8 @@ class TraderAlgorithmNew(
                                             ).also {
                                                 if (botSettings.direction == DIRECTION.LONG)
                                                     it.lastBorderPrice = BigDecimal.ZERO
-                                                else it.lastBorderPrice = BigDecimal(999999999999999999L)
+                                                else
+                                                    it.lastBorderPrice = BigDecimal(999999999999999999L)
                                             }
                                     }
                                 }

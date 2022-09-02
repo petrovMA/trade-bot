@@ -87,12 +87,12 @@ class EmulateNew(
         }
 
         val resultDir = File("emulate/results")
-        if (!resultDir.isDirectory)
-            resultDir.mkdirs()
+
+        if (!resultDir.isDirectory) resultDir.mkdirs()
 
         return writeIntoExcelNew(
             file = File(
-                "exchange/emulate/results/${pair}_start_${startDate}___end_${endDate}___time_" +
+                "exchange/emulate/results/${botSettings.direction}_${pair}_start_${startDate}___end_${endDate}___time_" +
                         "${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}.xls"
             ),
             head = listOf(

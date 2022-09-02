@@ -2,11 +2,11 @@ package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.emulate.SocketThreadStub
 import bot.telegram.notificator.exchanges.emulate.TestBalance
-import bot.telegram.notificator.exchanges.emulate.libs.NoEmptyOrdersException
 import bot.telegram.notificator.exchanges.emulate.libs.NotSupportedCandlestickIntervalException
 import bot.telegram.notificator.exchanges.emulate.libs.UnsupportedStateException
 import bot.telegram.notificator.exchanges.BotEvent
 import bot.telegram.notificator.exchanges.CandlestickListsIterator
+import bot.telegram.notificator.libs.UnsupportedOrderSideException
 import bot.telegram.notificator.libs.convertTime
 import bot.telegram.notificator.libs.div8
 import bot.telegram.notificator.libs.percent
@@ -106,9 +106,8 @@ class TestClient(
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> {
 
         val from = (candlestickNum + 1 - countCandles).let {
-            if (it < 0) {
-                0
-            } else it
+            if (it < 0) 0
+            else it
         }
         val to = (candlestickNum + 1).let {
             if (candlesticks.size < it) {
@@ -128,18 +127,27 @@ class TestClient(
         when (order.type) {
             TYPE.MARKET -> {
                 val candlestick = candlesticks[candlestickNum]
-                if (order.side == SIDE.BUY) {
-                    balance.secondBalance = balance.secondBalance - (order.origQty * candlestick.high)
-                    executedOrdersCount++
-                    balance.firstBalance += (order.origQty - order.origQty.percent(fee))
-                }
-                else if (order.side == SIDE.SELL) {
-                    balance.firstBalance = balance.firstBalance - order.origQty
-                    executedOrdersCount++
-                    var profit = order.origQty * candlestick.low
-                    profit = (profit - profit.percent(fee))
+                when (order.side) {
+                    SIDE.BUY -> {
 
-                    balance.secondBalance += profit
+                        // todo ADD check if not enough 'secondBalance'
+
+                        balance.secondBalance = balance.secondBalance - (order.origQty * candlestick.high)
+                        executedOrdersCount++
+                        balance.firstBalance += (order.origQty - order.origQty.percent(fee))
+                    }
+                    SIDE.SELL -> {
+
+                        // todo ADD check if not enough 'firstBalance'
+
+                        balance.firstBalance = balance.firstBalance - order.origQty
+                        executedOrdersCount++
+                        var profit = order.origQty * candlestick.low
+                        profit = (profit - profit.percent(fee))
+
+                        balance.secondBalance += profit
+                    }
+                    else -> throw UnsupportedOrderSideException()
                 }
                 return order
             }
