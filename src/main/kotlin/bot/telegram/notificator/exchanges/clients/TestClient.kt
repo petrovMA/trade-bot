@@ -6,10 +6,7 @@ import bot.telegram.notificator.exchanges.emulate.libs.NotSupportedCandlestickIn
 import bot.telegram.notificator.exchanges.emulate.libs.UnsupportedStateException
 import bot.telegram.notificator.exchanges.BotEvent
 import bot.telegram.notificator.exchanges.CandlestickListsIterator
-import bot.telegram.notificator.libs.UnsupportedOrderSideException
-import bot.telegram.notificator.libs.convertTime
-import bot.telegram.notificator.libs.div8
-import bot.telegram.notificator.libs.percent
+import bot.telegram.notificator.libs.*
 import mu.KotlinLogging
 import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
@@ -129,23 +126,24 @@ class TestClient(
                 val candlestick = candlesticks[candlestickNum]
                 when (order.side) {
                     SIDE.BUY -> {
-
-                        // todo ADD check if not enough 'secondBalance'
-
-                        balance.secondBalance = balance.secondBalance - (order.origQty * candlestick.high)
-                        executedOrdersCount++
-                        balance.firstBalance += (order.origQty - order.origQty.percent(fee))
+                        val newSecondBalance = balance.secondBalance - (order.origQty * candlestick.high)
+                        if (BigDecimal.ZERO <= newSecondBalance) {
+                            balance.secondBalance = newSecondBalance
+                            executedOrdersCount++
+                            balance.firstBalance += (order.origQty - order.origQty.percent(fee))
+                        } else throw NotEnoughBalanceException("Account has insufficient balance for requested action.")
                     }
                     SIDE.SELL -> {
+                        val newFirstBalance = balance.firstBalance - order.origQty
+                        if (BigDecimal.ZERO <= newFirstBalance) {
+                            balance.firstBalance = newFirstBalance
+                            executedOrdersCount++
+                            var profit = order.origQty * candlestick.low
+                            profit = (profit - profit.percent(fee))
 
-                        // todo ADD check if not enough 'firstBalance'
-
-                        balance.firstBalance = balance.firstBalance - order.origQty
-                        executedOrdersCount++
-                        var profit = order.origQty * candlestick.low
-                        profit = (profit - profit.percent(fee))
-
-                        balance.secondBalance += profit
+                            balance.secondBalance += profit
+                        }
+                        else throw NotEnoughBalanceException("Account has insufficient balance for requested action.")
                     }
                     else -> throw UnsupportedOrderSideException()
                 }
