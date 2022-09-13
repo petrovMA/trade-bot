@@ -207,3 +207,6 @@ fun String.toInterval(): INTERVAL = when {
     this == "1M" -> INTERVAL.MONTHLY
     else -> throw Exception("Not supported CandlestickInterval!")
 }
+
+fun format(value: BigDecimal, locale: Locale? = null): String =
+    locale?.let { String.format(it, "%.8f", value) } ?: String.format("%.8f", value)

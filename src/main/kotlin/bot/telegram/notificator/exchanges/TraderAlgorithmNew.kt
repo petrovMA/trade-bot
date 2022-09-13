@@ -130,14 +130,7 @@ class TraderAlgorithmNew(
                                     }
                                 }
                             } else
-                                log?.warn(
-                                    "Price ${
-                                        String.format(
-                                            "%.8f",
-                                            currentPrice
-                                        )
-                                    }, not in range: ${botSettings.tradingRange}"
-                                )
+                                log?.warn("Price ${format(currentPrice)}, not in range: ${botSettings.tradingRange}")
 
                             when (botSettings.direction) {
                                 DIRECTION.LONG -> {
@@ -481,7 +474,7 @@ class TraderAlgorithmNew(
 
     private fun strOrder(order: Order?) =
         if (order == null) "Order is null"
-        else "price = ${String.format("%.8f", order.price)}" +
+        else "price = ${format(order.price)}" +
                 "\nqty = ${order.executedQty}/${order.origQty} | ${order.side} ${order.status}"
 
     private fun isUnknown(order: Order?): Boolean =
