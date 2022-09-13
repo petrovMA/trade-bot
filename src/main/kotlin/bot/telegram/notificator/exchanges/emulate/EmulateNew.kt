@@ -97,14 +97,14 @@ class EmulateNew(
             ),
             head = listOf(
                 "pair",
-                "Profit\nin ${pair.second}\nBy Last\nPrice",
-                "Profit\nin ${pair.second}\nByFirst\nPrice",
+                "Profit\nin ${pair.second}\nByEnd\nPrice",
+                "Profit\nin ${pair.second}\nByStart\nPrice",
                 "Execute\norder\ncount",
                 "Update\nstatic\norder\ncount",
                 "${pair.first}\nBalance",
                 "${pair.second}\nBalance",
-                "${pair.second}\nBalance\nByFirst\nPrice",
-                "${pair.second}\nBalance\nByLast\nPrice",
+                "${pair.second}\nBalance\nByStart\nPrice",
+                "${pair.second}\nBalance\nByEnd\nPrice",
                 "from",
                 "to",
             ),
@@ -144,10 +144,7 @@ class EmulateNew(
 
             val firstBalanceA = client.balance.firstBalance.let {
                 client.balance.firstBalance + client.getOpenOrders(
-                    TradePair(
-                        client.balance.tradePair.first,
-                        client.balance.tradePair.second
-                    )
+                    TradePair(client.balance.tradePair.first, client.balance.tradePair.second)
                 ).map { order ->
                     if (order.status == STATUS.NEW && order.side == SIDE.SELL) {
                         order.origQty

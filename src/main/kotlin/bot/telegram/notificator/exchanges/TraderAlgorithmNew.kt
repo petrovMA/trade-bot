@@ -276,7 +276,7 @@ class TraderAlgorithmNew(
                 return order
             } catch (e: Exception) {
 
-                if (e.message == "Account has insufficient balance for requested action.") {
+                if (e.message?.contains("Account has insufficient balance for requested action.") == true) {
                     throw Exception(
                         "$tradePair Account has insufficient balance for requested action.\n" +
                                 "#insufficient_${tradePair}_balance_for: $order\n" +
@@ -321,7 +321,7 @@ class TraderAlgorithmNew(
                 return order
             } catch (e: Exception) {
 
-                if (e.message == "Account has insufficient balance for requested action.") {
+                if (e.message?.contains("Account has insufficient balance for requested action.") == true) {
                     throw Exception(
                         "$tradePair Account has insufficient balance for requested action.\n" +
                                 "#insufficient_${tradePair}_balance_for: $order\n" +
