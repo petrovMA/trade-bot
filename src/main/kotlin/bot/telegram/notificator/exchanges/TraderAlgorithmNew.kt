@@ -10,7 +10,7 @@ import java.io.File
 import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.util.*
+import java.util.Locale.US
 import java.util.concurrent.LinkedBlockingDeque
 import kotlin.collections.HashMap
 import kotlin.math.absoluteValue
@@ -89,7 +89,6 @@ class TraderAlgorithmNew(
 
             synchronizeOrders()
 
-
             socket.run()
 
             var msg = if (isEmulate) client.nextEvent() /* only for test */
@@ -108,25 +107,20 @@ class TraderAlgorithmNew(
 
                             if (currentPrice > minRange && currentPrice < maxRange) {
 
-                                val price = String.format(
-                                    Locale.US,
-                                    "%.8f",
-                                    currentPrice - (currentPrice % botSettings.orderDistance)
-                                )
+                                val price = format(currentPrice - (currentPrice % botSettings.orderDistance), US)
 
                                 orders[price]?.let { log?.trace("Order already exist: $it") } ?: run {
                                     if (orders.size < botSettings.orderMaxQuantity) {
-                                        orders[price] =
-                                            sentMarketOrder(
-                                                amount = botSettings.orderSize,
-                                                orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
-                                                else SIDE.SELL
-                                            ).also {
-                                                if (botSettings.direction == DIRECTION.LONG)
-                                                    it.lastBorderPrice = BigDecimal.ZERO
-                                                else
-                                                    it.lastBorderPrice = BigDecimal(999999999999999999L)
-                                            }
+                                        orders[price] = sentMarketOrder(
+                                            amount = botSettings.orderSize,
+                                            orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
+                                            else SIDE.SELL
+                                        ).also {
+                                            if (botSettings.direction == DIRECTION.LONG)
+                                                it.lastBorderPrice = BigDecimal.ZERO
+                                            else
+                                                it.lastBorderPrice = BigDecimal(999999999999999999L)
+                                        }
                                     }
                                 }
                             } else
@@ -134,38 +128,39 @@ class TraderAlgorithmNew(
 
                             when (botSettings.direction) {
                                 DIRECTION.LONG -> {
-                                    orders.forEach {
-                                        if (it.value.lastBorderPrice!! < currentPrice) {
-                                            it.value.lastBorderPrice = currentPrice
+                                    orders.forEach { (key, value) ->
+                                        if (value.lastBorderPrice!! < currentPrice) {
+                                            value.lastBorderPrice = currentPrice
 
-                                            if (it.value.stopPrice?.run { this < currentPrice - botSettings.triggerDistance } == true || it.value.stopPrice == null && it.key.toBigDecimal() < (currentPrice - botSettings.triggerDistance)) {
-                                                it.value.stopPrice = currentPrice - botSettings.triggerDistance
+                                            if (value.stopPrice?.run { this < currentPrice - botSettings.triggerDistance } == true
+                                                || value.stopPrice == null && key.toBigDecimal() < (currentPrice - botSettings.triggerDistance)) {
+
+                                                value.stopPrice = currentPrice - botSettings.triggerDistance
                                             }
                                         }
-                                        if (it.value.stopPrice?.run { this >= currentPrice } == true) {
-                                            log?.debug("Order close: ${it.value}")
-                                            sentMarketOrder(it.value.origQty, SIDE.SELL)
-                                            ordersListForRemove.add(it.key)
+                                        if (value.stopPrice?.run { this >= currentPrice } == true) {
+                                            log?.debug("Order close: $value")
+                                            ordersListForRemove.add(key)
                                         }
                                     }
                                 }
                                 DIRECTION.SHORT -> {
-                                    orders.forEach {
-                                        if (it.value.lastBorderPrice!! > currentPrice) {
-                                            it.value.lastBorderPrice = currentPrice
+                                    orders.forEach { (key, value) ->
+                                        if (value.lastBorderPrice!! > currentPrice) {
+                                            value.lastBorderPrice = currentPrice
 
-                                            if (it.value.stopPrice?.run { this > currentPrice - botSettings.triggerDistance } == true || it.value.stopPrice == null && it.key.toBigDecimal() < (currentPrice - botSettings.triggerDistance)) {
-                                                it.value.stopPrice = currentPrice - botSettings.triggerDistance
+                                            if (value.stopPrice?.run { this > currentPrice - botSettings.triggerDistance } == true || value.stopPrice == null && key.toBigDecimal() < (currentPrice - botSettings.triggerDistance)) {
+                                                value.stopPrice = currentPrice - botSettings.triggerDistance
                                             }
                                         }
-                                        if (it.value.stopPrice?.run { this <= currentPrice } == true) {
-                                            log?.debug("Order close: ${it.value}")
-                                            sentMarketOrder(it.value.origQty, SIDE.BUY)
-                                            orders.remove(it.key)
+                                        if (value.stopPrice?.run { this <= currentPrice } == true) {
+                                            log?.debug("Order close: $value")
+                                            ordersListForRemove.add(key)
                                         }
                                     }
                                 }
                             }
+                            sentMarketOrders(ordersListForRemove.mapNotNull { orders[it] })
                             ordersListForRemove.forEach { orders.remove(it) }
                             ordersListForRemove.clear()
                         }
@@ -185,8 +180,7 @@ class TraderAlgorithmNew(
                                         .split("\\s+".toRegex())
                                         .filter { it.isNotBlank() }
                                         .map { pair ->
-                                            val symbols = pair.split("[^a-zA-Z]+".toRegex())
-                                                .filter { it.isNotBlank() }
+                                            val symbols = pair.split("[^a-zA-Z]+".toRegex()).filter { it.isNotBlank() }
                                             TradePair(symbols[0], symbols[1])
                                         }
 
@@ -222,12 +216,7 @@ class TraderAlgorithmNew(
                                 BotEvent.Type.SHOW_GAP -> {
                                     if (balance.orderB != null && balance.orderS != null)
                                         sendMessage(
-                                            "#Gap $tradePair\n${
-                                                calcGapPercent(
-                                                    balance.orderB!!,
-                                                    balance.orderS!!
-                                                )
-                                            }"
+                                            "#Gap $tradePair\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}"
                                         )
                                     else
                                         sendMessage("#orderB_or_orderS_is_NULL_Cannot_calc_Gap.")
@@ -305,6 +294,11 @@ class TraderAlgorithmNew(
         interruptThis("Error: Can't send order.")
         throw Exception("$tradePair Error: Can't send order.")
     }
+
+    private fun sentMarketOrders(orders: List<Order>): List<Order> =
+        orders.groupBy { it.side }
+            .map { (k, v) -> k to v.first().apply { v.sumOf { it.price } } }
+            .map { (_, v) -> sentMarketOrder(v.origQty, v.side) }
 
     private fun sentMarketOrder(amount: BigDecimal, orderSide: SIDE): Order {
 
