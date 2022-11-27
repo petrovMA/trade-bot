@@ -1,8 +1,6 @@
 package bot.telegram.notificator.exchanges
 
-import bot.telegram.notificator.*
 import bot.telegram.notificator.libs.*
-import bot.telegram.notificator.exchanges.BotEvent.Type.*
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.exchanges.clients.socket.SocketThread
 import com.typesafe.config.Config
@@ -11,155 +9,79 @@ import java.io.File
 import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.time.Duration
+import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 import kotlin.math.absoluteValue
 
+
 class TraderAlgorithm(
-    conf: Config,
+    private val botSettings: BotSettings,
     val queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
-    private val exchangeEnum: ExchangeEnum = conf.getEnum(ExchangeEnum::class.java, "exchange"),
+    private val exchangeEnum: ExchangeEnum = ExchangeEnum.valueOf(botSettings.exchange.uppercase(Locale.getDefault())),
+    private val conf: Config = getConfigByExchange(exchangeEnum)!!,
     private val api: String = conf.getString("api"),
     private val sec: String = conf.getString("sec"),
     private var client: Client = newClient(exchangeEnum, api, sec),
-    private val firstSymbol: String = conf.getString("symbol.first")!!,
-    private val secondSymbol: String = conf.getString("symbol.second")!!,
-    private val tradePair: TradePair = TradePair(firstSymbol, secondSymbol),
-    private val path: String = "exchange/${tradePair}",
-    balanceTrade: BigDecimal = conf.getDouble("balance_trade").toBigDecimal(),
-    private val minTradeBalance: BigDecimal = conf.getDouble("min_balance_trade").toBigDecimal(),
-    private val minOverheadBalance: BigDecimal = conf.getDouble("min_overhead_balance").toBigDecimal(),
-    private val syncTimeInterval: Duration = conf.getDuration("sync_interval_time"),
-    private val cancelUnknownOrdersInterval: ActionInterval = ActionInterval(conf.getDuration("cancel_unknown_orders_interval")),
-    private val retrySentOrderCount: Int = conf.getInt("retry_sent_order_count"),
-    private val waitBalanceUpdate: Duration = conf.getDuration("wait_balance_update"),
-    private val timeBetweenTryingGetOrder: Duration = 1.m(),
     isLog: Boolean = true,
     private val isEmulate: Boolean = false,
-    percentBuyProf: BigDecimal? = null,
-    percentSellProf: BigDecimal? = null,
-    intervalCandlesBuy: Int? = null,
-    intervalCandlesSell: Int? = null,
-    updStaticOrders: BigDecimal? = null,
-    val sendMessage: (String) -> Unit
+    val sendMessage: (String, Boolean) -> Unit
 ) : Thread() {
     private val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
-    private var averageHigh = 0.toBigDecimal()
-    private var averageLow = 0.toBigDecimal()
-    private val updStaticOrdersPercent = updStaticOrders ?: conf.getDouble("percent.static_orders").toBigDecimal()
-    private val deltaPercent = conf.getDouble("percent.delta").toBigDecimal()
+    private val firstBalanceForOrderAmount = botSettings.orderBalanceType == "first"
+    private val minRange = botSettings.tradingRange.first
+    private val maxRange = botSettings.tradingRange.second
+    private val ordersListForRemove: MutableList<Pair<String, Order>> = mutableListOf()
 
-    private val percentBuyProf = percentBuyProf ?: conf.getDouble("percent.buy_prof").toBigDecimal()
-    private val percentSellProf = percentSellProf ?: conf.getDouble("percent.sell_prof").toBigDecimal()
-    private val intervalCandlesBuy = intervalCandlesBuy ?: conf.getInt("interval.candles_buy")
-    private val intervalCandlesSell = intervalCandlesSell ?: conf.getInt("interval.candles_sell")
-
-    private val percentCountForPartiallyFilledUpd =
-        conf.getDouble("percent.count_for_partially_filled_upd").toBigDecimal()
+    private val path: String = "exchangeBots/${botSettings.name}"
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
-    private val countCandles =
-        if (this.intervalCandlesBuy > this.intervalCandlesSell)
-            this.intervalCandlesBuy
-        else
-            this.intervalCandlesSell
-
     private val waitTime = conf.getDuration("interval.wait_socket_time")
-    private val mainBalance = 0.0.toBigDecimal()
-    private val firstBalanceFixed: Boolean = conf.getBoolean("first_balance_fixed")
-    private val formatCount = conf.getString("format.count")
-    private val formatPrice = conf.getString("format.price")
+    private val formatAmount = "%.${botSettings.countOfDigitsAfterDotForAmount}f"
+    private val formatPrice = "%.${botSettings.countOfDigitsAfterDotForPrice}f"
     private val retryGetOrderCount = conf.getInt("retry.get_order_count")
+    private val retrySentOrderCount: Int = conf.getInt("retry.sent_order_count")
     private val retryGetOrderInterval = conf.getDuration("retry.get_order_interval")
-    private val reconnectWaitTime = conf.getDuration("wait_time.reconnect")
-    private val exceptionWaitTime = conf.getDuration("wait_time.exception")
-    private val updateCandlestickOrdersInterval =
-        ActionInterval(conf.getDuration("update_candlestick_orders_time_interval"))
-    private val waitBetweenCancelAndUpdateOrders = conf.getDuration("wait_between_cancel_and_update_orders")
-
-    //    private val writeEthBalanceToHistoryInterval = conf.getDuration("save.eth_balance_to_history_interval")
-//    private val isWriteEthBalance = conf.getBoolean("save.eth_balance_to_history")
-    private val pauseBetweenCheckOrder = conf.getDuration("pause_between_check_orders")
-    private val printOrdersAndOff = conf.getBoolean("print_orders_and_off")
-    private val autoCreateAnyOrders = conf.getBoolean("auto_create_any_orders")
-    private val isCancelUnknownOrders = conf.getBoolean("cancel_unknown_orders")
-    private val updateIfAlmostFilled = conf.getBoolean("update_if_almost_filled")
 
     private var stopThread = false
-    private var nearSellPrice: BigDecimal = 0.toBigDecimal()
-    private var nearBuyPrice: BigDecimal = 0.toBigDecimal()
-    private var lastTradePrice: BigDecimal = 0.toBigDecimal()
-    private var checkBuyOrderTrigger = false to if (isEmulate) 0.s() else 1.s()
-    private var checkSellOrderTrigger = false to if (isEmulate) 0.s() else 1.s()
-    private var lastCheckBuyOrderTime: Duration = 5.s()
-    private var lastCheckSellOrderTime: Duration = 5.s()
-    private var lastSyncTime: Duration = 0.s()
+    private var currentPrice: BigDecimal = 0.toBigDecimal()
+    private var prevPrice: BigDecimal = 0.toBigDecimal()
 
-    //    private var lastLastWriteEthBalanceToHistory: Duration = 0.s()
-    private val maxTryingUpdateOrderSell: Int = 3
-    private var tryingUpdateOrderSell: Int = 0
-    private val maxTryingUpdateOrderBuy: Int = 3
-    private var tryingUpdateOrderBuy: Int = 0
-    private var candlestickList = ListLimit<Candlestick>(limit = countCandles)
-    private val klineConstructor = KlineConstructor(interval)
+    private val settingsPath = "$path/settings.json"
 
-    var firstCandlestick: Candlestick? = null
-        set(value) {
-            field = field?.let {
-                if (it.openTime > value?.openTime ?: Long.MAX_VALUE) value
-                else it
-            } ?: value
-        }
-    var lastCandlestick: Candlestick? = null
-        set(value) {
-            field = field?.let {
-                if (it.openTime < value?.openTime ?: 0) value
-                else it
-            } ?: value
-        }
+    private val ordersPath = "$path/orders"
+    private val orders: MutableMap<String, Order> =
+        if (isEmulate.not()) ObservableHashMap(
+            filePath = ordersPath,
+            keyToFileName = { key -> key.replace('.', '_') + ".json" },
+            fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
+        )
+        else mutableMapOf()
 
-    val balance = BalanceInfo(
-        symbols = tradePair,
-        firstBalance = 0.0.toBigDecimal(),
-        secondBalance = mainBalance,
-        balanceTrade = balanceTrade
-    )
+    var from: Long = Long.MAX_VALUE
+    var to: Long = Long.MIN_VALUE
 
-    private var socket: SocketThread = client.socket(TradePair(firstSymbol, secondSymbol), interval, queue)
+    private var socket: SocketThread = client.socket(botSettings.pair, interval, queue)
 
     fun interruptThis(msg: String? = null) {
         socket.interrupt()
-        var msgErr = "#Interrupt_$tradePair Thread, socket.status = ${socket.state}"
-        var logErr = "Thread for $tradePair Interrupt, socket.status = ${socket.state}"
+        var msgErr = "#Interrupt_${botSettings.pair} Thread, socket.status = ${socket.state}"
+        var logErr = "Thread for ${botSettings.pair} Interrupt, socket.status = ${socket.state}"
         msg?.let { msgErr = "$msgErr\nMessage: $it"; logErr = "$logErr\nMessage: $it"; }
-        sendMessage(msgErr)
+        send(msgErr)
         log?.warn(logErr)
         stopThread = true
     }
 
     override fun run() {
+        saveBotSettings(botSettings)
         stopThread = false
         try {
-            if (!File(path).isDirectory)
-                Files.createDirectories(Paths.get(path))
-
-            val orders = client.getOpenOrders(tradePair)
-
-            log?.info("All $tradePair open orders: " + orders.joinToString(prefix = "\n", separator = "\n"))
-
-            if (!isEmulate)
-                println("All $tradePair open orders: " + orders.joinToString(prefix = "\n", separator = "\n"))
-
-            if (printOrdersAndOff) return
+            if (File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
 
             synchronizeOrders()
 
-
-            socket.run()
-
-            calcAveragePrice()
-            firstCandlestick = candlestickList.first()
+            socket.run { start() }
 
             var msg = if (isEmulate) client.nextEvent() /* only for test */
             else queue.poll(waitTime)
@@ -168,1071 +90,419 @@ class TraderAlgorithm(
                 if (stopThread) return
                 try {
                     when (msg) {
-                        is DepthEventOrders -> {
-                            nearBuyPrice = msg.bid.price
-                            nearSellPrice = msg.ask.price
-                            log?.debug("$tradePair First DepthEvent:\n$msg")
-                            break
-                        }
                         is Trade -> {
-                            lastTradePrice = msg.price
-                            log?.debug("$tradePair TradeEvent:\n$msg")
+                            prevPrice = currentPrice
+                            currentPrice = msg.price
+                            log?.debug("${botSettings.name} TradeEvent:\n$msg")
 
-                            klineConstructor.nextKline(msg).forEach { kline ->
-                                if (kline.first) {
+                            from = if (from > msg.time) msg.time else from
+                            to = if (to < msg.time) msg.time else to
 
-                                    log?.info("$tradePair First CandlestickEvent:\n${kline.second}")
-                                    val closePrice = kline.second.close
-                                    val openPrice = kline.second.open
-                                    log?.info("$tradePair ClosePrice = $closePrice, OpenPrice = $openPrice")
+                            if (currentPrice > minRange && currentPrice < maxRange) {
 
-                                    if (closePrice > openPrice) {
-                                        nearBuyPrice = closePrice
-                                        nearSellPrice = openPrice
-                                    } else {
-                                        nearBuyPrice = openPrice
-                                        nearSellPrice = closePrice
+                                val priceIn = (currentPrice - (currentPrice % botSettings.orderDistance)).toPrice()
+
+                                when (botSettings.ordersType) {
+                                    TYPE.MARKET -> {
+                                        orders[priceIn]?.let { log?.trace("${botSettings.name} Order already exist: $it") }
+                                            ?: run {
+                                                if (orders.size < botSettings.orderMaxQuantity) {
+                                                    orders[priceIn] = sentOrder(
+                                                        amount = botSettings.orderSize,
+                                                        orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
+                                                        else SIDE.SELL,
+                                                        price = priceIn.toBigDecimal(),
+                                                        orderType = TYPE.MARKET
+                                                    ).also {
+                                                        if (botSettings.direction == DIRECTION.LONG)
+                                                            it.lastBorderPrice = BigDecimal.ZERO
+                                                        else
+                                                            it.lastBorderPrice = BigDecimal(99999999999999L)
+                                                    }
+                                                }
+                                            }
                                     }
 
-                                    candlestickList.add(kline.second)
-                                    calcAveragePrice()
-                                    lastCandlestick = candlestickList.last()
+                                    TYPE.LIMIT -> {
+                                        when (botSettings.direction) {
+                                            DIRECTION.LONG -> {
+                                                var keyPrice = priceIn.toBigDecimal()
+                                                while (keyPrice > minRange) {
+                                                    keyPrice.toPrice().let {
+                                                        orders[it]?.let { order -> log?.trace("${botSettings.name} Order already exist: $order") }
+                                                            ?: run {
+                                                                if (orders.size < botSettings.orderMaxQuantity) {
+                                                                    orders[it] = sentOrder(
+                                                                        price = keyPrice,
+                                                                        amount = botSettings.orderSize,
+                                                                        orderSide = SIDE.BUY,
+                                                                        orderType = TYPE.LIMIT
+                                                                    )
+                                                                } else
+                                                                    log?.trace("${botSettings.name} Orders count limit reached: price = $keyPrice; orderMaxQuantity = ${botSettings.orderMaxQuantity}")
+                                                            }
+                                                    }
+                                                    keyPrice -= botSettings.orderDistance
+                                                }
 
-                                }
-                            }
-                        }
-                    }
+                                                val prev =
+                                                    (prevPrice - (prevPrice % botSettings.orderDistance)).toPrice()
 
-                    msg = if (isEmulate) client.nextEvent() /* only for test */
-                    else queue.poll(waitTime)
+                                                if (priceIn.toBigDecimal() != prev.toBigDecimal()) {
+                                                    orders[prev]?.let { order ->
+                                                        if (order.price?.let { it > currentPrice } == true && order.status != STATUS.FILLED && order.status != STATUS.REJECTED && order.type != TYPE.MARKET) {
+                                                            val o = getOrder(botSettings.pair, order.orderId)
+                                                                ?: order.apply { status = STATUS.FILLED }
 
-                } catch (e: InterruptedException) {
-                    log?.error("$tradePair ${e.message}", e)
-                    sendMessage("#Error_$tradePair: \n${printTrace(e)}")
+                                                            if (o.status == STATUS.FILLED || o.status == STATUS.REJECTED) {
+                                                                orders[prev] = o.also {
+                                                                    it.type = TYPE.MARKET
+                                                                    it.lastBorderPrice = BigDecimal.ZERO
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
 
-                    socket = client.socket(TradePair(firstSymbol, secondSymbol), interval, queue)
-
-                    socket.start()
-                }
-            } while (true)
-
-            createStaticOrdersOnStart()
-
-            balance.orderB ?: run {
-                log?.error("$tradePair orderB is NULL. Not enough balance for start.")
-                sendMessage("#orderB_${tradePair}_is_NULL. Not enough balance for start.")
-                interruptThis()
-            }
-
-            balance.orderS ?: run {
-                log?.error("$tradePair orderS is NULL. Not enough balance for start.")
-                sendMessage("#orderS_${tradePair}_is_NULL. Not enough balance for start.")
-                interruptThis()
-            }
-
-            if (stopThread) return
-
-            msg = if (isEmulate) client.nextEvent() /* only for test */
-            else queue.poll(waitTime)
-
-            while (true) {
-                if (stopThread) return
-                try {
-                    if (msg != null) {
-                        try {
-                            when (msg) {
-                                is DepthEventOrders -> {
-                                    nearBuyPrice = msg.bid.price
-                                    nearSellPrice = msg.ask.price
-                                    log?.trace("$tradePair DepthEvent:\n$msg")
-
-                                    if (balance.orderB?.side == SIDE.SELL && balance.orderS?.side == SIDE.BUY) {
-                                        updateStaticOrders()
-                                    }
-                                }
-                                is Trade -> {
-                                    lastTradePrice = msg.price
-                                    log?.debug("$tradePair TradeEvent:\n$msg")
-
-                                    klineConstructor.nextKline(msg).forEach { kline ->
-                                        if (kline.first) {
-                                            candlestickList.add(kline.second)
-                                            if (isEmulate) {
-                                                calcAveragePrice()
-                                                lastCandlestick = candlestickList.last()
-                                                updateOrders()
+                                            DIRECTION.SHORT -> {
+                                                TODO()
                                             }
                                         }
                                     }
-                                    updateCandlestickOrdersInterval.tryInvoke {
-                                        log?.debug("$tradePair Update orders by Trade!")
-                                        calcAveragePrice()
-                                        updateOrders()
-                                    }
 
-                                    if (checkBuyOrderTrigger.first) {
-                                        if ((checkBuyOrderTrigger.second + pauseBetweenCheckOrder - time()).isNegative) {
-                                            log?.info("$tradePair Run trigger buy order check")
-                                            checkBuyOrder()
-                                            checkBuyOrderTrigger = false to 1.s()
-                                        } else
-                                            log?.info("$tradePair Trigger Buy wait: ${checkBuyOrderTrigger.second.format()}")
-                                    }
-
-                                    if (checkSellOrderTrigger.first) {
-                                        if ((checkSellOrderTrigger.second + pauseBetweenCheckOrder - time()).isNegative) {
-                                            log?.info("$tradePair Run trigger sell order check")
-                                            checkSellOrder()
-                                            checkSellOrderTrigger = false to 1.s()
-                                        } else
-                                            log?.info("$tradePair Trigger Sell wait: ${checkSellOrderTrigger.second.format()}")
-                                    }
-
-                                    if (balance.orderB!!.side == SIDE.BUY) {
-                                        if (lastTradePrice <= balance.orderB!!.price) {
-                                            if (!checkBuyOrderTrigger.first)
-                                                checkBuyOrder()
-                                            else
-                                                log?.info("$tradePair Wait Buy trigger: ${checkBuyOrderTrigger.second.format()}")
-                                        }
-                                    } else if (balance.orderB!!.side == SIDE.SELL) {
-                                        if (lastTradePrice >= balance.orderB!!.price) {
-                                            if (!checkBuyOrderTrigger.first)
-                                                checkBuyOrder()
-                                            else
-                                                log?.info("$tradePair Wait Buy trigger: ${checkBuyOrderTrigger.second.format()}")
-                                        }
-                                    } else {
-                                        if (isUnknown(balance.orderB)) checkBuyOrder()
-                                        else log?.warn("$tradePair Unsupported order side: ${balance.orderB!!.side}")
-                                    }
-
-                                    if (balance.orderS!!.side == SIDE.SELL) {
-                                        if (lastTradePrice > balance.orderS!!.price) {
-                                            if (!checkSellOrderTrigger.first)
-                                                checkSellOrder()
-                                            else
-                                                log?.info("$tradePair Wait Sell trigger: ${checkSellOrderTrigger.second.format()}")
-                                        }
-                                    } else if (balance.orderS!!.side == SIDE.BUY) {
-                                        if (lastTradePrice < balance.orderS!!.price) {
-                                            if (!checkSellOrderTrigger.first)
-                                                checkSellOrder()
-                                            else
-                                                log?.info("$tradePair Wait Sell trigger: ${checkSellOrderTrigger.second.format()}")
-                                        }
-                                    } else {
-                                        if (isUnknown(balance.orderS)) checkSellOrder()
-                                        else log?.warn("$tradePair Unsupported order side: ${balance.orderS!!.side}")
-                                    }
-
+                                    else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${botSettings.ordersType}'!")
                                 }
-                                is Order -> {
-                                    log?.info("$tradePair OrderUpdate:\n$msg")
+                            } else
+                                log?.warn("${botSettings.name} Price ${format(currentPrice)}, not in range: ${botSettings.tradingRange}")
 
-                                    if (msg.pair == tradePair) // todo DELETE IT WHEN socket will be one for all Pairs
+                            when (botSettings.direction) {
+                                DIRECTION.LONG -> {
+                                    val ordersForUpdate = orders.filter { it.value.type == TYPE.MARKET }
 
-                                        if (msg.status == STATUS.FILLED || msg.status == STATUS.PARTIALLY_FILLED)
-                                            if (msg.orderId == balance.orderB?.orderId) {
-                                                if (!checkBuyOrderTrigger.first)
-                                                    checkBuyOrder(msg)
-                                                else
-                                                    log?.info("$tradePair Wait Buy trigger: ${checkBuyOrderTrigger.second.format()}")
-                                            } else if (msg.orderId == balance.orderS?.orderId) {
-                                                if (!checkSellOrderTrigger.first)
-                                                    checkSellOrder(msg)
-                                                else
-                                                    log?.info("$tradePair Wait Sell trigger: ${checkSellOrderTrigger.second.format()}")
-                                            } else
-                                                log?.warn("$tradePair Unknown order: $msg\norderB: ${balance.orderB}\norderS: ${balance.orderS}")
+                                    ordersForUpdate.forEach { (k, v) ->
+                                        if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
+                                            v.lastBorderPrice = currentPrice
 
-                                }
-                                is BotEvent -> {
-                                    when (msg.type) {
-                                        GET_PAIR_OPEN_ORDERS -> {
-                                            val symbols = msg.message.split("[^a-zA-Z]+".toRegex())
-                                                .filter { it.isNotBlank() }
+                                            if (
+                                                v.stopPrice?.run { this < currentPrice - botSettings.triggerDistance } == true
+                                                || v.stopPrice == null && k.toBigDecimal() < (currentPrice - botSettings.triggerDistance - botSettings.enableStopOrderDistance)
+                                            ) {
+                                                v.stopPrice = currentPrice - botSettings.triggerDistance
+                                            }
 
-                                            sendMessage(
-                                                client.getOpenOrders(TradePair(symbols[0], symbols[1]))
-                                                    .joinToString("\n\n")
-                                            )
+                                            orders[k] = v
                                         }
-                                        GET_ALL_OPEN_ORDERS -> {
-                                            val pairs = msg.message
-                                                .split("\\s+".toRegex())
-                                                .filter { it.isNotBlank() }
-                                                .map { pair ->
-                                                    val symbols = pair.split("[^a-zA-Z]+".toRegex())
-                                                        .filter { it.isNotBlank() }
-                                                    TradePair(symbols[0], symbols[1])
-                                                }
-
-                                            client.getAllOpenOrders(pairs)
-                                                .forEach { sendMessage("${it.key}\n${it.value.joinToString("\n\n")}") }
+                                        if (v.stopPrice?.run { this >= currentPrice } == true) {
+                                            log?.debug("${botSettings.name} Order close: $v")
+                                            ordersListForRemove.add(k to v.apply { side = SIDE.SELL })
                                         }
-//                                        SHOW_ALL_BALANCES -> {
-//                                            sendMessage(
-//                                                    "#AllBalances " +
-//                                                            client.getBalances()
-//                                                                    .joinToString(prefix = "\n", separator = "\n")
-//                                            )
-//                                        }
-                                        SHOW_BALANCES -> {
-                                            sendMessage(
-                                                "#AllBalances " +
-                                                        client.getBalances()
-                                                            .joinToString(prefix = "\n", separator = "\n")
-                                            )
-                                        }
-//                                        SHOW_FREE_BALANCES -> {
-//                                            sendMessage(
-//                                                    "#FreeBalances " +
-//                                                            getFreeBalances(client,
-//                                                                    msg.message
-//                                                                            .split("\\s+".toRegex())
-//                                                                            .let { it.subList(1, it.size) }
-//                                                            )
-//                                                                    .sortedBy { it.first }
-//                                                                    .joinToString(prefix = "\n", separator = "\n") { "${it.first} ${it.second}" }
-//                                            )
-//                                        }
-                                        SHOW_GAP -> {
-                                            if (balance.orderB != null && balance.orderS != null)
-                                                sendMessage(
-                                                    "#Gap $tradePair\n${
-                                                        calcGapPercent(
-                                                            balance.orderB!!,
-                                                            balance.orderS!!
-                                                        )
-                                                    }"
-                                                )
-                                            else
-                                                sendMessage("#orderB_or_orderS_is_NULL_Cannot_calc_Gap.")
-                                        }
-                                        INTERRUPT -> {
-                                            socket.interrupt()
-                                            return
-                                        }
-                                        else -> sendMessage("Unsupported command: ${msg.type}")
                                     }
                                 }
-                                else -> log?.warn("Unsupported message: $msg")
+
+                                DIRECTION.SHORT -> {
+                                    val ordersForUpdate = orders.filter { it.value.type == TYPE.MARKET }
+
+                                    ordersForUpdate.forEach { (k, v) ->
+                                        if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
+                                            v.lastBorderPrice = currentPrice
+
+                                            if (
+                                                v.stopPrice?.run { this > currentPrice - botSettings.triggerDistance } == true
+                                                || v.stopPrice == null && k.toBigDecimal() > (currentPrice + botSettings.triggerDistance + botSettings.enableStopOrderDistance)
+                                            ) {
+                                                v.stopPrice = currentPrice - botSettings.triggerDistance
+                                            }
+
+                                            orders[k] = v
+                                        }
+                                        if (v.stopPrice?.run { this <= currentPrice } == true) {
+                                            log?.debug("${botSettings.name} Order close: $v")
+                                            ordersListForRemove.add(k to v.apply { side = SIDE.BUY })
+                                        }
+                                    }
+                                }
                             }
-                        } catch (e: KotlinNullPointerException) {
-                            log?.error("$tradePair Error:", e)
-                            sendMessage("#Error_$tradePair: \n${printTrace(e)}")
-                            sleep(exceptionWaitTime.toMillis())
-                            synchronizeOrders()
-                            createStaticOrdersOnStart()
+
+                            var sellSumAmount = BigDecimal.ZERO
+                            var buySumAmount = BigDecimal.ZERO
+
+                            ordersListForRemove.forEach {
+                                orders.remove(it.first)
+
+                                when (it.second.side) {
+                                    SIDE.BUY -> buySumAmount += it.second.origQty
+                                    SIDE.SELL -> sellSumAmount += it.second.origQty
+                                    else -> {}
+                                }
+                            }
+
+                            if (buySumAmount > BigDecimal.ZERO)
+                                sentOrder(
+                                    amount = buySumAmount,
+                                    orderSide = SIDE.BUY,
+                                    price = currentPrice,
+                                    orderType = TYPE.MARKET,
+                                    isCloseOrder = true
+                                )
+
+                            if (sellSumAmount > BigDecimal.ZERO)
+                                sentOrder(
+                                    amount = sellSumAmount,
+                                    orderSide = SIDE.SELL,
+                                    price = currentPrice,
+                                    orderType = TYPE.MARKET,
+                                    isCloseOrder = true
+                                )
+
+                            ordersListForRemove.clear()
                         }
-                    } else {
-                        log?.error("$tradePair Connection lost. No messages during $waitTime!!!")
-                        sendMessage("#lost_connection_$tradePair\nNo messages during $waitTime!!!")
-                        sleep(reconnectWaitTime.toMillis())
-                        socket = client.socket(TradePair(firstSymbol, secondSymbol), interval, queue)
 
-                        socket.start()
+                        is Order -> {
+                            if (msg.pair == botSettings.pair) {
+                                if (msg.status == STATUS.FILLED) {
+                                    if (msg.type == TYPE.LIMIT) {
+                                        val order = msg
+                                        val ordersForUpdate = orders.filter { (_, v) -> v.orderId == order.orderId }
 
-                        synchronizeOrders()
-                        createStaticOrdersOnStart()
+                                        ordersForUpdate.forEach { (k, _) ->
+                                            orders[k] = order.also {
+                                                it.type = TYPE.MARKET
+                                                it.lastBorderPrice = BigDecimal.ZERO
+                                            }
 
-                        log?.info("$tradePair Try to reconnect...")
+                                            send("Executed LIMIT order:\n```json\n${json(order)}\n```", true)
+                                        }
+                                    } else send("Executed MARKET order:\n```json\n${json(msg)}\n```", true)
+                                }
+                            }
+                        }
+
+                        is BotEvent -> {
+                            when (msg.type) {
+                                BotEvent.Type.GET_PAIR_OPEN_ORDERS -> {
+                                    val symbols = msg.message.split("[^a-zA-Z]+".toRegex())
+                                        .filter { it.isNotBlank() }
+
+                                    send(
+                                        client.getOpenOrders(TradePair(symbols[0], symbols[1]))
+                                            .joinToString("\n\n")
+                                    )
+                                }
+
+                                BotEvent.Type.GET_ALL_OPEN_ORDERS -> {
+                                    val pairs = msg.message
+                                        .split("\\s+".toRegex())
+                                        .filter { it.isNotBlank() }
+                                        .map { pair ->
+                                            val symbols = pair.split("[^a-zA-Z]+".toRegex())
+                                                .filter { it.isNotBlank() }
+                                            TradePair(symbols[0], symbols[1])
+                                        }
+
+                                    client.getAllOpenOrders(pairs)
+                                        .forEach { send("${it.key}\n${it.value.joinToString("\n\n")}") }
+                                }
+
+                                BotEvent.Type.SHOW_BALANCES -> {
+                                    send(
+                                        "#AllBalances " +
+                                                client.getBalances()
+                                                    .joinToString(prefix = "\n", separator = "\n")
+                                    )
+                                }
+
+                                BotEvent.Type.INTERRUPT -> {
+                                    socket.interrupt()
+                                    return
+                                }
+
+                                else -> send("${botSettings.name} Unsupported command: ${msg.type}")
+                            }
+                        }
+
+                        else -> log?.warn("${botSettings.name} Unsupported message: $msg")
                     }
 
                     msg = if (isEmulate) client.nextEvent() /* only for test */
                     else queue.poll(waitTime)
 
                 } catch (e: InterruptedException) {
-                    log?.error("$tradePair ${e.message}", e)
-                    sendMessage("#Error_$tradePair: \n${printTrace(e)}")
-                    stopThread = true
+                    log?.error("${botSettings.name} ${e.message}", e)
+                    send("#Error_${botSettings.name}: \n${printTrace(e)}")
+                    if (stopThread) return
                 }
-            }
+            } while (true)
+
         } catch (e: Exception) {
-            log?.error("$tradePair MAIN ERROR:\n", e)
-            sendMessage("#Error_$tradePair: \n${printTrace(e)}")
+            log?.error("${botSettings.name} MAIN ERROR:\n", e)
+            send("#Error_${botSettings.name}: \n${printTrace(e)}")
         } finally {
             interruptThis()
         }
     }
 
 
-    private fun checkBuyOrder(order: Order? = null): BigDecimal? {
-        var freeSecondBalance: BigDecimal? = null
-
-        if (isUnknown(balance.orderB)) {
-            val price =
-                if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                    averageHigh - averageHigh.percent(percentBuyProf)
-                else
-                    nearBuyPrice - nearBuyPrice.percent(deltaPercent)
-
-            sleep(waitBalanceUpdate.toMillis())
-            freeSecondBalance = client.getAssetBalance(secondSymbol).free
-
-            if (freeSecondBalance > balance.balanceTrade + balance.balanceTrade.percent(minOverheadBalance)) {
-                balance.orderB = sentOrder(
-                    amount = balance.balanceTrade.div8(price),
-                    price = price,
-                    orderSide = SIDE.BUY,
-                    isStaticUpdate = false
-                )
-                freeSecondBalance -= balance.balanceTrade
-
-                if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-
-                tryingUpdateOrderBuy = 0
-            } else {
-                log?.warn("$tradePair can't create orderB")
-                sendMessage(
-                    "#Cannot_create_orderB_$tradePair:" +
-                            "\nbalanceTrade.percent = ${balance.balanceTrade.percent(minOverheadBalance)}" +
-                            "\nbalanceTrade = ${balance.balanceTrade}" +
-                            "\nfreeSecondBalance = $freeSecondBalance"
-                )
-
-                if (tryingUpdateOrderBuy >= maxTryingUpdateOrderBuy) {
-                    tryingUpdateOrderBuy = 0
-                    interruptThis()
-                } else tryingUpdateOrderBuy++
-
-                return freeSecondBalance
-            }
-
-            log?.info("$tradePair BUY Order created:\n${balance.orderB}")
-        } else {
-
-            // todo replace with ActionInterval
-            if ((lastCheckBuyOrderTime + pauseBetweenCheckOrder - time()).isNegative) {
-
-                balance.orderB = order ?: getOrder(balance.symbols, balance.orderB!!.orderId)
-                if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-
-                lastCheckBuyOrderTime = time()
-
-                log?.info("$tradePair BUY Order status: ${balance.orderB!!.status}")
-
-                if (balance.orderB!!.status == STATUS.FILLED) {
-                    sendMessage("#$tradePair OrderB #FILLED:\n${strOrder(balance.orderB)}")
-                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                    updateBuyOrder()
-                    lastCheckBuyOrderTime = 0.s()
-                } else log?.info("$tradePair Order BUY:\n${balance.orderB}\nnot filled, but checkBuyOrder() was called")
-            } else {
-                if (!checkBuyOrderTrigger.first) {
-                    checkBuyOrderTrigger = true to time() + pauseBetweenCheckOrder
-
-                    log?.info(
-                        "$tradePair Requests trying more tran 1 times in 10 seconds. " +
-                                "Time = ${time().format()}; lastCheckBuyOrderTime = ${lastCheckBuyOrderTime.format()};\n" +
-                                "TRIGGER FOR CHECK BUY: ${checkBuyOrderTrigger.second.format()}"
-                    )
-                }
-            }
-        }
-        return freeSecondBalance
-    }
-
-    private fun checkSellOrder(order: Order? = null): BigDecimal? {
-        var freeFirstBalance: BigDecimal? = null
-
-        if (isUnknown(balance.orderS)) {
-            val price =
-                if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                    averageLow + averageLow.percent(percentSellProf)
-                else
-                    nearSellPrice + nearSellPrice.percent(deltaPercent)
-
-            sleep(waitBalanceUpdate.toMillis())
-            freeFirstBalance = client.getAssetBalance(firstSymbol).free
-
-            if (freeFirstBalance > (balance.balanceTrade.div8(price)) + (balance.balanceTrade.div8(price)).percent(
-                    minOverheadBalance
-                )
-            ) {
-                balance.orderS = sentOrder(
-                    amount = balance.balanceTrade.div8(price),
-                    price = price,
-                    orderSide = SIDE.SELL,
-                    isStaticUpdate = false
-                )
-                freeFirstBalance -= balance.balanceTrade.div8(price)
-
-                if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-
-                tryingUpdateOrderSell = 0
-            } else {
-                log?.warn("can't create orderS")
-                sendMessage(
-                    "#Cannot_create_orderS_$tradePair:" +
-                            "\n(balance.balanceTrade / price).percent = " +
-                            (balance.balanceTrade.div8(price)).percent(minOverheadBalance) +
-                            "\n(balance.balanceTrade / price) = ${(balance.balanceTrade.div8(price))}" +
-                            "\nfreeFirstBalance = $freeFirstBalance"
-                )
-
-                if (tryingUpdateOrderSell >= maxTryingUpdateOrderSell) {
-                    tryingUpdateOrderSell = 0
-                    interruptThis()
-                } else tryingUpdateOrderSell++
-
-                return freeFirstBalance
-            }
-
-            log?.info("$tradePair SELL Order created:\n${balance.orderS}")
-        } else {
-
-            // todo replace with ActionInterval
-            if ((lastCheckSellOrderTime + pauseBetweenCheckOrder - time()).isNegative) {
-
-                balance.orderS = order ?: getOrder(balance.symbols, balance.orderS!!.orderId)
-                if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-
-                lastCheckSellOrderTime = time()
-
-                val status = balance.orderS!!.status
-                log?.info("$tradePair SELL Order status: $status")
-
-                if (status == STATUS.FILLED) {
-                    sendMessage("#$tradePair OrderS #FILLED:\n${strOrder(balance.orderS)}")
-                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                    updateSellOrder()
-                    lastCheckSellOrderTime = 0.s()
-                } else log?.info("$tradePair Order SELL:\n${balance.orderS}\nnot filled, but checkSellOrder() was called")
-            } else {
-                if (!checkSellOrderTrigger.first) {
-                    checkSellOrderTrigger = true to time() + pauseBetweenCheckOrder
-
-                    log?.info(
-                        "$tradePair Requests trying more tran 1 times in 10 seconds. " +
-                                "Time = ${time().format()}; lastCheckSellOrderTime = ${lastCheckSellOrderTime.format()};\n" +
-                                "TRIGGER FOR CHECK SELL: ${checkSellOrderTrigger.second.format()}"
-                    )
-                }
-            }
-        }
-        return freeFirstBalance
-    }
-
-    private fun updateOrders() {
-        balance.orderB = getOrder(balance.symbols, balance.orderB!!.orderId)
-        log?.debug("$tradePair Start update buy: ${balance.orderB}")
-
-        var price =
-            if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                averageHigh - averageHigh.percent(percentBuyProf)
-            else
-                nearBuyPrice - nearBuyPrice.percent(deltaPercent)
-
-        when (balance.orderB!!.status) {
-            STATUS.NEW -> {
-                if (balance.orderB!!.side == SIDE.BUY) {
-
-                    val countToBuy = balance.orderB!!.origQty
-
-                    if (price != balance.orderB?.price) {
-                        cancelOrder(balance.symbols, balance.orderB!!, false)
-                        wait(waitBetweenCancelAndUpdateOrders)
-                        if (BigDecimal(100) - (countToBuy.div8(balance.balanceTrade.div8(price))
-                                .percent()) > percentCountForPartiallyFilledUpd
-                        )
-                            balance.orderB = sentOrder(
-                                amount = countToBuy,
-                                price = price,
-                                orderSide = SIDE.BUY,
-                                isStaticUpdate = false
-                            )
-                        else
-                            balance.orderB = sentOrder(
-                                amount = balance.balanceTrade.div8(price),
-                                price = price,
-                                orderSide = SIDE.BUY,
-                                isStaticUpdate = false
-                            )
-                    } else
-                        log?.debug("No need update! OrderB has same price!")
-
-                    if (!isEmulate)
-                        reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-
-                    log?.info("$tradePair BUY Order UPDATED:\n${balance.orderB}")
-                }
-            }
-            STATUS.PARTIALLY_FILLED -> {
-                if (balance.orderB!!.side == SIDE.BUY) {
-                    val countToBuy = balance.orderB!!.origQty - balance.orderB!!.executedQty
-                    log?.debug("$tradePair PARTIALLY_FILLED buy count = $countToBuy")
-
-                    if (countToBuy * balance.orderB!!.price > minTradeBalance) {
-                        if (price > balance.orderB!!.price) {
-
-                            cancelOrder(balance.symbols, balance.orderB!!, false)
-                            wait(waitBetweenCancelAndUpdateOrders)
-                            balance.orderB = sentOrder(
-                                amount = countToBuy,
-                                price = price,
-                                orderSide = SIDE.BUY,
-                                isStaticUpdate = false
-                            )
-
-                            if (!isEmulate)
-                                reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-
-                            log?.info("$tradePair BUY PARTIALLY_FILLED Order UPDATED:\n${balance.orderB}")
-                        } else
-                            log?.warn(
-                                "$tradePair Can't update PARTIALLY_FILLED Order BUY;\n" +
-                                        " Price: $price < ${balance.orderB!!.price}"
-                            )
-                    } else {
-                        if (updateIfAlmostFilled) {
-                            sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
-                            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                            cancelOrder(balance.symbols, balance.orderB!!, false)
-                            updateBuyOrder()
-                        } else
-                            log?.warn("$tradePair Can't update PARTIALLY_FILLED Order BUY:\n${balance.orderB}")
-                    }
-                }
-            }
-            STATUS.FILLED -> {
-                sendMessage("#$tradePair OrderB #Update #FILLED:\n${strOrder(balance.orderB)}")
-                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                log?.info("$tradePair Create new BUY order, instead update")
-                updateBuyOrder()
-            }
-            else -> log?.warn("$tradePair Order BUY update cancelled, OrderStatus is ${balance.orderB!!.status}")
-
-        }
-
-        balance.orderS = getOrder(balance.symbols, balance.orderS!!.orderId)
-        log?.debug("$tradePair Start update sell: ${balance.orderS}")
-
-        price =
-            if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                averageLow + averageLow.percent(percentSellProf)
-            else
-                nearSellPrice + nearSellPrice.percent(deltaPercent)
-
-        when (balance.orderS!!.status) {
-            STATUS.NEW -> {
-                if (balance.orderS!!.side == SIDE.SELL) {
-
-                    val countToSell = balance.orderS!!.origQty
-
-                    if (price != balance.orderS?.price) {
-                        cancelOrder(balance.symbols, balance.orderS!!, false)
-                        wait(waitBetweenCancelAndUpdateOrders)
-                        if (BigDecimal(100) - (countToSell.div8(balance.balanceTrade.div8(price))
-                                .percent()) > percentCountForPartiallyFilledUpd
-                        )
-                            balance.orderS = sentOrder(
-                                amount = countToSell,
-                                price = price,
-                                orderSide = SIDE.SELL,
-                                isStaticUpdate = false
-                            )
-                        else
-                            balance.orderS = sentOrder(
-                                amount = balance.balanceTrade.div8(price),
-                                price = price,
-                                orderSide = SIDE.SELL,
-                                isStaticUpdate = false
-                            )
-                    } else
-                        log?.debug("No need update! OrderS has same price!")
-
-                    if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-
-                    log?.info("$tradePair SELL Order UPDATED:\n${balance.orderS}")
-                }
-            }
-            STATUS.PARTIALLY_FILLED -> {
-                if (balance.orderS!!.side == SIDE.SELL) {
-                    val countToSell = balance.orderS!!.origQty - balance.orderS!!.executedQty
-                    log?.debug("$tradePair PARTIALLY_FILLED sell count = $countToSell")
-
-                    if (countToSell * balance.orderS!!.price > minTradeBalance) {
-                        if (price < balance.orderS!!.price) {
-
-                            cancelOrder(balance.symbols, balance.orderS!!, false)
-                            wait(waitBetweenCancelAndUpdateOrders)
-                            balance.orderS = sentOrder(
-                                amount = countToSell,
-                                price = price,
-                                orderSide = SIDE.SELL,
-                                isStaticUpdate = false
-                            )
-
-                            if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-
-                            log?.info("$tradePair SELL PARTIALLY_FILLED Order UPDATED:\n${balance.orderS}")
-                        } else
-                            log?.warn(
-                                "$tradePair Can't update PARTIALLY_FILLED Order SELL;\n" +
-                                        " Price: $price > ${balance.orderS!!.price}"
-                            )
-                    } else {
-                        if (updateIfAlmostFilled) {
-                            sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
-                            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                            cancelOrder(balance.symbols, balance.orderS!!, false)
-                            updateSellOrder()
-                        } else
-                            log?.warn("$tradePair Can't update PARTIALLY_FILLED Order SELL:\n${balance.orderS}")
-                    }
-                }
-            }
-            STATUS.FILLED -> {
-                sendMessage("#$tradePair OrderS #Update #FILLED:\n${strOrder(balance.orderS)}")
-                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                log?.info("$tradePair Create new SELL order, instead update")
-                updateSellOrder()
-            }
-            else -> log?.warn("$tradePair Order SELL update cancelled, OrderStatus is ${balance.orderS!!.status}")
-        }
-
-    }
-
-    private fun updateBuyOrder() {
-        if (balance.orderB!!.side == SIDE.BUY) {
-            log?.info("$tradePair BUY Order FILLED 1:\n${balance.orderB}")
-            val price = (balance.orderB!!.price
-                    + balance.orderB!!.price.percent(percentBuyProf))
-
-            val prevPrice = balance.orderB!!.price
-
-            balance.orderB = sentOrder(
-                amount = if (firstBalanceFixed) balance.balanceTrade.div8(prevPrice)
-                else balance.balanceTrade.div8(price),
-                price = price,
-                orderSide = SIDE.SELL,
-                isStaticUpdate = false
-            )
-
-            if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-
-            log?.info("$tradePair new BUY Order 2:\n${balance.orderB}")
-        } else {
-            val price =
-                if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                    averageHigh - averageHigh.percent(percentBuyProf)
-                else
-                    nearBuyPrice - nearBuyPrice.percent(deltaPercent)
-
-            log?.info("$tradePair BUY Order FILLED 2:\n${balance.orderB}")
-
-            balance.orderB = sentOrder(
-                amount = balance.balanceTrade.div8(price),
-                price = price,
-                orderSide = SIDE.BUY,
-                isStaticUpdate = false
-            )
-
-            if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-
-            log?.info("$tradePair new BUY Order 1:\n${balance.orderB}")
-        }
-    }
-
-    private fun updateSellOrder() {
-        if (balance.orderS!!.side == SIDE.SELL) {
-            log?.info("$tradePair SELL Order FILLED 1:\n${balance.orderS}")
-            val price = (balance.orderS!!.price -
-                    balance.orderS!!.price.percent(percentSellProf))
-
-            val prevPrice = balance.orderS!!.price
-
-            balance.orderS = sentOrder(
-                amount = if (firstBalanceFixed) balance.balanceTrade.div8(prevPrice)
-                else balance.balanceTrade.div8(price),
-                price = price,
-                orderSide = SIDE.BUY,
-                isStaticUpdate = false
-            )
-
-            if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-
-            log?.info("$tradePair new SELL Order 2:\n${balance.orderS}")
-        } else {
-            val price =
-                if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                    averageLow + averageLow.percent(percentSellProf)
-                else
-                    nearSellPrice + nearSellPrice.percent(deltaPercent)
-
-            log?.info("$tradePair SELL Order FILLED 2:\n${balance.orderS}")
-
-            balance.orderS = sentOrder(
-                amount = balance.balanceTrade.div8(price),
-                price = price,
-                orderSide = SIDE.SELL,
-                isStaticUpdate = false
-            )
-
-            if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-
-            log?.info("$tradePair new SELL Order 1:\n${balance.orderS}")
-        }
-    }
-
-    private fun calcAveragePrice() {
-        val (averageHigh, averageLow, candlestickList) = calcAveragePriceStatic(
-            currentCandlestickList = candlestickList,
-            countCandles = countCandles,
-            intervalCandlesBuy = intervalCandlesBuy,
-            intervalCandlesSell = intervalCandlesSell,
-            interval = interval,
-            symbols = tradePair,
-            client = client,
-            log = log,
-            isEmulate = isEmulate
-        )
-        this.averageHigh = averageHigh
-        this.averageLow = averageLow
-        this.candlestickList = candlestickList
-    }
-
-    private fun sentOrder(price: BigDecimal, amount: BigDecimal, orderSide: SIDE, isStaticUpdate: Boolean): Order {
-
-        log?.info("$tradePair Sent order with params: price = $price; count = $amount; side = $orderSide")
+    private fun sentOrder(
+        price: BigDecimal,
+        amount: BigDecimal,
+        orderSide: SIDE,
+        orderType: TYPE,
+        isStaticUpdate: Boolean = false,
+        isCloseOrder: Boolean = false
+    ): Order {
 
         var retryCount = retrySentOrderCount
 
-        var order = Order("", tradePair, price, amount, BigDecimal(0), orderSide, TYPE.LIMIT, STATUS.NEW)
+        val orderAmount = if (isCloseOrder) amount
+        else {
+            if (firstBalanceForOrderAmount) amount
+            else amount.div8(price)
+        }
+
+        log?.info("${botSettings.name} Sent $orderType order with params: price = $price; amount = $orderAmount; side = $orderSide")
+
+        var order = Order(
+            orderId = "",
+            pair = botSettings.pair,
+            price = price,
+            origQty = orderAmount,
+            executedQty = BigDecimal(0),
+            side = orderSide,
+            type = orderType,
+            status = STATUS.NEW
+        )
 
         do {
             try {
-                order = client.newOrder(order, isStaticUpdate, formatCount, formatPrice)
-                log?.debug("$tradePair Order sent: $order")
+                order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
+                log?.debug("${botSettings.name} Order sent: $order")
                 return order
             } catch (e: Exception) {
 
-                if (e.message == "Account has insufficient balance for requested action.") {
+                if (e.message?.contains("Account has insufficient balance for requested action.") == true) {
                     throw Exception(
-                        "$tradePair Account has insufficient balance for requested action.\n" +
-                                "#insufficient_${tradePair}_balance_for: $order\n" +
-                                "$firstSymbol = ${client.getAssetBalance(firstSymbol).free}\n" +
-                                "$secondSymbol = ${client.getAssetBalance(secondSymbol).free}"
+                        "${botSettings.pair} Account has insufficient balance for requested action.\n" +
+                                "#insufficient_${botSettings.pair}_balance_for: $order\n" +
+                                "${botSettings.pair.first} = ${client.getAssetBalance(botSettings.pair.first).free}\n" +
+                                "${botSettings.pair.second} = ${client.getAssetBalance(botSettings.pair.second).free}"
                     )
                 }
 
                 retryCount--
-                sendMessage("#Cannot_send_order_$tradePair: $order\nError:\n${printTrace(e, 50)}")
-                log?.error("$tradePair Can't send: $order", e)
+                send("#Cannot_send_order_${botSettings.name}: $order\nError:\n${printTrace(e, 50)}")
+                log?.error("${botSettings.name} Can't send: $order", e)
 
                 e.printStackTrace()
-                log?.debug("$tradePair Balances:\nBuy = ${balance.orderB}\nSell = ${balance.orderS}")
+                log?.debug("${botSettings.name} Orders:\n$orders")
                 client = newClient(exchangeEnum, api, sec)
-                cancelOrInit()
+                synchronizeOrders()
             }
             try {
                 sleep(5000)
             } catch (e: InterruptedException) {
-                log?.error("$tradePair ${e.stackTrace}", e)
-                sendMessage("#Error_$tradePair: \n${printTrace(e)}")
+                log?.error("${botSettings.name} ${e.stackTrace}", e)
+                send("#Error_${botSettings.name}: \n${printTrace(e)}")
             }
 
         } while (isUnknown(order) && retryCount > 0)
         interruptThis("Error: Can't send order.")
-        throw Exception("$tradePair Error: Can't send order.")
-    }
-
-    private fun cancelOrder(symbols: TradePair, order: Order, isStaticUpdate: Boolean) {
-        val tryTimes = 5
-        var trying = 0
-        do {
-            try {
-                client.cancelOrder(symbols, order.orderId, isStaticUpdate)
-                log?.debug("$symbols Cancelled order: $order")
-                break
-            } catch (e: Exception) {
-                ++trying
-                e.printStackTrace()
-                log?.warn("$symbols ${e.stackTrace}", e)
-                sendMessage("#Warn_$symbols: $\n${printTrace(e)}")
-
-                if (trying > tryTimes) {
-                    log?.error("$symbols can't cancel order ${e.stackTrace}", e)
-                    sendMessage("#Error_cannot_cancel_order_$symbols:\n${printTrace(e)}")
-                    interruptThis()
-                    throw e
-                } else {
-                    sleep(1.m().toMillis())
-                    client = newClient(exchangeEnum, api, sec)
-                    val status = getOrder(balance.symbols, order.orderId).status
-                    if (status != STATUS.NEW && status != STATUS.PARTIALLY_FILLED) {
-                        log?.warn("$symbols Order already cancelled: $order")
-                        sendMessage("#Order_already_cancelled_$symbols: $order")
-                        break
-                    } else
-                        log?.debug("$symbols Trying $trying to cancel order: $order")
-                }
-            }
-        } while (true)
-    }
-
-    private fun cancelOrInit() {
-        val orders = client.getOpenOrders(balance.symbols)
-        var orderId: String
-        for (order in orders) {
-            orderId = order.orderId
-            when (orderId) {
-                balance.orderB!!.orderId -> {
-                    balance.orderB = order
-                    log?.info("$tradePair Order buy Synchronized:\n$order")
-                }
-                balance.orderS!!.orderId -> {
-                    balance.orderS = order
-                    log?.info("$tradePair Order sell Synchronized:\n$order")
-                }
-                else -> {
-                    client.cancelOrder(balance.symbols, orderId, false)
-                    log?.info("$tradePair Order cancelled:\n$order")
-                }
-            }
-        }
-        log?.info("$tradePair All orders Synchronized")
-    }
-
-    private fun updateStaticOrders() {
-        if (isCancelUnknownOrders) cancelUnknownOrders()
-        if (isUnknown(balance.orderB)) {
-            checkBuyOrder()
-            return
-        }
-
-        if (isUnknown(balance.orderS)) {
-            checkSellOrder()
-            return
-        }
-
-        if ((balance.orderB!!.origQty - balance.orderB!!.executedQty) * balance.orderB!!.price < minTradeBalance && updateIfAlmostFilled) {
-            sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
-            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-            cancelOrder(balance.symbols, balance.orderB!!, false)
-            updateBuyOrder()
-            return
-        }
-
-        if ((balance.orderS!!.origQty - balance.orderS!!.executedQty) * balance.orderS!!.price < minTradeBalance && updateIfAlmostFilled) {
-            sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
-            if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-            cancelOrder(balance.symbols, balance.orderS!!, false)
-            updateSellOrder()
-            return
-        }
-
-        // Sell = Buy && Buy = Sell  -  because order.side conversely
-        val sellPrice = balance.orderB!!.price
-        val buyPrice = balance.orderS!!.price
-
-        if (sellPrice > nearSellPrice && buyPrice > nearBuyPrice) {
-            log?.warn(
-                "$tradePair sellPrice = ${String.format("%.8f", sellPrice)} " +
-                        "more than nearSellPrice = ${String.format("%.8f", nearSellPrice)} " +
-                        "buyPrice = ${String.format("%.8f", buyPrice)} " +
-                        "more than nearBuyPrice = ${String.format("%.8f", nearBuyPrice)}"
-            )
-
-            if ((lastSyncTime + syncTimeInterval - time()).isNegative) {
-                synchronizeOrders()
-                checkBuyOrder()
-                checkSellOrder()
-                lastSyncTime = time()
-            } else
-                log?.warn(
-                    "$tradePair Requests trying more tran 60 seconds. Time = ${time().format()}; lastSyncTime = " +
-                            "${lastSyncTime.format()};"
-                )
-        }
-
-        if (sellPrice < nearSellPrice && buyPrice < nearBuyPrice) {
-            log?.warn(
-                "$tradePair sellPrice = ${String.format("%.8f", sellPrice)} " +
-                        "less than nearSellPrice = ${String.format("%.8f", nearSellPrice)} " +
-                        "buyPrice = ${String.format("%.8f", buyPrice)} " +
-                        "less than nearBuyPrice = ${String.format("%.8f", nearBuyPrice)}"
-            )
-
-            if ((lastSyncTime + 60.s() - time()).isNegative) {
-                synchronizeOrders()
-                checkBuyOrder()
-                checkSellOrder()
-                lastSyncTime = time()
-            } else
-                log?.warn(
-                    "$tradePair Requests trying more tran 60 seconds. Time = ${time().format()}; lastSyncTime = " +
-                            "${lastSyncTime.format()};"
-                )
-        }
-
-        val minPriceDifference =
-            if (sellPrice - nearSellPrice > nearBuyPrice - buyPrice)
-                nearBuyPrice - buyPrice
-            else
-                sellPrice - nearSellPrice
-
-        log?.trace(
-            "$tradePair Update static IF: $minPriceDifference > ${sellPrice.percent(updStaticOrdersPercent)} &&" +
-                    " $minPriceDifference > ${buyPrice.percent(updStaticOrdersPercent)}"
-        )
-
-        if (
-            minPriceDifference > sellPrice.percent(updStaticOrdersPercent) &&
-            minPriceDifference > buyPrice.percent(updStaticOrdersPercent)
-        ) {
-
-            log?.info("$tradePair Update STATIC Orders from:\nB:\n${balance.orderB}\n\nS:\n${balance.orderS}")
-
-            balance.orderB = getOrder(balance.symbols, balance.orderB!!.orderId)
-
-            balance.orderS = getOrder(balance.symbols, balance.orderS!!.orderId)
-
-            if (!isEmulate) {
-                reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-                reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-            }
-
-            log?.debug("$tradePair StatusOrderB: ${balance.orderB!!.status}, StatusOrderS: ${balance.orderS!!.status}")
-
-            if ((balance.orderB!!.status == STATUS.NEW || balance.orderB!!.status == STATUS.PARTIALLY_FILLED) &&
-                (balance.orderS!!.status == STATUS.NEW || balance.orderS!!.status == STATUS.PARTIALLY_FILLED)
-            ) {
-
-                val priceBuyS = ((balance.orderS!!.price + minPriceDifference) -
-                        (balance.orderS!!.price + minPriceDifference).percent(deltaPercent))
-
-                val countToBuyS =
-                    balance.orderS!!.origQty * balance.orderS!!.price.div8(priceBuyS) - balance.orderS!!.executedQty
-
-                if (countToBuyS * priceBuyS < minTradeBalance && updateIfAlmostFilled) {
-                    sendMessage("#$tradePair OrderS #ALMOST_FILLED:\n${strOrder(balance.orderS)}")
-                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                    cancelOrder(balance.symbols, balance.orderS!!, false)
-                    updateBuyOrder()
-                    return
-                }
-
-
-                val priceSellB = ((balance.orderB!!.price - minPriceDifference) +
-                        (balance.orderB!!.price - minPriceDifference).percent(deltaPercent))
-
-                val countToSellB =
-                    balance.orderB!!.origQty * balance.orderB!!.price.div8(priceSellB) - balance.orderB!!.executedQty
-
-                if (countToSellB * priceSellB < minTradeBalance && updateIfAlmostFilled) {
-                    sendMessage("#$tradePair OrderB #ALMOST_FILLED:\n${strOrder(balance.orderB)}")
-                    if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-                    cancelOrder(balance.symbols, balance.orderB!!, false)
-                    updateSellOrder()
-                    return
-                }
-
-                if (countToBuyS * priceBuyS > minTradeBalance && countToSellB * priceSellB > minTradeBalance) {
-                    sendMessage(
-                        "#UpdateStatic_$tradePair Orders from:\nB:\n${strOrder(balance.orderB)}\n\nS:\n" +
-                                "${strOrder(balance.orderS)}\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}"
-                    )
-
-                    cancelOrder(balance.symbols, balance.orderB!!, true)
-                    cancelOrder(balance.symbols, balance.orderS!!, true)
-                    wait(waitBetweenCancelAndUpdateOrders)
-
-                    balance.orderB = sentOrder(
-                        amount = countToSellB,
-                        price = priceSellB,
-                        orderSide = SIDE.SELL,
-                        isStaticUpdate = true
-                    )
-
-                    if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-                    log?.info("$tradePair STATIC BUY Order UPDATED:\n${balance.orderB}")
-
-                    balance.orderS = sentOrder(
-                        amount = countToBuyS,
-                        price = priceBuyS,
-                        orderSide = SIDE.BUY,
-                        isStaticUpdate = true
-                    )
-
-                    if (!isEmulate) {
-                        reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-                    }
-
-                    log?.info("$tradePair STATIC SELL Order UPDATED:\n${balance.orderS}")
-                    sendMessage(
-                        "#UpdateStatic_$tradePair Orders to:\nB:\n${strOrder(balance.orderB)}\n\nS:${strOrder(balance.orderS)}" +
-                                "\n\n${calcGapPercent(balance.orderB!!, balance.orderS!!)}"
-                    )
-                } else
-                    log?.info(
-                        "$tradePair \nSTATIC Orders update cancelled, orders PARTIALLY_FILLED:" +
-                                "\nBuy = ${balance.orderB}\nSell = ${balance.orderS}"
-                    )
-            } else
-                log?.warn("$tradePair \nSTATIC Orders update cancelled, BuyOrderStatus is ${balance.orderB!!.status} != NEW, SellOrderStatus is ${balance.orderS!!.status} != NEW")
-            log?.info("$tradePair STATIC Update Orders to:\nB:\n${balance.orderB}\n\nS:\n${balance.orderS}")
-        }
+        throw Exception("${botSettings.name} Error: Can't send order.")
     }
 
 
     private fun synchronizeOrders() {
-        if (File("$path/orderB.json").exists()) {
-            val oldOrder = readObjectFromFile(File("$path/orderB.json"), Order::class.java)
+        when (orders) {
+            is ObservableHashMap -> {
+                orders.readFromFile()
 
-            balance.orderB = getOrder(balance.symbols, oldOrder.orderId)
+                var price = minRange
+                val openOrders = client.getOpenOrders(botSettings.pair)
+                while (price <= maxRange) {
+                    val priceIn = price.toPrice()
+                    openOrders.find { it.price == priceIn.toBigDecimal() }?.let { openOrder ->
+                        orders[priceIn] ?: run {
+                            if (botSettings.direction == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
+                                val orderSize = if (firstBalanceForOrderAmount) botSettings.orderSize
+                                else botSettings.orderSize.div8(price)
 
-            if (balance.orderB?.status == STATUS.FILLED) {
-                sendMessage("#$tradePair OrderB sync #FILLED:\n${strOrder(balance.orderB)}")
-                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
+                                val qty = orderSize.percent(10.toBigDecimal())
+
+                                if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
+                                    orders[price.toPrice()] = openOrder
+                                    log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
+                                }
+                            } else if (botSettings.direction == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
+                                val orderSize = if (firstBalanceForOrderAmount) botSettings.orderSize
+                                else botSettings.orderSize.div8(price)
+
+                                val qty = orderSize.percent(10.toBigDecimal())
+
+                                if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
+                                    orders[price.toPrice()] = openOrder
+                                    log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
+                                }
+                            }
+                        }
+                    }
+                    price += botSettings.orderDistance
+                }
+
+                orders.forEach { (k, v) ->
+                    openOrders
+                        .find { (v.orderId == it.orderId || v.type == TYPE.MARKET) && v.price?.run { this in minRange..maxRange } ?: false }
+                        ?: run {
+                            ordersListForRemove.add(k to v)
+                            log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
+                        }
+                }
+
+                ordersListForRemove.forEach { orders.remove(it.first) }
+                ordersListForRemove.clear()
+
+                if (botSettings.setCloseOrders) {
+                    price = minRange
+                    while (price <= maxRange) {
+                        val priceIn = price.toPrice()
+
+                        orders[priceIn]?.let { order -> log?.trace("${botSettings.name} Order already exist: $order") }
+                            ?: run {
+                                orders[priceIn] = Order(
+                                    orderId = "",
+                                    pair = botSettings.pair,
+                                    price = priceIn.toBigDecimal(),
+                                    origQty = if (firstBalanceForOrderAmount) botSettings.orderSize
+                                    else botSettings.orderSize.div8(price),
+                                    executedQty = BigDecimal(0),
+                                    side = if (botSettings.direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
+                                    type = TYPE.MARKET,
+                                    status = STATUS.FILLED,
+                                    lastBorderPrice = BigDecimal.ZERO
+                                )
+                            }
+
+
+                        price += botSettings.orderDistance
+                    }
+                }
             }
 
-            log?.info("$tradePair OrderB status: ${balance.orderB}")
-
-            if (balance.orderB!!.status != STATUS.NEW && balance.orderB!!.status != STATUS.PARTIALLY_FILLED) {
-                removeFile(File("$path/orderB.json"))
-                balance.orderB = null
-            } else {
-                if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-
-                log?.info("$tradePair orderB synchronized: ${balance.orderB}")
-            }
-        }
-
-        if (File("$path/orderS.json").exists()) {
-            val oldOrder = readObjectFromFile(File("$path/orderS.json"), Order::class.java)
-
-            balance.orderS = getOrder(balance.symbols, oldOrder.orderId)
-
-            if (balance.orderS?.status == STATUS.FILLED) {
-                sendMessage("#$tradePair OrderS sync #FILLED:\n${strOrder(balance.orderS)}")
-                if (!isEmulate) writeLine(balance, File("$path/balance.json"))
-            }
-
-            log?.info("$tradePair orderS status: ${balance.orderS}")
-
-            if (balance.orderS!!.status != STATUS.NEW && balance.orderS!!.status != STATUS.PARTIALLY_FILLED) {
-                removeFile(File("$path/orderS.json"))
-                balance.orderS = null
-            } else {
-                if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-
-                log?.info("$tradePair orderS synchronized: ${balance.orderS}")
-            }
+            else -> {}
         }
     }
 
-    private fun getOrder(pair: TradePair, orderId: String): Order {
+    private fun getOrder(pair: TradePair, orderId: String): Order? {
         var retryCount = retryGetOrderCount
         do {
             try {
                 return client.getOrder(pair, orderId)
             } catch (e: Exception) {
-                log?.warn("$pair getOrder trying ${(retryCount - retryGetOrderCount).absoluteValue}:\n", e)
-                sendMessage(
-                    "#getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n" +
+                log?.warn(
+                    "$pair ${botSettings.name} getOrder trying ${(retryCount - retryGetOrderCount).absoluteValue}:\n",
+                    e
+                )
+                send(
+                    "${botSettings.name} #getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n" +
                             printTrace(e, 0)
                 )
                 sleep(retryGetOrderInterval.toMillis())
@@ -1241,77 +511,20 @@ class TraderAlgorithm(
         throw Exception("Can't get Order! retry = $retryGetOrderCount; interval = $retryGetOrderInterval")
     }
 
-    private fun strOrder(order: Order?) =
-        if (order == null) "Order is null"
-        else "price = ${String.format("%.8f", order.price)}" +
-                "\nqty = ${order.executedQty}/${order.origQty} | ${order.side} ${order.status}"
-
-    private fun createStaticOrdersOnStart() {
-        val freeFirstBalance = checkSellOrder() ?: client.getAssetBalance(firstSymbol).free
-        if (isCancelUnknownOrders) cancelUnknownOrders()
-        if (isUnknown(balance.orderB) && autoCreateAnyOrders) {
-            val priceFirst =
-                if (averageLow + averageLow.percent(percentSellProf) > nearSellPrice)
-                    averageLow + averageLow.percent(percentSellProf)
-                else
-                    nearSellPrice + nearSellPrice.percent(deltaPercent)
-
-            if (freeFirstBalance > (balance.balanceTrade.div8(priceFirst)) + (balance.balanceTrade.div8(priceFirst)).percent(
-                    minOverheadBalance
-                )
-            ) {
-                balance.orderB = sentOrder(
-                    amount = balance.balanceTrade.div8(priceFirst),
-                    price = priceFirst,
-                    orderSide = SIDE.SELL,
-                    isStaticUpdate = false
-                )
-                if (!isEmulate) reWriteObject(balance.orderB!!, File("$path/orderB.json"))
-            } else {
-                val warnMsg = "#cannot_create_orderB_$tradePair:" +
-                        "\n(balance.balanceTrade / price).percent = " +
-                        (balance.balanceTrade.div8(priceFirst)).percent(minOverheadBalance) +
-                        "\n(balance.balanceTrade / price) = ${(balance.balanceTrade.div8(priceFirst))}" +
-                        "\nfreeFirstBalance = $freeFirstBalance"
-                log?.warn(warnMsg)
-                sendMessage(warnMsg)
-            }
-        }
-
-        val freeSecondBalance = checkBuyOrder() ?: client.getAssetBalance(secondSymbol).free
-        if (isUnknown(balance.orderS) && autoCreateAnyOrders) {
-            val priceSecond =
-                if (averageHigh - averageHigh.percent(percentBuyProf) < nearBuyPrice)
-                    averageHigh - averageHigh.percent(percentBuyProf)
-                else
-                    nearBuyPrice - nearBuyPrice.percent(deltaPercent)
-
-            if (freeSecondBalance > balance.balanceTrade + balance.balanceTrade.percent(minOverheadBalance)) {
-                balance.orderS = sentOrder(
-                    amount = balance.balanceTrade.div8(priceSecond),
-                    price = priceSecond,
-                    orderSide = SIDE.BUY,
-                    isStaticUpdate = false
-                )
-                if (!isEmulate) reWriteObject(balance.orderS!!, File("$path/orderS.json"))
-            } else {
-                val warnMsg = "#cannot_create_orderS_$tradePair:" +
-                        "\nbalanceTrade.percent = ${balance.balanceTrade.percent(minOverheadBalance)}" +
-                        "\nbalanceTrade = ${balance.balanceTrade}" +
-                        "\nfreeSecondBalance = $freeSecondBalance"
-                log?.warn(warnMsg)
-                sendMessage(warnMsg)
-            }
-        }
-    }
-
     private fun isUnknown(order: Order?): Boolean =
         order == null || order.status == STATUS.UNSUPPORTED || order.side == SIDE.UNSUPPORTED
 
-    private fun cancelUnknownOrders(orders: List<Order>? = null) = cancelUnknownOrdersInterval.tryInvoke {
-        (orders ?: client.getOpenOrders(tradePair)).forEach {
-            if (it.orderId != balance.orderB?.orderId && it.orderId != balance.orderS?.orderId)
-                cancelOrder(tradePair, it, false)
-        }
+    private fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
+
+    private fun saveBotSettings(botSettings: BotSettings) {
+        val settingsDir = File(path)
+
+        if (settingsDir.isDirectory.not()) Files.createDirectories(Paths.get(path))
+
+        val settingsFile = File(settingsPath)
+
+        reWriteObject(botSettings, settingsFile)
     }
+
+    private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 }

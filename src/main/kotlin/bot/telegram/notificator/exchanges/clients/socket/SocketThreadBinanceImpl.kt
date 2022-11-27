@@ -8,6 +8,7 @@ import mu.KotlinLogging
 import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.dto.Order
 import org.knowm.xchange.dto.trade.LimitOrder
+import org.knowm.xchange.dto.trade.MarketOrder
 import java.util.concurrent.BlockingQueue
 
 class SocketThreadBinanceImpl(
@@ -55,7 +56,7 @@ class SocketThreadBinanceImpl(
                 }
             )
 
-            exchange.streamingMarketDataService.getOrderBook(pair).subscribe(
+            /*exchange.streamingMarketDataService.getOrderBook(pair).subscribe(
                 { book ->
                     log.trace("OrderBook: $book")
 
@@ -72,19 +73,19 @@ class SocketThreadBinanceImpl(
                 { error ->
                     log.warn("OrderBook stream Error:", error)
                 }
-            )
+            )*/
 
             if (api != null && sec != null)
                 exchange.streamingTradeService.orderChanges.subscribe(
                     { oc: Order? ->
-                        log.trace("Order change: {}", oc)
+                        log.info("Order change: {}", oc)
 
                         oc?.let { order ->
-                            if (order is LimitOrder)
-                                queue.add(
+                            when (order) {
+                                is LimitOrder -> queue.add(
                                     Order(
                                         orderId = order.id,
-                                        pair = TradePair(pair),
+                                        pair = TradePair(oc.instrument.toString()),
                                         price = order.limitPrice,
                                         origQty = order.originalAmount,
                                         executedQty = order.cumulativeAmount,
@@ -93,6 +94,20 @@ class SocketThreadBinanceImpl(
                                         status = STATUS.valueOf(order.status)
                                     )
                                 )
+                                is MarketOrder -> queue.add(
+                                    Order(
+                                        orderId = order.id,
+                                        pair = TradePair(oc.instrument.toString()),
+                                        price = order.averagePrice,
+                                        origQty = order.originalAmount,
+                                        executedQty = order.cumulativeAmount,
+                                        side = SIDE.valueOf(order.type),
+                                        type = TYPE.MARKET,
+                                        status = STATUS.valueOf(order.status),
+                                        fee = order.fee
+                                    )
+                                )
+                            }
                         }
                     }, { error ->
                         log.warn("Order stream Error:", error)

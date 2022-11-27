@@ -4,7 +4,7 @@ import java.lang.RuntimeException
 
 class NotFoundApiAndSecCodes : RuntimeException()
 class UnsupportedClientException : RuntimeException()
-class UnsupportedOrderTypeException : RuntimeException()
+class UnsupportedOrderTypeException(msg: String) : RuntimeException(msg)
 class UnsupportedOrderSideException : RuntimeException()
 class UnsupportedEnumOrderIntervalException : RuntimeException()
 class ConfigNotFoundException(msg: String) : RuntimeException(msg)

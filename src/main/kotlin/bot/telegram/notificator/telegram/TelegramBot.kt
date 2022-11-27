@@ -29,15 +29,16 @@ class TelegramBot(
     private val log = KotlinLogging.logger {}
 
     val bot: Communicator = Communicator(
-            intervalCandlestick = intervalCandlestick,
-            intervalStatistic = intervalStatistic,
-            timeDifference = timeDifference,
-            candlestickDataCommandStr = candlestickDataCommandStr,
-            candlestickDataPath = candlestickDataPath,
-            taskQueue = taskQueue,
-            exchangeFiles = exchangeFiles,
-            sendFile = { sendFile(it) }
-    ) { sendMessage(it) }
+        intervalCandlestick = intervalCandlestick,
+        intervalStatistic = intervalStatistic,
+        timeDifference = timeDifference,
+        candlestickDataCommandStr = candlestickDataCommandStr,
+        candlestickDataPath = candlestickDataPath,
+        taskQueue = taskQueue,
+        exchangeFiles = exchangeFiles,
+        sendFile = { sendFile(it) },
+        sendMessage = { message, isMarkDown -> sendMessage(message, isMarkDown) }
+    )
 
     override fun onUpdateReceived(update: Update) {
         log.info("Income update message: $update")
@@ -48,11 +49,12 @@ class TelegramBot(
 
     override fun getBotToken(): String = botToken
 
-    private fun sendMessage(messageText: String): Unit = try {
+    private fun sendMessage(messageText: String, isMarkDown: Boolean = false): Unit = try {
         execute(SendMessage().also {
             log.debug("Send to chatId = $chatId\nMessage: \"$messageText\"")
             it.chatId = chatId
             it.text = messageText
+            it.enableMarkdownV2(isMarkDown)
         })
         Unit
     } catch (e: Exception) {

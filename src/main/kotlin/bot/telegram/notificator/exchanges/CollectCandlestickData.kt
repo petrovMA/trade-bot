@@ -23,7 +23,7 @@ fun main() {
 //            command = Command.WRITE,
 //            command = Command.CHECK,
         exchangeEnum = ExchangeEnum.BINANCE
-    ) {}.run()
+    ) { _, _ -> }.run()
 
 
 //        .fromTextToDataBase(
@@ -37,7 +37,7 @@ class CollectCandlestickData(
     private val command: Command,
     firstDay: LocalDate? = null,
     private val exchangeEnum: ExchangeEnum,
-    val sendMessage: (String) -> Unit
+    val sendMessage: (String, Boolean) -> Unit
 ) : Thread() {
     private val maxLimit = 1000
     private val log = KotlinLogging.logger {}
@@ -80,17 +80,17 @@ class CollectCandlestickData(
                 Command.NONE -> Unit
                 Command.CHECK -> {
                     checkCandlesticks(pathDB)
-                    sendMessage("#CollectCandlestickData #$exchangeEnum check from date $firstDay done")
+                    send("#CollectCandlestickData #$exchangeEnum check from date $firstDay done")
                 }
                 Command.WRITE -> {
                     writeCandlesToDB(pathDB, client)
-                    sendMessage("#CollectCandlestickData #$exchangeEnum write done")
+                    send("#CollectCandlestickData #$exchangeEnum write done")
                 }
                 Command.WRITE_AND_CHECK -> {
                     writeCandlesToDB(pathDB, client)
-                    sendMessage("#CollectCandlestickData #$exchangeEnum write done, starts check from date $firstDay")
+                    send("#CollectCandlestickData #$exchangeEnum write done, starts check from date $firstDay")
                     checkCandlesticks(pathDB)
-                    sendMessage("#CollectCandlestickData #$exchangeEnum check from date $firstDay done")
+                    send("#CollectCandlestickData #$exchangeEnum check from date $firstDay done")
                 }
                 Command.CUSTOM -> {
                     deleteAllEmpty(pathDB, client)
@@ -99,7 +99,7 @@ class CollectCandlestickData(
         } catch (t: Throwable) {
             t.printStackTrace()
             log.error("Error in threads.", t)
-            sendMessage("#CollectCandlestickData #$exchangeEnum error: \n${printTrace(t)}")
+            send("#CollectCandlestickData #$exchangeEnum error: \n${printTrace(t)}")
         }
     }
 
@@ -145,7 +145,7 @@ class CollectCandlestickData(
                 log.error("\n\n++===========================+\n$logOut\n\n++===========================++\n")
                 errMsg += logOut
                 if (errMsg.length > 4000) {
-                    sendMessage("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
+                    send("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
                     errMsg = ""
                 }
 
@@ -157,7 +157,7 @@ class CollectCandlestickData(
         connect.close()
 
         if (errMsg.isNotBlank())
-            sendMessage("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
+            send("#CollectCandlestickData #$exchangeEnum: errors\n$errMsg")
     }
 
 
@@ -182,7 +182,7 @@ class CollectCandlestickData(
                             pathDB = pathDB
                         )
                     } catch (t: Throwable) {
-                        sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
+                        send("Can't write pair: $tradePair Error:\n${printTrace(t)}")
                         log.warn("Can't write pair: $tradePair Error:", t)
                     }
                 }
@@ -232,7 +232,7 @@ class CollectCandlestickData(
                         }
 
                     } catch (t: Throwable) {
-                        sendMessage("Can't write pair: $tradePair Error:\n${printTrace(t)}")
+                        send("Can't write pair: $tradePair Error:\n${printTrace(t)}")
                         log.warn("Can't write pair: $tradePair Error:", t)
                     }
                 }
@@ -330,6 +330,8 @@ class CollectCandlestickData(
 
         stmt.close()
     }
+
+    private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 }
 
 

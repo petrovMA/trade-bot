@@ -8,7 +8,7 @@ import java.lang.RuntimeException
 
 class DeleteOldCandlestickData(
     private val exchangeEnum: ExchangeEnum,
-    private val sendMessage: (String) -> Unit = {},
+    private val sendMessage: (String, Boolean) -> Unit = { _, _ -> },
     lastDate: String = convertTime(System.currentTimeMillis() - 60000 * 60 * 24 * 14, fileFormat)
 ) : Thread() {
     private val log = KotlinLogging.logger {}
@@ -35,7 +35,7 @@ class DeleteOldCandlestickData(
         } catch (t: Throwable) {
             t.printStackTrace()
             log.error("Error in threads.", t)
-            sendMessage("#DeleteOldCandlestickData #$exchangeEnum error: \n${printTrace(t)}")
+            send("#DeleteOldCandlestickData #$exchangeEnum error: \n${printTrace(t)}")
         }
     }
 
@@ -64,4 +64,6 @@ class DeleteOldCandlestickData(
                     else log.error("Directory for $symbolFile not found")
                 }
     }
+
+    private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 }

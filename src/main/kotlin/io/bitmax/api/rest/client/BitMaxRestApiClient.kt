@@ -39,7 +39,6 @@ open class BitMaxRestApiClient {
      * @param limit max bars count
      */
     fun getCandlestickBars(symbol: String, interval: INTERVAL, limit: Int): List<RestBarHist> {
-        val between = getFrom(interval, limit)
         val params = "?symbol=$symbol&interval=${getInterval(interval)}&n=$limit"
         return try {
             executeRequest(
@@ -133,30 +132,7 @@ open class BitMaxRestApiClient {
     /**
      * @return two timestamps, range for bar history
      * @param interval bars interval
-     * @param limit max bars count
      */
-    private fun getFrom(interval: INTERVAL, limit: Int): Pair<Long, Long> {
-        val time = System.currentTimeMillis()
-        return when (interval) {
-            INTERVAL.ONE_MINUTE -> time - 60000L * limit to time
-            INTERVAL.THREE_MINUTES -> time - 180000L * limit to time
-            INTERVAL.FIVE_MINUTES -> time - 300000L * limit to time
-            INTERVAL.FIFTEEN_MINUTES -> time - 900000L * limit to time
-            INTERVAL.HALF_HOURLY -> time - 1800000L * limit to time
-            INTERVAL.HOURLY -> time - 3600000L * limit to time
-            INTERVAL.TWO_HOURLY -> time - 3600000L * 2 * limit to time
-            INTERVAL.FOUR_HOURLY -> time - 3600000L * 4 * limit to time
-            INTERVAL.SIX_HOURLY -> time - 3600000L * 6 * limit to time
-            INTERVAL.EIGHT_HOURLY -> time - 3600000L * 8 * limit to time
-            INTERVAL.TWELVE_HOURLY -> time - 3600000L * 12 * limit to time
-            INTERVAL.DAILY -> time - 3600000L * 24 * limit to time
-            INTERVAL.THREE_DAILY -> time - 3600000L * 24 * 3 * limit to time
-            INTERVAL.WEEKLY -> time - 3600000L * 24 * 7 * limit to time
-            INTERVAL.MONTHLY -> time - 3600000L * 24 * 31 * limit to time
-        }
-    }
-
-
     private fun getInterval(interval: INTERVAL): String = when (interval) {
         INTERVAL.ONE_MINUTE -> "1"
         INTERVAL.FIVE_MINUTES -> "5"

@@ -14,12 +14,12 @@ private val log = KotlinLogging.logger {}
 fun main() {
     PropertyConfigurator.configure("log4j.properties")
 
-    val conf = readConf("exchange/BTC_USDC/exchange.conf")!!
+    val conf = readConf("exchangeConfigs/BYBIT.conf")!!
 
     val api = conf.getString("api")
     val sec = conf.getString("sec")
 
-
+/*
 // api webSocket
     ByBitApiWebSocketListener(
 //        api,
@@ -45,11 +45,12 @@ fun main() {
         .setKlineCallback { println("Kline -> $it") }
         .setInsuranceCallback { println("Insurance -> $it") }
         .setInstrumentInfoCallback { println("InstrumentInfo -> $it") }
-        .setLiquidationCallback { println("Liquidation -> $it") }
+        .setLiquidationCallback { println("Liquidation -> $it") }*/
 
 // api rest
     ByBitRestApiClient(api, sec).apply {
-        val resultOrderBook = getOrderBook("BTCUSD")
+        getOpenOrders("option")
+        val resultOrderBook = getOrderBook("ETH-PERP")
         println(resultOrderBook)
 
         val resultKline = getKline(
@@ -59,12 +60,13 @@ fun main() {
         )
         println(resultKline)
 
-        val time = getTime()
-        println(time.time_now)
+        /*
+                val time = getTime()
+                println(time.time_now)
 
-        val balance = getBalance()
-        println(balance)
-
+                val balance = getBalance()
+                println(balance)*/
+/*
         val createOrder = orderCreate(
             side = "Buy",
             symbol = "BTCUSD",
@@ -88,5 +90,6 @@ fun main() {
             orderLinkId = "123456"
         )
         println(orderCancel)
+*/
     }
 }

@@ -2,6 +2,7 @@ package bot.telegram.notificator.exchanges
 
 import bot.telegram.notificator.ListLimit
 import bot.telegram.notificator.exchanges.clients.*
+import bot.telegram.notificator.libs.readConf
 import mu.KLogger
 import java.math.BigDecimal
 
@@ -153,3 +154,5 @@ class KlineConstructor(val interval: INTERVAL) {
         }
     }
 }
+
+fun getConfigByExchange(enum: ExchangeEnum) = readConf("exchangeConfigs/$enum.conf")

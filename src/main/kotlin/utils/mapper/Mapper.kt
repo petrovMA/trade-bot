@@ -1,6 +1,6 @@
 package utils.mapper
 
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -10,7 +10,7 @@ import java.lang.reflect.Type
  * Converts json to java object and vice versa
  */
 object Mapper {
-    private val gson = Gson()
+    private val gson = GsonBuilder().setPrettyPrinting().create()
 
     @JvmStatic
     fun <T> asObject(json: String, clazz: Class<T>): T = gson.fromJson(json, clazz)
@@ -23,6 +23,9 @@ object Mapper {
 
     @JvmStatic
     fun <T> asListObjects(file: File, type: Type): List<T> = gson.fromJson(FileReader(file), type)
+
+    @JvmStatic
+    fun <K, V> asMapObjects(file: File, type: Type): Map<K, V> = gson.fromJson(FileReader(file), type)
 
     @JvmStatic
     fun asString(message: Any): String = gson.toJson(message)

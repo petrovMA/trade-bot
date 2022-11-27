@@ -3,6 +3,7 @@ package bot.telegram.notificator.exchanges.clients
 import bot.telegram.notificator.exchanges.clients.socket.SocketThreadBinanceImpl
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
+import bot.telegram.notificator.libs.UnsupportedOrderTypeException
 import mu.KotlinLogging
 import org.knowm.xchange.Exchange
 import org.knowm.xchange.ExchangeFactory
@@ -18,6 +19,7 @@ import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.dto.account.AccountInfo
 import org.knowm.xchange.dto.account.Wallet
 import org.knowm.xchange.dto.trade.LimitOrder
+import org.knowm.xchange.dto.trade.MarketOrder
 import org.knowm.xchange.service.trade.params.orders.DefaultQueryOrderParamCurrencyPair
 import java.math.BigDecimal
 import java.util.*
@@ -175,69 +177,12 @@ class ClientBinance(
                     org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
                     org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
 
-                        org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
-                        org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-                        else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
-                    }
-                )
-            }.first()
-
-
-//        val ids = orderId.split('|')
-//
-//        if (ids.size > 1)
-//            return tradeService.orderStatus(pair.toCurrencyPair(), ids[0].toLong(), ids[1]).let {
-//                Order(
-//                    price = it.price,
-//                    pair = pair,
-//                    orderId = "${it.orderId}|${it.clientOrderId}",
-//                    origQty = it.origQty,
-//                    executedQty = it.executedQty,
-//                    side = fromBinanceSide(it.side),
-//                    type = TYPE.LIMIT,
-//                    status = when (it.status) {
-//                        org.knowm.xchange.binance.dto.trade.OrderStatus.NEW -> STATUS.NEW
-//
-//                        org.knowm.xchange.binance.dto.trade.OrderStatus.CANCELED -> STATUS.CANCELED
-//                        org.knowm.xchange.binance.dto.trade.OrderStatus.PENDING_CANCEL -> STATUS.CANCELED
-//                        org.knowm.xchange.binance.dto.trade.OrderStatus.REJECTED -> STATUS.CANCELED
-//                        org.knowm.xchange.binance.dto.trade.OrderStatus.EXPIRED -> STATUS.CANCELED
-//
-//                        org.knowm.xchange.binance.dto.trade.OrderStatus.FILLED -> STATUS.FILLED
-//                        org.knowm.xchange.binance.dto.trade.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-//                        else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
-//                    }
-//                )
-//            }
-//        else
-//            return tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
-//                it as LimitOrder
-//                Order(
-//                    price = it.limitPrice,
-//                    pair = (it.instrument as CurrencyPair).run { TradePair(base.currencyCode, counter.currencyCode) },
-//                    orderId = it.id,
-//                    origQty = it.originalAmount,
-//                    executedQty = it.cumulativeAmount,
-//                    side = SIDE.valueOf(it.type),
-//                    type = TYPE.LIMIT,
-//                    status = when (it.status) {
-//                        org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
-//                        org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
-//                        org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
-//
-//                        org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
-//                        org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
-//                        org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
-//                        org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
-//                        org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
-//                        org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
-//
-//                        org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
-//                        org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-//                        else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
-//                    }
-//                )
-//            }.first()
+                    org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
+                    org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
+                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
+                }
+            )
+        }.first()
     }
 
     override fun newOrder(
@@ -248,16 +193,25 @@ class ClientBinance(
     ): Order {
         val typeX = order.side.toType()
         val currPair = CurrencyPair(order.pair.first, order.pair.second)
-        val orderId = tradeService.placeLimitOrder(
-            LimitOrder(
-                typeX,
-                String.format(formatCount, order.origQty).toBigDecimal(),
-                currPair,
-                null,
-                Date(),
-                String.format(formatPrice, order.price).toBigDecimal()
+        val orderId = when (order.type) {
+            TYPE.LIMIT -> tradeService.placeLimitOrder(
+                LimitOrder(
+                    typeX,
+                    String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
+                    currPair,
+                    null,
+                    Date(),
+                    String.format(formatPrice, order.price).replace(',', '.').toBigDecimal()
+                )
             )
-        )
+            TYPE.MARKET -> tradeService.placeMarketOrder(
+                MarketOrder(
+                    typeX,
+                    String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
+                    currPair
+                )
+            ) else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${order.type}'!")
+        }
 
         return Order(orderId, order.pair, order.price, order.origQty, BigDecimal(0), order.side, order.type, STATUS.NEW)
 
@@ -300,15 +254,6 @@ class ClientBinance(
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean = try {
         tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
-
-
-//        val ids = orderId.split('|')
-//
-//        if (ids.size > 1)
-//            tradeService.cancelOrder(pair.toCurrencyPair(), ids[0].toLong(), ids[1], null)
-//        else
-//            tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
-
         true
     } catch (e: Exception) {
         log.warn("Cancel order Error: ", e)

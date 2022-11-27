@@ -2,9 +2,9 @@ package bot.telegram.notificator.exchanges.emulate
 
 import bot.telegram.notificator.exchanges.CandlestickListsIterator
 import bot.telegram.notificator.exchanges.clients.*
-import bot.telegram.notificator.exchanges.emulate.libs.writeIntoExcel
 import bot.telegram.notificator.exchanges.TraderAlgorithm
 import bot.telegram.notificator.exchanges.connect
+import bot.telegram.notificator.exchanges.emulate.libs.writeIntoExcelNew
 import bot.telegram.notificator.libs.*
 import mu.KotlinLogging
 import java.io.File
@@ -15,13 +15,14 @@ import kotlin.text.toDouble
 
 class Emulate(
     val sendFile: (File) -> Unit,
-    val sendMessage: (String) -> Unit,
-    private val pair: String,
+    val sendMessage: (String, Boolean) -> Unit,
+    private val botSettings: BotSettings,
     private val startDate: String,
     private val endDate: String,
+    firstBalance: BigDecimal,
+    secondBalance: BigDecimal,
     candlestickDataPath: Map<ExchangeEnum, String>,
-    exchangeEnum: ExchangeEnum,
-    private val isFindParam: Boolean = true
+    exchangeEnum: ExchangeEnum
 ) : Thread() {
 
     private val log = KotlinLogging.logger {}
@@ -30,99 +31,20 @@ class Emulate(
 
     private val emulateDataPath = candlestickDataPath.getValue(exchangeEnum)
 
+    private val testBalance = TestBalance(
+        firstBalance = firstBalance,
+        secondBalance = secondBalance,
+        tradePair = botSettings.pair
+    )
+
     override fun run() {
         try {
-            val result = if (isFindParam) emulate(pair.toRegex(), startDate, endDate, emulateDataPath)
-            else findParams(TradePair(pair), startDate, endDate, emulateDataPath)
-            sendFile(result)
+            sendFile(findParams(testBalance.tradePair, startDate, endDate, emulateDataPath))
         } catch (t: Throwable) {
             t.printStackTrace()
             log.error { "Emulate error:\n$t" }
-            sendMessage("Emulate error:\n${printTrace(t)}")
+            send("Emulate error:\n${printTrace(t)}")
         }
-    }
-
-    private fun emulate(regex: Regex, startDate: String, endDate: String, pathDB: String): File {
-
-        val logging = conf.getBoolean("logging")
-
-        val connect = connect(pathDB, log)
-
-        var result: List<EmulateResult>
-
-        try {
-            val stmt = connect.createStatement()
-            val resultSetTables = stmt.executeQuery("SELECT name FROM sqlite_master where type='table'")
-
-            val tablesPairs = ArrayList<Pair<String, TradePair>>()
-
-            while (resultSetTables.next()) {
-                val tableName: String = resultSetTables.getString("name")
-                val pair = tableName.substring(12)
-                if (pair.matches(regex))
-                    tablesPairs.add(tableName to TradePair(pair))
-            }
-            stmt.close()
-
-            result = tablesPairs.asSequence().map { tablePair ->
-
-                calcProfit(TestClient(
-                    iterator = CandlestickListsIterator(
-                        connect,
-                        tableName = tablePair.first,
-                        listSize = 500,
-                        startDateTime = Timestamp.valueOf("${startDate.replace('_', '-')} 00:00:00.000000"),
-                        endDateTime = Timestamp.valueOf("${endDate.replace('_', '-')} 00:00:00.000000"),
-                        interval = INTERVAL.FIVE_MINUTES,
-                        fillGaps = true
-                    ),
-                    balance = TestBalance(
-                        secondBalance = BigDecimal(100),
-                        balanceTrade = BigDecimal(50),
-                        tradePair = tablePair.second
-                    ),
-                    startCandleNum = (conf.getInt("interval.candles_buy") to conf.getInt("interval.candles_sell"))
-                        .run { if (first > second) first else second }
-                ),
-                    logging = logging
-                )
-            }
-                .filterNotNull()
-                .sortedBy { it.profitByFirstPrice * -1 }
-                .toList()
-
-        } catch (t: Throwable) {
-            log.error("CalcProfit ERROR:", t)
-            sendMessage("Calc profit ERROR:\n${printTrace(t, 5)}")
-            result = emptyList()
-        } finally {
-            connect.close()
-        }
-
-        val resultDir = File("emulate/results")
-        if (!resultDir.isDirectory)
-            resultDir.mkdirs()
-
-        return writeIntoExcel(
-            file = File(
-                "exchange/emulate/results/start_${startDate}___end_${endDate}___time_" +
-                        "${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}.xls"
-            ),
-            head = listOf(
-                "pair",
-                "Profit\nByEnd\nPrice",
-                "Profit\nByStart\nPrice",
-                "Execute\norder\ncount",
-                "Update\nstatic\norder\ncount",
-                "first\nBalance",
-                "second\nBalance",
-                "second\nBalance\nByStart\nPrice",
-                "second\nBalance\nByEnd\nPrice",
-                "from",
-                "to"
-            ),
-            lines = result
-        )
     }
 
     private fun findParams(pair: TradePair, startDate: String, endDate: String, pathDB: String): File {
@@ -134,129 +56,59 @@ class Emulate(
         var result: List<EmulateResult>
 
         try {
-
-            val func: (Double, Double, Int, Int, Double) -> EmulateResult? =
-                { buyProf: Double, sellProf: Double, candlesBuy: Int, candlesSell: Int, updStaticOrders: Double ->
-                    calcProfit(
-                        buyProf = buyProf,
-                        sellProf = sellProf,
-                        candlesBuy = candlesBuy,
-                        candlesSell = candlesSell,
-                        updStaticOrders = updStaticOrders,
-                        client = TestClient(
-                            iterator = CandlestickListsIterator(
-                                connect,
-                                tableName = "CANDLESTICK_$pair",
-                                listSize = 500,
-                                startDateTime = Timestamp.valueOf(
-                                    "${startDate.replace('_', '-')} 00:00:00.000000"
-                                ),
-                                endDateTime = Timestamp.valueOf(
-                                    "${endDate.replace('_', '-')} 00:00:00.000000"
-                                ),
-                                interval = INTERVAL.FIVE_MINUTES,
-                                fillGaps = true
-                            ),
-                            balance = TestBalance(
-                                secondBalance = BigDecimal(100),
-                                balanceTrade = BigDecimal(50),
-                                tradePair = pair
-                            ),
-                            startCandleNum = (conf.getInt("interval.candles_buy") to conf.getInt("interval.candles_sell"))
-                                .run { if (first > second) first else second }
+            val calculatedProf = calcProfit(
+                client = TestClient(
+                    iterator = CandlestickListsIterator(
+                        connect,
+                        tableName = "CANDLESTICK_$pair",
+                        listSize = 500,
+                        startDateTime = Timestamp.valueOf(
+                            "${startDate.replace('_', '-')} 00:00:00.000000"
                         ),
-                        logging = logging
+                        endDateTime = Timestamp.valueOf(
+                            "${endDate.replace('_', '-')} 00:00:00.000000"
+                        ),
+                        interval = INTERVAL.FIVE_MINUTES,
+                        fillGaps = true
+                    ),
+                    balance = testBalance,
+                    startCandleNum = (conf.getInt("interval.candles_buy") to conf.getInt("interval.candles_sell"))
+                        .run { if (first > second) first else second }
+                ),
+                logging = logging
+            )
 
-                    )
-                }
-
-            val buyProfStart = 2.0
-            val sellProfStart = 2.0
-            val staticOrdersStart = 3.0
-            val candlesBuyStart = 15
-            val candlesSellStart = 15
-
-            var staticOrders = staticOrdersStart
-            var buyProf = buyProfStart
-            var sellProf = sellProfStart
-            var candlesBuy = candlesBuyStart
-            var candlesSell = candlesSellStart
-            val calculatedProf = ArrayList<EmulateResult?>()
-
-            while (buyProf <= 4.0) {
-                while (sellProf <= 4.0) {
-                    while (candlesBuy <= 30 && candlesSell <= 30) {
-                        while (staticOrders <= 8.0) {
-
-                            if (buyProf < staticOrders && sellProf < staticOrders)
-                                calculatedProf.add(func(buyProf, sellProf, candlesBuy, candlesSell, staticOrders))
-
-                            staticOrders += 0.2
-                        }
-
-                        staticOrders = staticOrdersStart
-                        candlesBuy += 5
-                        candlesSell += 5
-                    }
-
-                    staticOrders = staticOrdersStart
-                    candlesBuy = candlesBuyStart
-                    candlesSell = candlesSellStart
-                    sellProf += 0.2
-
-                    log.info { "buyProf=$buyProf\t sellProf=$sellProf" }
-                }
-
-                staticOrders = staticOrdersStart
-                candlesBuy = candlesBuyStart
-                candlesSell = candlesSellStart
-                sellProf = sellProfStart
-                buyProf += 0.2
-
-                log.info { "$buyProf $sellProf   list_size = ${calculatedProf.size}" }
-            }
-
-
-            result = calculatedProf
-                .filterNotNull()
-                .sortedBy { it.profitByFirstPrice * -1 }
-                .toList()
+            result = listOf(calculatedProf!!)
 
         } catch (t: Throwable) {
             log.error("CalcProfit ERROR:", t)
-            sendMessage("Calc profit ERROR:\n${printTrace(t, 5)}")
+            send("Calc profit ERROR:\n${printTrace(t, 5)}")
             result = emptyList()
         } finally {
             connect.close()
         }
 
         val resultDir = File("emulate/results")
-        if (!resultDir.isDirectory)
-            resultDir.mkdirs()
 
-        return writeIntoExcel(
+        if (!resultDir.isDirectory) resultDir.mkdirs()
+
+        return writeIntoExcelNew(
             file = File(
-                "exchange/emulate/results/${pair}_start_${startDate}___end_${endDate}___time_" +
+                "exchange/emulate/results/${botSettings.direction}_${botSettings.ordersType}_${pair}_start_${startDate}___end_${endDate}___time_" +
                         "${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}.xls"
             ),
             head = listOf(
                 "pair",
-                "Profit\nByEnd\nPrice",
-                "Profit\nByStart\nPrice",
+                "Profit\nin ${pair.second}\nByEnd\nPrice",
+                "Profit\nin ${pair.second}\nByStart\nPrice",
                 "Execute\norder\ncount",
                 "Update\nstatic\norder\ncount",
-                "first\nBalance",
-                "second\nBalance",
-                "second\nBalance\nByStart\nPrice",
-                "second\nBalance\nByEnd\nPrice",
+                "${pair.first}\nBalance",
+                "${pair.second}\nBalance",
+                "${pair.second}\nBalance\nByStart\nPrice",
+                "${pair.second}\nBalance\nByEnd\nPrice",
                 "from",
                 "to",
-                "",
-                "buy_prof",
-                "sell_prof",
-                "buy_candles",
-                "sell_candles",
-                "upd_static\norders"
             ),
             lines = result
         )
@@ -275,21 +127,16 @@ class Emulate(
             val trade = TraderAlgorithm(
                 conf = conf,
                 queue = client.queue,
-                firstSymbol = client.balance.tradePair.first,
-                secondSymbol = client.balance.tradePair.second,
-                balanceTrade = client.balance.balanceTrade,
+                botSettings = botSettings,
+//                firstSymbol = client.balance.tradePair.first,
+//                secondSymbol = client.balance.tradePair.second,
                 exchangeEnum = ExchangeEnum.STUB_TEST,
                 client = client,
-                path = "exchange/emulate/data/results/${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}",
-                syncTimeInterval = (-1000).ms(),
+//                path = "exchange/emulate/data/results/${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}",
+//                syncTimeInterval = (-1000).ms(),
                 isLog = logging,
-                isEmulate = true,
-                percentBuyProf = buyProf?.toBigDecimal(),
-                percentSellProf = sellProf?.toBigDecimal(),
-                intervalCandlesBuy = candlesBuy,
-                intervalCandlesSell = candlesSell,
-                updStaticOrders = updStaticOrders?.toBigDecimal()
-            ) { }
+                isEmulate = true
+            ) { _, _ -> }
 
             trade.start()
             trade.join()
@@ -298,10 +145,7 @@ class Emulate(
 
             val firstBalanceA = client.balance.firstBalance.let {
                 client.balance.firstBalance + client.getOpenOrders(
-                    TradePair(
-                        client.balance.tradePair.first,
-                        client.balance.tradePair.second
-                    )
+                    TradePair(client.balance.tradePair.first, client.balance.tradePair.second)
                 ).map { order ->
                     if (order.status == STATUS.NEW && order.side == SIDE.SELL) {
                         order.origQty
@@ -317,7 +161,7 @@ class Emulate(
                     )
                 ).map { order ->
                     if (order.status == STATUS.NEW && order.side == SIDE.BUY) {
-                        order.origQty * order.price
+                        order.origQty * (order.price ?: 0.0.toBigDecimal())
                     } else BigDecimal(0)
                 }.fold(BigDecimal.ZERO, BigDecimal::add)
             }
@@ -332,17 +176,21 @@ class Emulate(
                 result = EmulateResult(
                     pair = client.balance.tradePair.toString(),
                     profitByLastPrice = String.format("%.4f", secondBalanceByLastPrice - allStartSecondBalance)
+                        .replace(',', '.')
                         .toDouble(),
                     profitByFirstPrice = String.format("%.4f", secondBalanceByFirstPrice - allStartSecondBalance)
+                        .replace(',', '.')
                         .toDouble(),
                     executeOrderCount = client.executedOrdersCount.toDouble(),
                     updateStaticOrderCount = client.updateStaticOrdersCount.toDouble(),
-                    firstBalance = String.format("%.4f", firstBalanceA).toDouble(),
-                    secondBalance = String.format("%.4f", secondBalanceA).toDouble(),
-                    secondBalanceByFirstPrice = String.format("%.4f", secondBalanceByFirstPrice).toDouble(),
-                    secondBalanceByLastPrice = String.format("%.4f", secondBalanceByLastPrice).toDouble(),
-                    from = convertTime(trade.firstCandlestick?.openTime ?: 0).removePrefix("20"),
-                    to = convertTime(trade.lastCandlestick?.openTime ?: 0).removePrefix("20"),
+                    firstBalance = String.format("%.4f", firstBalanceA).replace(',', '.').toDouble(),
+                    secondBalance = String.format("%.4f", secondBalanceA).replace(',', '.').toDouble(),
+                    secondBalanceByFirstPrice = String.format("%.4f", secondBalanceByFirstPrice).replace(',', '.')
+                        .toDouble(),
+                    secondBalanceByLastPrice = String.format("%.4f", secondBalanceByLastPrice).replace(',', '.')
+                        .toDouble(),
+                    from = convertTime(trade.from).removePrefix("20"),
+                    to = convertTime(trade.to).removePrefix("20"),
                     buyProfitPercent = buyProf,
                     sellProfitPercent = sellProf,
                     candlesBuyInterval = candlesBuy?.toDouble(),
@@ -380,4 +228,6 @@ class Emulate(
         val candlesSellInterval: Double? = null,
         val updStaticOrders: Double? = null
     )
+
+    private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 }

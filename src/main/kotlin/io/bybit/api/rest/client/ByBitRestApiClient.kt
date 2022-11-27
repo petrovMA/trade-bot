@@ -12,12 +12,15 @@ import io.bybit.api.rest.messages.kline.KlineResponse
 import io.bybit.api.rest.messages.order_book.OrderBookResponse
 import io.bybit.api.rest.messages.order_list.OrderListResponse
 import io.bybit.api.rest.messages.time.TimeResponse
+import io.netty.handler.codec.http.HttpHeaders.addHeader
 import mu.KotlinLogging
+import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.internal.addHeaderLenient
 import okio.Buffer
 import java.io.IOException
 import java.util.*
@@ -26,7 +29,7 @@ import java.util.*
 class ByBitRestApiClient(private val apikey: String, private val secret: String) {
     private val url = "api.bybit.com"
     private val public = "public"
-    private val version = "v2"
+    private val version = "v5"
     private val private = "private"
     private val client: OkHttpClient = OkHttpClient()
     private val objectMapper: ObjectMapper = ObjectMapper()
@@ -44,13 +47,36 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         return executeRequest(request, OrderBookResponse::class.java)
     }
 
+
+    fun getOpenOrders(category: String, pair: String? = null): Any {
+
+        val headers = createHeaderParams()
+
+        val builder = private().apply {
+            addPathSegment("account")
+            addPathSegment("wallet-balance")
+            addQueryParameter("accountType", "UNIFIED")
+            addQueryParameter("coin", "USDC")
+            pair?.let { addQueryParameter("pair", it) }
+        }
+            .build()
+
+        val request: Request = Request.Builder().url(builder)
+            .apply { headers.forEach { (key, value) -> addHeader(key, value) } }
+            .addHeader("Content-Type", "application/json")
+            .build()
+
+        return executeRequest(request, Any::class.java)
+    }
+
     fun getKline(pair: String, interval: INTERVAL, from: Long, limit: Long? = null): KlineResponse {
         val builder = public().apply {
+            addPathSegment("market")
             addPathSegment("kline")
-            addPathSegment("list")
+            addQueryParameter("category", "inverse")
             addQueryParameter("symbol", pair)
-            addQueryParameter("interval", interval.time)
-            addQueryParameter("from", from.toString())
+            addQueryParameter("interval", "60")
+//            addQueryParameter("from", from.toString())
             limit?.let { addQueryParameter("limit", it.toString()) }
         }.build()
 
@@ -192,10 +218,12 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     }
 
     private fun private() = HttpUrl.Builder().scheme("https").host(url)
-        .addPathSegment(version).addPathSegment(private)
+        .addPathSegment(version)
+//        .addPathSegment(private)
 
     private fun public() = HttpUrl.Builder().scheme("https").host(url)
-        .addPathSegment(version).addPathSegment(public)
+        .addPathSegment(version)
+//        .addPathSegment(public)
 
     private fun body(obj: Any) =
         objectMapper.writeValueAsString(obj).toRequestBody("application/json".toMediaTypeOrNull()!!)
@@ -204,6 +232,13 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         put("api_key", apikey)
         put("timestamp", System.currentTimeMillis().toString())
         put("sign", Authorization.signForRest(this, secret))
+    }
+
+    private fun createHeaderParams(params: TreeMap<String, String> = TreeMap()): TreeMap<String, String> = params.apply {
+        put("X-BAPI-RECV-WINDOW", "5000")
+        put("X-BAPI-API-KEY", apikey)
+        put("X-BAPI-TIMESTAMP", System.currentTimeMillis().toString())
+        put("X-BAPI-SIGN", Authorization.signForRest(this, secret))
     }
 
     enum class INTERVAL(val time: String) {

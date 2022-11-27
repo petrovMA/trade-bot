@@ -1,7 +1,6 @@
 package bot.telegram.notificator.exchanges.emulate.libs
 
 import bot.telegram.notificator.exchanges.emulate.Emulate
-import bot.telegram.notificator.exchanges.emulate.EmulateNew
 import org.apache.poi.hssf.usermodel.HSSFSheet
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
 import java.io.File
@@ -50,7 +49,7 @@ fun writeIntoExcel(file: File, lines: Iterable<Emulate.EmulateResult>, head: Lis
     }
 }
 
-fun writeIntoExcelNew(file: File, lines: Iterable<EmulateNew.EmulateResult>, head: List<String>): File = HSSFWorkbook().let {
+fun writeIntoExcelNew(file: File, lines: Iterable<Emulate.EmulateResult>, head: List<String>): File = HSSFWorkbook().let {
 
     it.createSheet("sheet").let { sheet ->
 
@@ -67,7 +66,7 @@ fun writeIntoExcelNew(file: File, lines: Iterable<EmulateNew.EmulateResult>, hea
         sheet.setColumnWidth(10, 4000)
         sheet.setColumnWidth(11, 4000)
 
-        val writeRov = { result: EmulateNew.EmulateResult, s: HSSFSheet, rowNum: Int ->
+        val writeRov = { result: Emulate.EmulateResult, s: HSSFSheet, rowNum: Int ->
             val row = s.createRow(rowNum)
             var cell = -1
 

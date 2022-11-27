@@ -130,7 +130,7 @@ class ClientBitmax(
             orderType = when (order.type) {
                 TYPE.LIMIT -> "limit"
                 TYPE.MARKET -> "market"
-                else -> throw UnsupportedOrderTypeException()
+                else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${order.type}'!")
             },
             side = when (order.side) {
                 SIDE.BUY -> "buy"

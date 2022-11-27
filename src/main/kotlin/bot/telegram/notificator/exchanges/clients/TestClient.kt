@@ -16,7 +16,7 @@ class TestClient(
     val iterator: CandlestickListsIterator,
     val balance: TestBalance,
     startCandleNum: Int,
-    private val fee: BigDecimal = BigDecimal(0.15)
+    private val fee: BigDecimal = BigDecimal(0.1)
 ) : Client {
     private val log = KotlinLogging.logger {}
     private var orders: MutableMap<String, Order> = HashMap()
@@ -26,10 +26,6 @@ class TestClient(
     val queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque()
 
     private var candlesticks: List<Candlestick> = iterator.next().also {
-//        addAll(readObjectFromFile(files.component1(), ArrayList::class.java).map { toCandlestick(it) })
-//        addAll(readObjectFromFile(files.component2(), ArrayList::class.java).map { toCandlestick(it) })
-//        addAll(readObjectFromFile(files.component3(), ArrayList::class.java).map { toCandlestick(it) })
-
         balance.apply { if (firstBalance == BigDecimal(0)) firstBalance = secondBalance.div8(it.first().close) }
     }
 
@@ -87,18 +83,7 @@ class TestClient(
     override fun getAssetBalance(asset: String): Balance = getBalances().find { it.asset == asset }
         ?: Balance(asset = asset, free = BigDecimal(0), total = BigDecimal(0), locked = BigDecimal(0))
 
-    override fun getOrder(pair: TradePair, orderId: String): Order =
-        getOpenOrders(pair).find { it.orderId == orderId }
-            ?: Order(
-                pair = balance.tradePair,
-                side = SIDE.SELL,
-                type = TYPE.LIMIT,
-                origQty = BigDecimal(0),
-                executedQty = BigDecimal(0),
-                price = lastBuyPrice,
-                status = STATUS.NEW,
-                orderId = orderId
-            )
+    override fun getOrder(pair: TradePair, orderId: String): Order? = getOpenOrders(pair).find { it.orderId == orderId }
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> {
 
@@ -133,6 +118,7 @@ class TestClient(
                             balance.firstBalance += (order.origQty - order.origQty.percent(fee))
                         } else throw NotEnoughBalanceException("Account has insufficient balance for requested action.")
                     }
+
                     SIDE.SELL -> {
                         val newFirstBalance = balance.firstBalance - order.origQty
                         if (BigDecimal.ZERO <= newFirstBalance) {
@@ -142,13 +128,14 @@ class TestClient(
                             profit = (profit - profit.percent(fee))
 
                             balance.secondBalance += profit
-                        }
-                        else throw NotEnoughBalanceException("Account has insufficient balance for requested action.")
+                        } else throw NotEnoughBalanceException("Account has insufficient balance for requested action.")
                     }
+
                     else -> throw UnsupportedOrderSideException()
                 }
                 return order
             }
+
             TYPE.LIMIT -> {
                 if (isStaticUpdate) updateStaticOrdersCount++
                 ++clientOrderId
@@ -166,13 +153,13 @@ class TestClient(
                 if (order.side == SIDE.SELL)
                     balance.firstBalance -= order.origQty
                 else if (order.side == SIDE.BUY)
-                    balance
-                        .secondBalance -= order.origQty * order.price
+                    balance.secondBalance -= order.origQty * (order.price ?: 0.0.toBigDecimal())
 
                 orders[newOrder.orderId] = newOrder
 
                 return newOrder
             }
+
             else -> return order
         }
     }
@@ -185,7 +172,7 @@ class TestClient(
             if (order.side == SIDE.SELL)
                 balance.firstBalance += order.origQty
             else if (order.side == SIDE.BUY)
-                balance.secondBalance += order.origQty * order.price
+                balance.secondBalance += order.origQty * (order.price ?: 0.0.toBigDecimal())
         } ?: log.info("Order: id = $orderId Not found!")
         return true
     }
@@ -212,6 +199,7 @@ class TestClient(
 
                 return Trade(price = candlestick.open, qty = candlestick.volume, candlestick.openTime + 1)
             }
+
             EventState.SELL_TRADE -> {
                 checkOrderExecuted(lastBuyPrice)
                 checkOrderExecuted(lastSellPrice)
@@ -243,6 +231,7 @@ class TestClient(
                 state = EventState.from(state.number + 1)
                 return Trade(price = candlestick.high, qty = BigDecimal(0), candlestick.openTime + 10)
             }
+
             EventState.CANDLESTICK_CLOSE -> {
                 ++candlestickNum
                 if (candlestickNum >= candlesticks.size)
@@ -259,9 +248,8 @@ class TestClient(
 
                 return Trade(price = candlestick.close, qty = BigDecimal(0), candlestick.closeTime)
             }
-            else -> {
-                throw UnsupportedStateException("State: $state unsupported")
-            }
+
+            else -> throw UnsupportedStateException("State: $state unsupported")
         }
     }
 
@@ -297,7 +285,7 @@ class TestClient(
     private fun checkOrderExecuted(price: BigDecimal) {
 
         val checkOrder: (order: Order) -> Order = { order ->
-            if (order.status == STATUS.NEW) {
+            if (order.status == STATUS.NEW && order.price != null) {
                 when {
                     order.price > price -> {
                         if (order.side == SIDE.BUY) {
@@ -312,6 +300,7 @@ class TestClient(
 
                         order
                     }
+
                     order.price < price -> {
                         if (order.side == SIDE.SELL) {
                             order.status = STATUS.FILLED
@@ -326,6 +315,7 @@ class TestClient(
 
                         order
                     }
+
                     else -> order
                 }
             } else order

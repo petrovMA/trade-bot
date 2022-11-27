@@ -13,18 +13,24 @@ data class Balance(val asset: String, val total: BigDecimal, val free: BigDecima
 data class Order(
     val orderId: String,
     val pair: TradePair,
-    val price: BigDecimal,
+    val price: BigDecimal?,
     val origQty: BigDecimal,
     var executedQty: BigDecimal,
-    val side: SIDE,
+    var side: SIDE,
     var type: TYPE,
     var status: STATUS,
     var stopPrice: BigDecimal? = null,
-    var lastBorderPrice: BigDecimal? = null
+    var lastBorderPrice: BigDecimal? = null,
+    var fee: BigDecimal? = null
 ) : CommonExchangeData
 
 data class TradePair(val first: String, val second: String) {
-    constructor(pair: String) : this(pair.split('_')[0], pair.split('_')[1])
+
+    constructor(pair: String) : this(
+        first = pair.split("[_\\\\/\\-|\\s]".toRegex())[0],
+        second = pair.split("[_\\\\/\\-|\\s]".toRegex())[1]
+    )
+
     constructor(pair: CurrencyPair) : this(pair.base.currencyCode, pair.counter.currencyCode)
 
     override fun toString(): String = "${first}_$second"
@@ -154,14 +160,18 @@ data class Candlestick(
 
 data class BotSettings(
     val name: String,
-    val pair: String,
+    val pair: TradePair,
+    val exchange: String,
     val direction: DIRECTION,
     val ordersType: TYPE,
     val tradingRange: Pair<BigDecimal, BigDecimal>,
     val orderSize: BigDecimal, // Order Quantity:: order size
+    val orderBalanceType: String, // if first => BTC balance, else second => USDT balance (default = second)
     val orderDistance: BigDecimal, // Order Distance:: distance between every order
     val triggerDistance: BigDecimal, // Trigger Distance:: distance between order and stop-order
-    val orderMaxQuantity: Int, // Max Trigger count:: max amount of orders
-    val firstBalance: BigDecimal, // for example, pair BTC_USDT => BTC balance
-    val secondBalance: BigDecimal // for example, pair BTC_USDT => USDT balance
+    val enableStopOrderDistance: BigDecimal = BigDecimal(0), // enable stop order distance (stopOrderDistance = triggerDistance + enableStopOrderDistance)
+    val orderMaxQuantity: Int, // Max Order count:: max amount of orders
+    val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    val setCloseOrders: Boolean = true // set close position orders when bot starts
 )

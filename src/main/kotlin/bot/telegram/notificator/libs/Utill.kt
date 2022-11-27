@@ -1,9 +1,6 @@
 package bot.telegram.notificator.libs
 
-import bot.telegram.notificator.exchanges.clients.Candlestick
-import bot.telegram.notificator.exchanges.clients.Client
-import bot.telegram.notificator.exchanges.clients.INTERVAL
-import bot.telegram.notificator.exchanges.clients.Order
+import bot.telegram.notificator.exchanges.clients.*
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import utils.mapper.Mapper.asFile
@@ -11,6 +8,7 @@ import utils.mapper.Mapper.asListObjects
 import utils.mapper.Mapper.asObject
 import utils.mapper.Mapper.asString
 import mu.KotlinLogging
+import utils.mapper.Mapper.asMapObjects
 import java.io.File
 import java.io.IOException
 import java.io.PrintWriter
@@ -50,32 +48,38 @@ fun Long.toLocalDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneId.sys
 
 fun <T> readObjectFromFile(file: File, valueType: Class<T>): T =
     if (file.exists() && !file.isDirectory) asObject(file, valueType)
-    else throw Exception("Can't find order file: ${file.absolutePath}")
+    else throw Exception("Can't find file: ${file.absolutePath}")
 
 fun readListObjectsFromFile(file: File, type: Type): List<Candlestick> =
     if (file.exists() && !file.isDirectory) asListObjects(file, type)
     else throw Exception("Can't find order file: ${file.absolutePath}")
 
+fun readMapObjectsFromFile(file: File, type: Type): Map<String, Order> =
+    if (file.exists() && !file.isDirectory) asMapObjects(file, type)
+    else throw Exception("Can't find file: ${file.absolutePath}")
+
 fun readListObjectsFromString(json: String, type: Type): List<Candlestick> = asListObjects(json, type)
 
-fun reWriteObject(object_: Any, file: File) {
+fun reWriteObject(obj: Any, file: File) {
     removeFile(file)
-    asFile(object_, file)
+    asFile(obj, file)
 }
 
-fun writeObject(object_: Any, file: File) = asFile(object_, file)
+fun writeObject(obj: Any, file: File) = asFile(obj, file)
+
+fun json(obj: Any) = asString(obj)
 
 fun removeFile(file: File) {
     if (file.exists()) file.delete()
 }
 
-fun writeLine(object_: Any, file: File) {
+fun writeLine(obj: Any, file: File) {
     try {
         if (file.exists())
-            Files.write(file.toPath(), ("${asString(object_)}\n").toByteArray(), StandardOpenOption.APPEND)
+            Files.write(file.toPath(), ("${asString(obj)}\n").toByteArray(), StandardOpenOption.APPEND)
         else {
             if (file.parentFile.run { !exists() || !isDirectory }) Files.createDirectories(file.parentFile.toPath())
-            asFile(object_, file)
+            asFile(obj, file)
             Files.write(file.toPath(), "\n".toByteArray(), StandardOpenOption.APPEND)
         }
 
@@ -168,7 +172,7 @@ fun repeatEvery(task: () -> Unit, timeRepeat: Duration, timeDifference: Duration
 
 fun calcGapPercent(orderB: Order, orderS: Order): String {
     var result = ""
-    val (buyPrice, sellPrice) = orderB.price to orderS.price
+    val (buyPrice, sellPrice) = (orderB.price ?: 0.toBigDecimal()) to (orderS.price ?: 0.toBigDecimal())
     val percent = ((buyPrice + sellPrice) / 2.toBigDecimal()).percent()
 
     result += String.format(
@@ -181,8 +185,8 @@ fun calcGapPercent(orderB: Order, orderS: Order): String {
 
 fun calcExecuted(orderB: Order, orderS: Order, balanceTrade: BigDecimal): String =
     (balanceTrade.toDouble() / 100).let { percent ->
-        "qty oB=${String.format("%.1f", orderB.price.toDouble() * (orderB.origQty.toDouble() - orderB.executedQty.toDouble()) / percent)}% " +
-                "oS=${String.format("%.1f", orderS.price.toDouble() * (orderS.origQty.toDouble() - orderS.executedQty.toDouble()) / percent)}%"
+        "qty oB=${String.format("%.1f", (orderB.price ?: 0.toBigDecimal()).toDouble() * (orderB.origQty.toDouble() - orderB.executedQty.toDouble()) / percent)}% " +
+                "oS=${String.format("%.1f", (orderS.price ?: 0.toBigDecimal()).toDouble() * (orderS.origQty.toDouble() - orderS.executedQty.toDouble()) / percent)}%"
     }
 
 fun <E> LinkedBlockingDeque<E>.poll(time: Duration): E? = this.poll(time.seconds, TimeUnit.SECONDS)
@@ -208,5 +212,5 @@ fun String.toInterval(): INTERVAL = when {
     else -> throw Exception("Not supported CandlestickInterval!")
 }
 
-fun format(value: BigDecimal, locale: Locale? = null): String =
+fun format(value: BigDecimal?, locale: Locale? = null): String =
     locale?.let { String.format(it, "%.8f", value) } ?: String.format("%.8f", value)

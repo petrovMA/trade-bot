@@ -2,7 +2,10 @@ package bot.telegram.notificator
 
 data class Commands(
         val commandHelp: Regex = "/?help\\s+[A-z,\\d]+".toRegex(),
-        val commandStartBot: Regex = "/?start[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
+        val commandCreateTradeBot: Regex = "/?create[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
+        val commandStartTradeBot: Regex = "/?start\\s[a-zA-Z0-9_]+$".toRegex(),
+        val commandEmulateTradeBot: Regex = "/?emulate[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
+        val commandLoadTradeBot: Regex = "/?load\\s[a-zA-Z0-9_]+$".toRegex(),
 
 
         val commandStatus: Regex = "/?status".toRegex(),
