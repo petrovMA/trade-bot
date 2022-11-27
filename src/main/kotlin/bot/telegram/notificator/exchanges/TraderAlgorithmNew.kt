@@ -15,6 +15,7 @@ import java.util.concurrent.LinkedBlockingDeque
 import kotlin.collections.HashMap
 import kotlin.math.absoluteValue
 
+
 class TraderAlgorithmNew(
     conf: Config,
     val queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
