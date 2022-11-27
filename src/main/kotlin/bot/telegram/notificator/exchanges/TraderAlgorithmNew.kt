@@ -37,7 +37,6 @@ class TraderAlgorithmNew(
     private val orders: HashMap<String, Order> = HashMap()
     private val ordersListForRemove: MutableList<String> = mutableListOf()
 
-
     private val tradePair = TradePair(botSettings.pair)
     private val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
     private val path: String = "exchange/${tradePair}"
@@ -56,6 +55,7 @@ class TraderAlgorithmNew(
 
     private var stopThread = false
     private var currentPrice: BigDecimal = 0.toBigDecimal()
+    private var prevPrice: BigDecimal = 0.toBigDecimal()
 
     var from: Long = Long.MAX_VALUE
     var to: Long = Long.MIN_VALUE
@@ -100,6 +100,7 @@ class TraderAlgorithmNew(
                 try {
                     when (msg) {
                         is Trade -> {
+                            prevPrice = currentPrice
                             currentPrice = msg.price
                             log?.debug("$tradePair TradeEvent:\n$msg")
 
@@ -108,33 +109,75 @@ class TraderAlgorithmNew(
 
                             if (currentPrice > minRange && currentPrice < maxRange) {
 
-                                val price = String.format(
-                                    Locale.US,
-                                    "%.8f",
-                                    currentPrice - (currentPrice % botSettings.orderDistance)
-                                )
+                                val price = (currentPrice - (currentPrice % botSettings.orderDistance)).toPrice()
 
-                                orders[price]?.let { log?.trace("Order already exist: $it") } ?: run {
-                                    if (orders.size < botSettings.orderMaxQuantity) {
-                                        orders[price] =
-                                            sentMarketOrder(
-                                                amount = botSettings.orderSize,
-                                                orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
-                                                else SIDE.SELL
-                                            ).also {
-                                                if (botSettings.direction == DIRECTION.LONG)
-                                                    it.lastBorderPrice = BigDecimal.ZERO
-                                                else
-                                                    it.lastBorderPrice = BigDecimal(999999999999999999L)
+                                when (botSettings.ordersType) {
+                                    TYPE.MARKET -> {
+                                        orders[price]?.let { log?.trace("Order already exist: $it") } ?: run {
+                                            if (orders.size < botSettings.orderMaxQuantity) {
+                                                orders[price] =
+                                                    sentMarketOrder(
+                                                        amount = botSettings.orderSize,
+                                                        orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
+                                                        else SIDE.SELL
+                                                    ).also {
+                                                        if (botSettings.direction == DIRECTION.LONG)
+                                                            it.lastBorderPrice = BigDecimal.ZERO
+                                                        else
+                                                            it.lastBorderPrice = BigDecimal(99999999999999L)
+                                                    }
                                             }
+                                        }
                                     }
+                                    TYPE.LIMIT -> {
+                                        when (botSettings.direction) {
+                                            DIRECTION.LONG -> {
+                                                var keyPrice = price.toBigDecimal()
+                                                while (keyPrice > minRange) {
+                                                    keyPrice.toPrice().let {
+                                                        orders[it]?.let { order -> log?.trace("Order already exist: $order") }
+                                                            ?: run {
+                                                                orders[it] =
+                                                                    sentOrder(
+                                                                        price = keyPrice,
+                                                                        amount = botSettings.orderSize,
+                                                                        orderSide = SIDE.BUY
+                                                                    )
+                                                            }
+                                                    }
+                                                    keyPrice -= botSettings.orderDistance
+                                                }
+
+
+                                                val prev =
+                                                    (prevPrice - (prevPrice % botSettings.orderDistance)).toPrice()
+
+                                                if (price.toBigDecimal() != prev.toBigDecimal()) {
+                                                    orders[prev]?.let { order ->
+                                                        val o = getOrder(tradePair, order.orderId)
+
+                                                        if (o.status == STATUS.FILLED || o.status == STATUS.REJECTED) {
+                                                            orders[prev] = o.also {
+                                                                it.type = TYPE.MARKET
+                                                                it.lastBorderPrice = BigDecimal.ZERO
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            DIRECTION.SHORT -> {
+                                                TODO()
+                                            }
+                                        }
+                                    }
+                                    else -> throw UnsupportedOrderTypeException()
                                 }
                             } else
                                 log?.warn("Price ${format(currentPrice)}, not in range: ${botSettings.tradingRange}")
 
                             when (botSettings.direction) {
                                 DIRECTION.LONG -> {
-                                    orders.forEach {
+                                    orders.filter { it.value.type == TYPE.MARKET }.forEach {
                                         if (it.value.lastBorderPrice!! < currentPrice) {
                                             it.value.lastBorderPrice = currentPrice
 
@@ -150,7 +193,7 @@ class TraderAlgorithmNew(
                                     }
                                 }
                                 DIRECTION.SHORT -> {
-                                    orders.forEach {
+                                    orders.filter { it.value.type == TYPE.MARKET }.forEach {
                                         if (it.value.lastBorderPrice!! > currentPrice) {
                                             it.value.lastBorderPrice = currentPrice
 
@@ -261,7 +304,12 @@ class TraderAlgorithmNew(
     }
 
 
-    private fun sentOrder(price: BigDecimal, amount: BigDecimal, orderSide: SIDE, isStaticUpdate: Boolean): Order {
+    private fun sentOrder(
+        price: BigDecimal,
+        amount: BigDecimal,
+        orderSide: SIDE,
+        isStaticUpdate: Boolean = false
+    ): Order {
 
         log?.info("$tradePair Sent order with params: price = $price; count = $amount; side = $orderSide")
 
@@ -486,4 +534,6 @@ class TraderAlgorithmNew(
                 cancelOrder(tradePair, it, false)
         }
     }
+
+    private fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
 }

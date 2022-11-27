@@ -17,7 +17,7 @@ data class Order(
     val origQty: BigDecimal,
     var executedQty: BigDecimal,
     val side: SIDE,
-    val type: TYPE,
+    var type: TYPE,
     var status: STATUS,
     var stopPrice: BigDecimal? = null,
     var lastBorderPrice: BigDecimal? = null

@@ -39,45 +39,10 @@ fun main() {
                 sendFile = {}
         ) { println(it) }
 
-//        Commands for test
-//        java.util.Timer("TradePairs", false).schedule(500) { bot.onUpdate("TradePairs init") }
-//        java.util.Timer("start", false).schedule(7000) {
-//            println("start ALGO_BTC")
-//            bot.onUpdate("start ALGO_BTC")
-//        }
-
-
-//        java.util.Timer("emulate", false).schedule(3.s().toMillis()) {
-//            bot.onUpdate("Collect gate WRITE")
-
-//            bot.onUpdate("tradePairs init")
-//            bot.onUpdate("Emulate binance HBAR_BNB 2021_04_21 2021_05_03")
-
-//            bot.onUpdate("FindParams binance HBAR_BNB 2021_04_03 2021_05_03")
-
-//            bot.onUpdate("FindParams huobi RAI_ETH 2021_03_26 2021_04_26")
-
-//            bot.onUpdate("FindParams binance PUNDIX_ETH 2021_03_30 2021_04_30")
-
-//            bot.onUpdate("FindParams binance AVA_BNB 2021_03_28 2021_04_28")
-//            bot.onUpdate("FindParams binance AION_ETH 2021_03_28 2021_04_28")
-//            bot.onUpdate("FindParams binance IOTX_ETH 2021_03_28 2021_04_28")
-//            bot.onUpdate("FindParams binance HBAR_BNB 2021_03_28 2021_04_28")
-
-//            bot.onUpdate("FindParams binance ETH_BTC 2021_03_27 2021_04_27")
-
-//            bot.onUpdate("FindParams binance BTC_USDT 2021_03_27 2021_04_27")
-//            bot.onUpdate("FindParams huobi BTC_USDT 2021_03_27 2021_04_27")
-//            bot.onUpdate("FindParams bitmax BTC_USDT 2021_03_27 2021_04_27")
-//        }
         java.util.Timer("start2", false).schedule(10.s().toMillis()) {
             bot.onUpdate("start|name name|pair ETH_USDT|ordersType Market|direction LONG|tradingRange 600.123 2000.5|orderSize 0.05|orderDistance 50|triggerDistance 100|orderMaxQuantity 200|firstBalance 1.2|secondBalance 2000|startDate 2022_06_07|endDate 2022_08_19|exchange binance")
             bot.onUpdate("start|name name|pair ETH_USDT|ordersType Market|direction SHORT|tradingRange 600.123 2100.5|orderSize 0.05|orderDistance 50|triggerDistance 100|orderMaxQuantity 200|firstBalance 1.2|secondBalance 2000|startDate 2022_07_22|endDate 2022_08_28|exchange binance")
         }
-//        java.util.Timer("TradePairs", false).schedule(5.m().toMillis()) {
-//            bot.taskQueue.put(CollectCandlestickData(bot.candlestickDataCommand, null, ExchangeEnum.BINANCE, bot.sendMessage))
-//            bot.taskQueue.put(CollectCandlestickData(bot.candlestickDataCommand, null, ExchangeEnum.BITMAX, bot.sendMessage))
-//        }
 
         while (true)
             bot.onUpdate(readLine().toString())
