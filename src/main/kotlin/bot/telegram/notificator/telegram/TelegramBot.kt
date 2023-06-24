@@ -15,7 +15,7 @@ import java.util.concurrent.BlockingQueue
 class TelegramBot(
     private val chatId: String,
     private val botUsername: String,
-    private val botToken: String,
+    botToken: String,
     exchangeFiles: File,
     intervalCandlestick: Duration?,
     intervalStatistic: Duration?,
@@ -24,7 +24,7 @@ class TelegramBot(
     candlestickDataPath: Map<ExchangeEnum, String>,
     taskQueue: BlockingQueue<Thread>,
     private val defaultCommands: Map<String, String>
-) : TelegramLongPollingBot() {
+) : TelegramLongPollingBot(botToken) {
 
     private val log = KotlinLogging.logger {}
 
@@ -47,9 +47,7 @@ class TelegramBot(
 
     override fun getBotUsername(): String = botUsername
 
-    override fun getBotToken(): String = botToken
-
-    private fun sendMessage(messageText: String, isMarkDown: Boolean = false): Unit = try {
+    fun sendMessage(messageText: String, isMarkDown: Boolean = false): Unit = try {
         execute(SendMessage().also {
             log.debug("Send to chatId = $chatId\nMessage: \"$messageText\"")
             it.chatId = chatId

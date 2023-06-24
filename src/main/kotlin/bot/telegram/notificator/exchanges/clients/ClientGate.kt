@@ -35,7 +35,7 @@ class ClientGate(
     private val log = KotlinLogging.logger {}
 
     override fun getAllPairs(): List<TradePair> =
-        instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
+        instance.exchangeMetaData.instruments.map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
 
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =

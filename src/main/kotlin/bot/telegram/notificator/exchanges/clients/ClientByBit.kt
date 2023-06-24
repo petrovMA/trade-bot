@@ -275,10 +275,10 @@ class ClientByBit(
     private fun asCandlestick(kline: BinanceKline): Candlestick = Candlestick(
         openTime = kline.openTime,
         closeTime = kline.closeTime,
-        open = kline.openPrice,
-        high = kline.highPrice,
-        low = kline.lowPrice,
-        close = kline.closePrice,
+        open = kline.open,
+        high = kline.high,
+        low = kline.low,
+        close = kline.close,
         volume = kline.volume
     )
 

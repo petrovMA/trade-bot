@@ -44,7 +44,7 @@ class ClientBinance(
 
 
     override fun getAllPairs(): List<TradePair> =
-        instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
+        instance.exchangeMetaData.instruments.map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
 
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
@@ -253,7 +253,7 @@ class ClientBinance(
 
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean = try {
-        tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
+        tradeService.cancelOrder(orderId)
         true
     } catch (e: Exception) {
         log.warn("Cancel order Error: ", e)
@@ -292,10 +292,10 @@ class ClientBinance(
     private fun asCandlestick(kline: BinanceKline): Candlestick = Candlestick(
         openTime = kline.openTime,
         closeTime = kline.closeTime,
-        open = kline.openPrice,
-        high = kline.highPrice,
-        low = kline.lowPrice,
-        close = kline.closePrice,
+        open = kline.open,
+        high = kline.high,
+        low = kline.low,
+        close = kline.close,
         volume = kline.volume
     )
 

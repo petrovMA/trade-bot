@@ -1,11 +1,17 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
-    kotlin("jvm") version "1.6.0"
+    id("org.springframework.boot") version "3.1.0"
+    kotlin("jvm") version "1.8.0"
+    id("org.jetbrains.kotlin.plugin.spring") version "1.8.0"
+    application
+}
+
+application {
+    mainClass.set("bot.telegram.notificator.Main")
 }
 
 group = "bot.exchange"
 version = "2.0-SNAPSHOT"
+java.sourceCompatibility = JavaVersion.VERSION_19
 
 repositories {
     mavenCentral()
@@ -14,48 +20,36 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
-
+    implementation("org.springframework.boot:spring-boot-starter-web:3.1.0") {
+        exclude(group = "ch.qos.logback", module = "logback-classic")
+    }
     implementation("org.apache.commons:commons-lang3:3.12.0")
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
     implementation("com.typesafe:config:1.4.2")
-    implementation("com.google.code.gson:gson:2.10")
+    implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.squareup.retrofit2:converter-jackson:2.9.0")
-    implementation("org.telegram:telegrambots-spring-boot-starter:6.1.0")
+    implementation("org.telegram:telegrambots-spring-boot-starter:6.5.0")
     implementation("com.neovisionaries:nv-websocket-client:2.14")
     implementation("org.apache.poi:poi:5.2.2") // exel table
 
     // exchanges
-    implementation("org.knowm.xchange:xchange-core:5.0.13")
-    implementation("org.knowm.xchange:xchange-binance:5.0.13")
-    implementation("org.knowm.xchange:xchange-stream-binance:5.0.13")
-    implementation("org.knowm.xchange:xchange-huobi:5.0.13")
-    implementation("org.knowm.xchange:xchange-gateio:5.0.13")
+    implementation("org.knowm.xchange:xchange-core:5.1.0")
+    implementation("org.knowm.xchange:xchange-binance:5.1.0")
+    implementation("org.knowm.xchange:xchange-stream-binance:5.1.0")
+    implementation("org.knowm.xchange:xchange-huobi:5.1.0")
+    implementation("org.knowm.xchange:xchange-gateio:5.1.0")
 //    implementation("org.knowm.xchange:xchange-bybit:5.0.12")
-    implementation("org.knowm.xchange:xchange-stream-huobi:5.0.13")
+    implementation("org.knowm.xchange:xchange-stream-huobi:5.1.0")
 
-    implementation("org.slf4j:slf4j-api:2.0.4")
-
-    implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
+    implementation("org.slf4j:slf4j-api:2.0.5")
+    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
 
     // todo  Instruction https://gist.github.com/rppowell-lasfs/f0e3b2d18c3be03ada38a3e367eaf1b8
     // https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc
-    implementation("org.xerial:sqlite-jdbc:3.39.4.1")
+    implementation("org.xerial:sqlite-jdbc:3.40.1.0")
 
     // logging
-    implementation("org.slf4j:slf4j-log4j12:2.0.4")
-    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.19.0")
-}
-
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "14"
-}
-
-tasks.withType<Jar> {
-    manifest {
-        attributes("Main-Class" to "bot.telegram.notificator.MainKt")
-    }
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-
-    from (configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+    implementation("org.slf4j:slf4j-log4j12:2.0.5")
+    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.20.0")
 }

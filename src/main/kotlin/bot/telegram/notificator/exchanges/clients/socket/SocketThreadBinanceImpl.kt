@@ -15,7 +15,8 @@ class SocketThreadBinanceImpl(
     val pair: CurrencyPair,
     private val queue: BlockingQueue<CommonExchangeData>,
     private val api: String?,
-    private val sec: String?
+    private val sec: String?,
+    private val isFuture: Boolean = false
 ) : SocketThread() {
 
     private val log = KotlinLogging.logger {}
@@ -76,7 +77,7 @@ class SocketThreadBinanceImpl(
             )*/
 
             if (api != null && sec != null)
-                exchange.streamingTradeService.orderChanges.subscribe(
+                exchange.streamingTradeService.getOrderChanges(isFuture).subscribe(
                     { oc: Order? ->
                         log.info("Order change: {}", oc)
 
