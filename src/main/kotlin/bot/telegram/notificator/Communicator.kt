@@ -376,11 +376,9 @@ class Communicator(
                     }
 
                     cmd.commandAllOrders.matches(message) -> {
-                        var pairs = ""
-                        map {
-                            pairs += "${it.key} "
-                            it.value
-                        }
+                        val pairs = map { it.key }.joinToString(",")
+
+                        map { it.value }
                             .find { it.isAlive }
                             ?.apply {
                                 if (!queue.add(BotEvent(pairs, BotEvent.Type.GET_ALL_OPEN_ORDERS))) {
