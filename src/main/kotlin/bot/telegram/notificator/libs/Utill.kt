@@ -50,6 +50,8 @@ fun <T> readObjectFromFile(file: File, valueType: Class<T>): T =
     if (file.exists() && !file.isDirectory) asObject(file, valueType)
     else throw Exception("Can't find file: ${file.absolutePath}")
 
+inline fun <reified T> String.deserialize(): T = asObject(this, T::class.java)
+
 fun readListObjectsFromFile(file: File, type: Type): List<Candlestick> =
     if (file.exists() && !file.isDirectory) asListObjects(file, type)
     else throw Exception("Can't find order file: ${file.absolutePath}")

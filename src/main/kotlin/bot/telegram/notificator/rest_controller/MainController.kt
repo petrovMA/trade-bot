@@ -1,9 +1,12 @@
 package bot.telegram.notificator.rest_controller
 
 import bot.telegram.notificator.TaskExecutor
-import bot.telegram.notificator.exchanges.clients.ExchangeEnum
+import bot.telegram.notificator.libs.*
+import bot.telegram.notificator.exchanges.clients.*
+import bot.telegram.notificator.exchanges.getConfigByExchange
 import bot.telegram.notificator.libs.readConf
 import bot.telegram.notificator.telegram.TelegramBot
+import com.typesafe.config.Config
 import mu.KLogger
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
@@ -14,12 +17,20 @@ import org.springframework.web.bind.annotation.RestController
 import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
 import java.io.File
+import java.math.BigDecimal
 import java.util.concurrent.LinkedBlockingDeque
 
 @RestController
 class MainController {
     final val log: KLogger = KotlinLogging.logger {}
     final val bot: TelegramBot
+    private val conf: Config = getConfigByExchange(ExchangeEnum.BINANCE)!!
+
+    val client = newClient(
+        ExchangeEnum.BINANCE,
+        conf.getString("api"),
+        conf.getString("sec")
+    )
 
     init {
         val exchangeFile = File("exchange")
@@ -73,7 +84,27 @@ class MainController {
         val response = MyResponse("success", "Received $request")
         log.info("Response for /endpoint/trade = $response")
 
-        bot.sendMessage(request)
+        val notification = request.deserialize<Notification>()
+
+        val order = Order(
+            orderId = "",
+            pair = TradePair(notification.pair),
+            price = 2500.toBigDecimal(),
+            origQty = BigDecimal(notification.amount),
+            executedQty = BigDecimal(0),
+            side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
+            type = TYPE.LIMIT,
+            status = STATUS.NEW
+        )
+
+        bot.sendMessage(json(order), true)
+
+//        client.newOrder(
+//            ,
+//            formatCount = "%.2f",
+//            formatPrice = "%.4f",
+//            isStaticUpdate = false
+//        )
 
         return ResponseEntity.ok(response)
     }
