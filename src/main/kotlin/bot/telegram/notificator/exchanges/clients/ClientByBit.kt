@@ -121,7 +121,7 @@ class ClientByBit(
 //        .groupBy { TradePair(it.pair.toString()) }
 
 
-    override fun getBalances(): List<Balance> =
+    override fun getBalances(): Map<String, List<Balance>>? =
         TODO("getBalances NOT IMPLEMENTED")
 
 //    wallet?.balances?.map {
@@ -148,7 +148,7 @@ class ClientByBit(
 //            )
 //        }
 
-    override fun getAssetBalance(asset: String): Balance =
+    override fun getAssetBalance(asset: String): Map<String, Balance?> =
         TODO("getAssetBalance NOT IMPLEMENTED")
 
 //        wallet?.getBalance(Currency(asset))?.let {

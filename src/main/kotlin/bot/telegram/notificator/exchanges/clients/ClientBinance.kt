@@ -36,7 +36,7 @@ class ClientBinance(
     private val marketDataService: BinanceMarketDataService = instance.marketDataService as BinanceMarketDataService
     private val accountService: BinanceAccountService = instance.accountService as BinanceAccountService
     private val accountInfo: AccountInfo? = if (sec == null) null else accountService.accountInfo
-    private val wallet: Wallet? = if (sec == null) null else accountInfo!!.wallet
+    private val wallets: Map<String, Wallet>? = if (sec == null) null else accountInfo!!.wallets
 
     private val log = KotlinLogging.logger {}
 
@@ -120,14 +120,17 @@ class ClientBinance(
         }
         .groupBy { TradePair(it.pair.toString()) }
 
-    override fun getBalances(): List<Balance> = wallet?.balances?.map {
-        Balance(
-            asset = it.key.currencyCode,
-            total = it.value.total,
-            free = it.value.available,
-            locked = it.value.frozen
-        )
-    } ?: throw UnsupportedOperationException(
+    override fun getBalances(): Map<String, List<Balance>> = wallets?.map {
+        it.key to it.value.balances.map { balance ->
+            Balance(
+                asset = balance.key.currencyCode,
+                total = balance.value.total,
+                free = balance.value.available,
+                locked = balance.value.frozen
+            )
+        }
+    }
+        ?.toMap() ?: throw UnsupportedOperationException(
         "This initialization has no API and SECRET keys, " +
                 "because of that fun 'getBalances' not supported."
     )
@@ -141,14 +144,16 @@ class ClientBinance(
             )
         }
 
-    override fun getAssetBalance(asset: String): Balance = wallet?.getBalance(Currency(asset))?.let {
-        Balance(
-            asset = asset,
-            total = it.total,
-            free = it.available,
-            locked = it.frozen
-        )
-    } ?: throw UnsupportedOperationException(
+    override fun getAssetBalance(asset: String): Map<String, Balance?> = wallets?.map {
+        it.key to it.value.getBalance(Currency(asset))?.let { balance ->
+            Balance(
+                asset = asset,
+                total = balance.total,
+                free = balance.available,
+                locked = balance.frozen
+            )
+        }
+    }?.toMap() ?: throw UnsupportedOperationException(
         "This initialization has no API and SECRET keys, " +
                 "because of that fun 'getAssetBalance' not supported."
     )
@@ -204,13 +209,16 @@ class ClientBinance(
                     String.format(formatPrice, order.price).replace(',', '.').toBigDecimal()
                 )
             )
+
             TYPE.MARKET -> tradeService.placeMarketOrder(
                 MarketOrder(
                     typeX,
                     String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
                     currPair
                 )
-            ) else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${order.type}'!")
+            )
+
+            else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${order.type}'!")
         }
 
         return Order(orderId, order.pair, order.price, order.origQty, BigDecimal(0), order.side, order.type, STATUS.NEW)

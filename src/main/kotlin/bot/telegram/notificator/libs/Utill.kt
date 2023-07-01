@@ -121,9 +121,6 @@ fun time() = System.currentTimeMillis().ms()
 
 fun Duration.format() = convertTime(this.toMillis())
 
-fun getFreeBalances(client: Client, coins: List<String> = emptyList()) =
-    client.getBalances().asSequence().filter { coins.contains(it.asset) }.map { it.asset to it.free }
-
 fun scanAll(directory: File, symbols: List<String>) = directory.listFiles()!!
     .filter {
         it.isDirectory && symbols.contains(it.name)

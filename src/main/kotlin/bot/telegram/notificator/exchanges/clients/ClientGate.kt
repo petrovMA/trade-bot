@@ -30,7 +30,7 @@ class ClientGate(
     private val marketDataService: GateioMarketDataService = instance.marketDataService as GateioMarketDataService
     private val accountService: GateioAccountService = instance.accountService as GateioAccountService
     private val accountInfo: AccountInfo? = if (sec == null) null else accountService.accountInfo
-    private val wallet: Wallet? = if (sec == null) null else accountInfo!!.wallet
+    private val wallets: Map<String, Wallet>? = if (sec == null) null else accountInfo!!.wallets
 
     private val log = KotlinLogging.logger {}
 
@@ -112,14 +112,17 @@ class ClientGate(
         }
         .groupBy { TradePair(it.pair.toString()) }
 
-    override fun getBalances(): List<Balance> = wallet?.balances?.map {
-        Balance(
-            asset = it.key.currencyCode,
-            total = it.value.total,
-            free = it.value.available,
-            locked = it.value.frozen
-        )
-    } ?: throw UnsupportedOperationException(
+    override fun getBalances(): Map<String, List<Balance>> = wallets?.map {
+        it.key to it.value.balances.map { balance ->
+            Balance(
+                asset = balance.key.currencyCode,
+                total = balance.value.total,
+                free = balance.value.available,
+                locked = balance.value.frozen
+            )
+        }
+    }
+        ?.toMap() ?: throw UnsupportedOperationException(
         "This initialization has no API and SECRET keys, " +
                 "because of that fun 'getBalances' not supported."
     )
@@ -133,14 +136,16 @@ class ClientGate(
             )
         }
 
-    override fun getAssetBalance(asset: String): Balance = wallet?.getBalance(Currency(asset))?.let {
-        Balance(
-            asset = asset,
-            total = it.total,
-            free = it.available,
-            locked = it.frozen
-        )
-    } ?: throw UnsupportedOperationException(
+    override fun getAssetBalance(asset: String): Map<String, Balance?> = wallets?.map {
+        it.key to it.value.getBalance(Currency(asset))?.let { balance ->
+            Balance(
+                asset = asset,
+                total = balance.total,
+                free = balance.available,
+                locked = balance.frozen
+            )
+        }
+    }?.toMap() ?: throw UnsupportedOperationException(
         "This initialization has no API and SECRET keys, " +
                 "because of that fun 'getAssetBalance' not supported."
     )

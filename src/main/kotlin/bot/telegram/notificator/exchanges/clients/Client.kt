@@ -8,9 +8,9 @@ interface Client {
     fun getAllPairs(): List<TradePair>
     fun getOpenOrders(pair: TradePair): List<Order>
     fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>>
-    fun getBalances(): List<Balance>
+    fun getBalances(): Map<String, List<Balance>>?
     fun getOrderBook(pair: TradePair, limit: Int): OrderBook
-    fun getAssetBalance(asset: String): Balance
+    fun getAssetBalance(asset: String): Map<String, Balance?>
     fun getOrder(pair: TradePair, orderId: String): Order?
     fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick>
     fun newOrder(order: Order, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order

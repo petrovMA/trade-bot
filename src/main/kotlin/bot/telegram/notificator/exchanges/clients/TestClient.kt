@@ -60,18 +60,20 @@ class TestClient(
 
     override fun getOpenOrders(pair: TradePair): List<Order> = orders.map { it.value }
 
-    override fun getBalances(): List<Balance> = listOf(
-        Balance(
-            asset = balance.tradePair.first,
-            free = balance.firstBalance,
-            total = balance.firstBalance,
-            locked = BigDecimal(0)
-        ),
-        Balance(
-            asset = balance.tradePair.second,
-            free = balance.secondBalance,
-            total = balance.secondBalance,
-            locked = BigDecimal(0)
+    override fun getBalances(): Map<String, List<Balance>> = mapOf(
+        "Total Balance" to listOf(
+            Balance(
+                asset = balance.tradePair.first,
+                free = balance.firstBalance,
+                total = balance.firstBalance,
+                locked = BigDecimal(0)
+            ),
+            Balance(
+                asset = balance.tradePair.second,
+                free = balance.secondBalance,
+                total = balance.secondBalance,
+                locked = BigDecimal(0)
+            )
         )
     )
 
@@ -80,8 +82,8 @@ class TestClient(
         bids = listOf(Offer(price = lastSellPrice, qty = BigDecimal(0)))
     )
 
-    override fun getAssetBalance(asset: String): Balance = getBalances().find { it.asset == asset }
-        ?: Balance(asset = asset, free = BigDecimal(0), total = BigDecimal(0), locked = BigDecimal(0))
+    override fun getAssetBalance(asset: String): Map<String, Balance?> =
+        mapOf("Total Balance" to getBalances()["Total Balance"]?.find { it.asset == asset })
 
     override fun getOrder(pair: TradePair, orderId: String): Order? = getOpenOrders(pair).find { it.orderId == orderId }
 

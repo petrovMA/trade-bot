@@ -308,7 +308,10 @@ class TraderAlgorithm(
                                     send(
                                         "#AllBalances " +
                                                 client.getBalances()
-                                                    .joinToString(prefix = "\n", separator = "\n")
+                                                    ?.toList()
+                                                    ?.joinToString(prefix = "\n", separator = "\n") {
+                                                        it.first + "\n" + it.second.joinToString(prefix = "\n", separator = "\n")
+                                                    }
                                     )
                                 }
 
@@ -384,8 +387,8 @@ class TraderAlgorithm(
                     throw Exception(
                         "${botSettings.pair} Account has insufficient balance for requested action.\n" +
                                 "#insufficient_${botSettings.pair}_balance_for: $order\n" +
-                                "${botSettings.pair.first} = ${client.getAssetBalance(botSettings.pair.first).free}\n" +
-                                "${botSettings.pair.second} = ${client.getAssetBalance(botSettings.pair.second).free}"
+                                "${botSettings.pair.first} = ${client.getAssetBalance(botSettings.pair.first)}\n" +
+                                "${botSettings.pair.second} = ${client.getAssetBalance(botSettings.pair.second)}"
                     )
                 }
 

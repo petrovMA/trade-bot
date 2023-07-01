@@ -63,7 +63,8 @@ class ClientBitmax(
             .groupBy { TradePair(it.pair.toString()) }
     }
 
-    override fun getBalances(): List<Balance> = instance.balance!!.data.map { it.toBalance() }
+    override fun getBalances(): Map<String, List<Balance>> =
+        mapOf("Total Balance" to instance.balance!!.data.map { it.toBalance() })
 
     override fun getOrderBook(pair: TradePair, limit: Int): OrderBook {
         val book = instance.getOrderBook("${pair.first}/${pair.second}")
@@ -80,8 +81,8 @@ class ClientBitmax(
         return OrderBook(bids = bids, asks = asks)
     }
 
-    override fun getAssetBalance(asset: String): Balance =
-        instance.balance!!.data.first { it.asset == asset }.toBalance()
+    override fun getAssetBalance(asset: String): Map<String, Balance?> =
+        mapOf("Total Balance" to instance.balance!!.data.first { it.asset == asset }.toBalance())
 
     override fun getOrder(pair: TradePair, orderId: String): Order = instance.getOrder(orderId)
         ?.also { log.debug("instance.getOrder: $it") }?.data?.toOrder() ?: stub()
