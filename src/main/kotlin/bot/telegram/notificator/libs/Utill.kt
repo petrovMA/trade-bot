@@ -71,6 +71,16 @@ fun writeObject(obj: Any, file: File) = asFile(obj, file)
 
 fun json(obj: Any) = asString(obj)
 
+fun escapeMarkdownV2Text(inputText: String): String = StringBuilder().run {
+    for (char in inputText) {
+        if (char in listOf('_', '*', '{', '}', '[', ']', '(', ')', '~', '#', '+', '-', '.', '!', '|', '\\')) {
+            append('\\')
+        }
+        append(char)
+    }
+    toString()
+}
+
 fun removeFile(file: File) {
     if (file.exists()) file.delete()
 }
@@ -184,8 +194,18 @@ fun calcGapPercent(orderB: Order, orderS: Order): String {
 
 fun calcExecuted(orderB: Order, orderS: Order, balanceTrade: BigDecimal): String =
     (balanceTrade.toDouble() / 100).let { percent ->
-        "qty oB=${String.format("%.1f", (orderB.price ?: 0.toBigDecimal()).toDouble() * (orderB.origQty.toDouble() - orderB.executedQty.toDouble()) / percent)}% " +
-                "oS=${String.format("%.1f", (orderS.price ?: 0.toBigDecimal()).toDouble() * (orderS.origQty.toDouble() - orderS.executedQty.toDouble()) / percent)}%"
+        "qty oB=${
+            String.format(
+                "%.1f",
+                (orderB.price ?: 0.toBigDecimal()).toDouble() * (orderB.origQty.toDouble() - orderB.executedQty.toDouble()) / percent
+            )
+        }% " +
+                "oS=${
+                    String.format(
+                        "%.1f",
+                        (orderS.price ?: 0.toBigDecimal()).toDouble() * (orderS.origQty.toDouble() - orderS.executedQty.toDouble()) / percent
+                    )
+                }%"
     }
 
 fun <E> LinkedBlockingDeque<E>.poll(time: Duration): E? = this.poll(time.seconds, TimeUnit.SECONDS)
