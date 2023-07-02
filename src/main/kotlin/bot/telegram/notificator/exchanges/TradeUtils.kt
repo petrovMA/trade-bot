@@ -68,91 +68,116 @@ fun calcAveragePriceStatic(
 
 class KlineConstructor(val interval: INTERVAL) {
     private val millsInterval = interval.toMillsTime()
-    private var candlestick =
-        true to Candlestick(0, 0, BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))
+    private var lastCandlestick: LastCandlestick = LastCandlestick(
+        candlestick = Candlestick(0, 0, BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0)),
+        isClosed = true
+    )
 
-    fun nextKline(trade: Trade): List<Pair<Boolean, Candlestick>> {
+    fun nextKline(trade: Trade): List<LastCandlestick> {
 
         return when {
-            candlestick.first -> {
+            lastCandlestick.isClosed -> {
 
                 val openTime = trade.time - (trade.time % millsInterval)
 
-                candlestick = false to Candlestick(
-                    openTime = openTime,
-                    closeTime = openTime + millsInterval - 1,
-                    open = trade.price,
-                    close = trade.price,
-                    high = trade.price,
-                    low = trade.price,
-                    volume = trade.qty
+                lastCandlestick = LastCandlestick(
+                    isClosed = false,
+                    candlestick = Candlestick(
+                        openTime = openTime,
+                        closeTime = openTime + millsInterval - 1,
+                        open = trade.price,
+                        close = trade.price,
+                        high = trade.price,
+                        low = trade.price,
+                        volume = trade.qty
+                    )
                 )
 
-                listOf(candlestick)
+                listOf(lastCandlestick)
             }
-            candlestick.second.closeTime < trade.time -> {
+
+            lastCandlestick.candlestick.closeTime < trade.time -> {
 
                 val openTime = trade.time - (trade.time % millsInterval)
 
-                val cndls: ArrayList<Pair<Boolean, Candlestick>> = ArrayList()
+                val cndls: ArrayList<LastCandlestick> = ArrayList()
 
-                candlestick = true to Candlestick(
-                    openTime = candlestick.second.openTime,
-                    closeTime = candlestick.second.closeTime,
-                    open = candlestick.second.open,
-                    close = candlestick.second.close,
-                    high = candlestick.second.high,
-                    low = candlestick.second.low,
-                    volume = candlestick.second.volume
+                lastCandlestick = LastCandlestick(
+                    isClosed = true,
+                    candlestick = Candlestick(
+                        openTime = lastCandlestick.candlestick.openTime,
+                        closeTime = lastCandlestick.candlestick.closeTime,
+                        open = lastCandlestick.candlestick.open,
+                        close = lastCandlestick.candlestick.close,
+                        high = lastCandlestick.candlestick.high,
+                        low = lastCandlestick.candlestick.low,
+                        volume = lastCandlestick.candlestick.volume
+                    )
                 )
 
-                cndls.add(candlestick)
+                cndls.add(lastCandlestick)
 
-                while (cndls.last().second.closeTime + millsInterval < openTime) {
+                while (cndls.last().candlestick.closeTime + millsInterval < openTime) {
                     cndls.add(
-                        true to Candlestick(
-                            openTime = cndls.last().second.openTime + millsInterval,
-                            closeTime = cndls.last().second.closeTime + millsInterval,
-                            open = cndls.last().second.open,
-                            close = cndls.last().second.close,
-                            high = cndls.last().second.high,
-                            low = cndls.last().second.low,
-                            volume = BigDecimal(0)
+                        LastCandlestick(
+                            isClosed = true,
+                            candlestick = Candlestick(
+                                openTime = cndls.last().candlestick.openTime + millsInterval,
+                                closeTime = cndls.last().candlestick.closeTime + millsInterval,
+                                open = cndls.last().candlestick.open,
+                                close = cndls.last().candlestick.close,
+                                high = cndls.last().candlestick.high,
+                                low = cndls.last().candlestick.low,
+                                volume = BigDecimal(0)
+                            )
                         )
                     )
                 }
 
-                candlestick = false to Candlestick(
-                    openTime = openTime,
-                    closeTime = openTime + millsInterval - 1,
-                    open = trade.price,
-                    close = trade.price,
-                    high = trade.price,
-                    low = trade.price,
-                    volume = trade.qty
+                lastCandlestick = LastCandlestick(
+                    isClosed = false,
+                    candlestick = Candlestick(
+                        openTime = openTime,
+                        closeTime = openTime + millsInterval - 1,
+                        open = trade.price,
+                        close = trade.price,
+                        high = trade.price,
+                        low = trade.price,
+                        volume = trade.qty
+                    )
                 )
 
-                cndls.add(candlestick)
+                cndls.add(lastCandlestick)
 
                 cndls
             }
+
             else -> {
-                val high = if (trade.price > candlestick.second.high) trade.price else candlestick.second.high
-                val low = if (trade.price < candlestick.second.low) trade.price else candlestick.second.low
-                candlestick = false to Candlestick(
-                    openTime = candlestick.second.openTime,
-                    closeTime = candlestick.second.closeTime,
-                    open = candlestick.second.open,
-                    close = trade.price,
-                    high = high,
-                    low = low,
-                    volume = candlestick.second.volume + trade.qty
+                val high =
+                    if (trade.price > lastCandlestick.candlestick.high) trade.price else lastCandlestick.candlestick.high
+                val low =
+                    if (trade.price < lastCandlestick.candlestick.low) trade.price else lastCandlestick.candlestick.low
+
+                lastCandlestick = LastCandlestick(
+                    isClosed = false,
+                    candlestick = Candlestick(
+                        openTime = lastCandlestick.candlestick.openTime,
+                        closeTime = lastCandlestick.candlestick.closeTime,
+                        open = lastCandlestick.candlestick.open,
+                        close = trade.price,
+                        high = high,
+                        low = low,
+                        volume = lastCandlestick.candlestick.volume + trade.qty
+                    )
                 )
 
-                listOf(candlestick)
+                listOf(lastCandlestick)
             }
         }
     }
+
+    data class LastCandlestick(val isClosed: Boolean, val candlestick: Candlestick)
+    fun getCandlestick() = lastCandlestick.candlestick
 }
 
 fun getConfigByExchange(enum: ExchangeEnum) = readConf("exchangeConfigs/$enum.conf")

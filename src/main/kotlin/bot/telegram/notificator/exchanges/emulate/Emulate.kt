@@ -2,7 +2,7 @@ package bot.telegram.notificator.exchanges.emulate
 
 import bot.telegram.notificator.exchanges.CandlestickListsIterator
 import bot.telegram.notificator.exchanges.clients.*
-import bot.telegram.notificator.exchanges.TraderAlgorithm
+import bot.telegram.notificator.exchanges.AlgorithmTrader
 import bot.telegram.notificator.exchanges.connect
 import bot.telegram.notificator.exchanges.emulate.libs.writeIntoExcelNew
 import bot.telegram.notificator.libs.*
@@ -124,7 +124,7 @@ class Emulate(
         updStaticOrders: Double? = null
     ): EmulateResult? {
         try {
-            val trade = TraderAlgorithm(
+            val trade = AlgorithmTrader(
                 conf = conf,
                 queue = client.queue,
                 botSettings = botSettings,

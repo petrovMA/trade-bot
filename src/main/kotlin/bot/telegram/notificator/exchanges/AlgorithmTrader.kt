@@ -12,7 +12,7 @@ import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 
 
-class TraderAlgorithm(
+class AlgorithmTrader(
     botSettings: BotSettings,
     queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
     exchangeEnum: ExchangeEnum = ExchangeEnum.valueOf(botSettings.exchange.uppercase(Locale.getDefault())),
@@ -249,7 +249,7 @@ class TraderAlgorithm(
                         is BotEvent -> {
                             when (msg.type) {
                                 BotEvent.Type.GET_PAIR_OPEN_ORDERS -> {
-                                    val symbols = msg.message.split("[^a-zA-Z]+".toRegex())
+                                    val symbols = msg.text.split("[^a-zA-Z]+".toRegex())
                                         .filter { it.isNotBlank() }
 
                                     send(
@@ -259,7 +259,7 @@ class TraderAlgorithm(
                                 }
 
                                 BotEvent.Type.GET_ALL_OPEN_ORDERS -> {
-                                    val pairs = msg.message
+                                    val pairs = msg.text
                                         .split("\\s+".toRegex())
                                         .filter { it.isNotBlank() }
                                         .map { pair ->

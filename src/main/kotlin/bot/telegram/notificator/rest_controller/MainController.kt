@@ -17,20 +17,12 @@ import org.springframework.web.bind.annotation.RestController
 import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
 import java.io.File
-import java.math.BigDecimal
 import java.util.concurrent.LinkedBlockingDeque
 
 @RestController
 class MainController {
     final val log: KLogger = KotlinLogging.logger {}
     final val bot: TelegramBot
-    private val conf: Config = getConfigByExchange(ExchangeEnum.BINANCE)!!
-
-    val client = newClient(
-        ExchangeEnum.BINANCE,
-        conf.getString("api"),
-        conf.getString("sec")
-    )
 
     init {
         val exchangeFile = File("exchange")
@@ -62,19 +54,7 @@ class MainController {
             throw e
         }
     }
-    data class MyRequest(val message: String)
     data class MyResponse(val status: String, val data: Any)
-
-    @PostMapping("/endpoint")
-    fun receivePost(@RequestBody request: String): ResponseEntity<MyResponse> {
-        log.info("Request for /endpoint = $request")
-
-        // process the request here and prepare the response
-        val response = MyResponse("success", "Received $request")
-        log.info("Response for /endpoint = $response")
-
-        return ResponseEntity.ok(response)
-    }
 
     @PostMapping("/endpoint/trade")
     fun receivePostTrade(@RequestBody request: String): ResponseEntity<MyResponse> {
@@ -86,25 +66,9 @@ class MainController {
 
         val notification = request.deserialize<Notification>()
 
-        val order = Order(
-            orderId = "",
-            pair = TradePair(notification.pair),
-            price = 2500.toBigDecimal(),
-            origQty = BigDecimal(notification.amount),
-            executedQty = BigDecimal(0),
-            side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
-            type = TYPE.LIMIT,
-            status = STATUS.NEW
-        )
+        bot.communicator.sendOrder(request)
 
-        bot.sendMessage(json(order), true)
-
-//        client.newOrder(
-//            ,
-//            formatCount = "%.2f",
-//            formatPrice = "%.4f",
-//            isStaticUpdate = false
-//        )
+        bot.sendMessage("Order:\n```json\n${json(notification)}```", true)
 
         return ResponseEntity.ok(response)
     }

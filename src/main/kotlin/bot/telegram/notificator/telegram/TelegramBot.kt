@@ -28,7 +28,7 @@ class TelegramBot(
 
     private val log = KotlinLogging.logger {}
 
-    val bot: Communicator = Communicator(
+    val communicator: Communicator = Communicator(
         intervalCandlestick = intervalCandlestick,
         intervalStatistic = intervalStatistic,
         timeDifference = timeDifference,
@@ -42,7 +42,7 @@ class TelegramBot(
 
     override fun onUpdateReceived(update: Update) {
         log.info("Income update message: $update")
-        bot.onUpdate(update.message.text)
+        communicator.onUpdate(update.message.text)
     }
 
     override fun getBotUsername(): String = botUsername

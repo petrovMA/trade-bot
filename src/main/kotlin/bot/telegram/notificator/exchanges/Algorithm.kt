@@ -27,27 +27,27 @@ abstract class Algorithm(
     val sendMessage: (String, Boolean) -> Unit
 ) : Thread() {
     val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
-    val firstBalanceForOrderAmount = botSettings.orderBalanceType == "first"
+    private val firstBalanceForOrderAmount = botSettings.orderBalanceType == "first"
     val minRange = botSettings.tradingRange.first
     val maxRange = botSettings.tradingRange.second
     val ordersListForRemove: MutableList<Pair<String, Order>> = mutableListOf()
 
-    val path: String = "exchangeBots/${botSettings.name}"
+    private val path: String = "exchangeBots/${botSettings.name}"
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
-    val waitTime = conf.getDuration("interval.wait_socket_time")
-    val formatAmount = "%.${botSettings.countOfDigitsAfterDotForAmount}f"
-    val formatPrice = "%.${botSettings.countOfDigitsAfterDotForPrice}f"
-    val retryGetOrderCount = conf.getInt("retry.get_order_count")
-    val retrySentOrderCount: Int = conf.getInt("retry.sent_order_count")
-    val retryGetOrderInterval = conf.getDuration("retry.get_order_interval")
+    val waitTime = conf.getDuration("interval.wait_socket_time")!!
+    private val formatAmount = "%.${botSettings.countOfDigitsAfterDotForAmount}f"
+    private val formatPrice = "%.${botSettings.countOfDigitsAfterDotForPrice}f"
+    private val retryGetOrderCount = conf.getInt("retry.get_order_count")
+    private val retrySentOrderCount: Int = conf.getInt("retry.sent_order_count")
+    private val retryGetOrderInterval = conf.getDuration("retry.get_order_interval")
 
     var stopThread = false
     var currentPrice: BigDecimal = 0.toBigDecimal()
     var prevPrice: BigDecimal = 0.toBigDecimal()
 
-    val settingsPath = "$path/settings.json"
+    private val settingsPath = "$path/settings.json"
 
     val ordersPath = "$path/orders"
     val orders: MutableMap<String, Order> =

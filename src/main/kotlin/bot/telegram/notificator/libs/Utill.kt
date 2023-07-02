@@ -73,7 +73,7 @@ fun json(obj: Any) = asString(obj)
 
 fun escapeMarkdownV2Text(inputText: String): String = StringBuilder().run {
     for (char in inputText) {
-        if (char in listOf('_', '*', '{', '}', '[', ']', '(', ')', '~', '#', '+', '-', '.', '!', '|', '\\')) {
+        if (char in listOf('_', '*', '~', '#', '+', '-', '.', '!', '|', '\\')) {
             append('\\')
         }
         append(char)
