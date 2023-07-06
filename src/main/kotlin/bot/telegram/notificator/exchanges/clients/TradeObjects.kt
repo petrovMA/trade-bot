@@ -166,7 +166,7 @@ data class BotSettings(
     val ordersType: TYPE,
     val tradingRange: Pair<BigDecimal, BigDecimal>,
     val orderSize: BigDecimal, // Order Quantity:: order size
-    val orderBalanceType: String, // if first => BTC balance, else second => USDT balance (default = second)
+    val orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
     val orderDistance: BigDecimal, // Order Distance:: distance between every order
     val triggerDistance: BigDecimal, // Trigger Distance:: distance between order and stop-order
     val enableStopOrderDistance: BigDecimal = BigDecimal(0), // enable stop order distance (stopOrderDistance = triggerDistance + enableStopOrderDistance)

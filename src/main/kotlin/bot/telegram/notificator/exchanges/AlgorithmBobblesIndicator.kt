@@ -4,12 +4,10 @@ import bot.telegram.notificator.ListLimit
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.rest_controller.Notification
+import bot.telegram.notificator.rest_controller.RatioSetting
 import com.typesafe.config.Config
 import mu.KotlinLogging
-import java.io.File
 import java.math.BigDecimal
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 import kotlin.math.abs
@@ -48,8 +46,7 @@ class AlgorithmBobblesIndicator(
     private var klineConstructor = KlineConstructor(interval)
     private var candlestickList = ListLimit<Candlestick>(limit = 50)
 
-    private var enableBuy = true
-    private var enableSell = true
+    private var ratio = RatioSetting()
 
     override fun run() {
 //        saveBotSettings(botSettings)
@@ -135,21 +132,27 @@ class AlgorithmBobblesIndicator(
                                     val side = if (order.type == "buy") SIDE.BUY else SIDE.SELL
                                     val price = if (side == SIDE.BUY) kline.low else kline.high
 
-                                    if (enableBuy && side == SIDE.BUY) {
-//                                        sentOrder(
-//                                            price = price,
-//                                            amount = order.amount.toBigDecimal(),
-//                                            orderSide = side,
-//                                            orderType = TYPE.MARKET
-//                                        )
-                                    } else if (enableSell && side == SIDE.SELL) {
-//                                        sentOrder(
-//                                            price = price,
-//                                            amount = order.amount.toBigDecimal(),
-//                                            orderSide = side,
-//                                            orderType = TYPE.MARKET
-//                                        )
+                                    if (ratio.buyRatio > BigDecimal.ZERO && side == SIDE.BUY) {
+                                        sentOrder(
+                                            price = price,
+                                            amount = order.amount.toBigDecimal() * ratio.buyRatio,
+                                            orderSide = side,
+                                            orderType = TYPE.LIMIT
+                                        )
+                                    } else if (ratio.sellRatio > BigDecimal.ZERO && side == SIDE.SELL) {
+                                        sentOrder(
+                                            price = price,
+                                            amount = order.amount.toBigDecimal() * ratio.sellRatio,
+                                            orderSide = side,
+                                            orderType = TYPE.LIMIT
+                                        )
                                     }
+                                }
+
+                                BotEvent.Type.SET_SETTINGS -> {
+                                    ratio = msg.text.deserialize()
+
+                                    send("Settings:\n```json\n${json(ratio)}```", true)
                                 }
 
                                 BotEvent.Type.INTERRUPT -> {

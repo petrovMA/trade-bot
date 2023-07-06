@@ -5,6 +5,7 @@ import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.exchanges.emulate.Emulate
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.rest_controller.Notification
+import bot.telegram.notificator.rest_controller.RatioSetting
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
@@ -70,7 +71,7 @@ class Communicator(
                 ordersType = TYPE.LIMIT,
                 tradingRange = 0.0.toBigDecimal() to 0.0.toBigDecimal(),
                 orderSize = 0.toBigDecimal(), // Order Quantity:: order size
-                orderBalanceType = "if first => BTC balance, else second => USDT balance (default = second)",
+                orderBalanceType = "first",
                 orderDistance = 0.toBigDecimal(),
                 triggerDistance = 0.toBigDecimal(),
                 orderMaxQuantity = 0,
@@ -474,6 +475,26 @@ class Communicator(
                             "${params[1]} queueSize = ${get(TradePair(params[1]))?.queue?.size}"
                         else
                             "command 'queueSize' must have one param"
+                    }
+
+                    cmd.commandSettings.matches(message) -> {
+                        val params = message.split("\\n+".toRegex(), limit = 2)
+                        val param = params[0].split("\\s+".toRegex())
+                        if (param.size == 2) {
+                            val key = TradePair(param[1].uppercase())
+                            get(key)?.let { tradePair ->
+
+                                val settings = params[1].deserialize<RatioSetting>()
+
+                                log.info("new settings: $settings\nfor tradePair: $key")
+
+                                tradePair.queue.add(BotEvent(params[1], BotEvent.Type.SET_SETTINGS))
+
+                            } ?: run { msg = "$key not exist" }
+                        } else {
+                            msg = "command 'settings' must have two param"
+                            log.info("command 'settings' must have two param. Msg = $message")
+                        }
                     }
 
                     else -> {

@@ -30,7 +30,8 @@ data class Commands(
         val commandEmulate: Regex = "/?[Ee]mulate\\s+[A-z]{4,11}\\s+.{1,50}\\s+\\d{4}_\\d{2}_\\d{2}\\s+\\d{4}_\\d{2}_\\d{2}".toRegex(),
         val commandFindParams: Regex = "/?[Ff]indParams\\s+[A-z]{4,11}\\s+.{1,50}\\s+\\d{4}_\\d{2}_\\d{2}\\s+\\d{4}_\\d{2}_\\d{2}".toRegex(),
         val commandTradePairsInit: Regex = "/?[Tt]radePairs\\s+[Ii]nit".toRegex(),
-        val commandCollect: Regex = "/?[Cc]ollect\\s+[A-z]{4,11}\\s+[A-z]{3,100}".toRegex()
+        val commandCollect: Regex = "/?[Cc]ollect\\s+[A-z]{4,11}\\s+[A-z]{3,100}".toRegex(),
+        val commandSettings: Regex = "/?[Ss]ettings\\s+[\\w-]{3,15}[\\w\\d:,\"{}\\.\\s]+".toRegex()
 ) {
     override fun toString(): String = """
         commandStatus = $commandStatus
