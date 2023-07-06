@@ -75,8 +75,8 @@ class Communicator(
                 orderDistance = 0.toBigDecimal(),
                 triggerDistance = 0.toBigDecimal(),
                 orderMaxQuantity = 0,
-                countOfDigitsAfterDotForAmount = 2,
-                countOfDigitsAfterDotForPrice = 4
+                countOfDigitsAfterDotForAmount = 4,
+                countOfDigitsAfterDotForPrice = 2
             ),
             sendMessage = sendMessage,
         )
