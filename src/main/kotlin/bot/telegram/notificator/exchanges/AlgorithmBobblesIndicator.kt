@@ -7,6 +7,7 @@ import bot.telegram.notificator.rest_controller.Notification
 import bot.telegram.notificator.rest_controller.RatioSetting
 import com.typesafe.config.Config
 import mu.KotlinLogging
+import org.knowm.xchange.exceptions.ExchangeException
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
@@ -79,7 +80,7 @@ class AlgorithmBobblesIndicator(
 
                         is Order -> {
                             if (msg.pair == botSettings.pair) {
-                                send("Executed order:\n```json\n${json(msg)}\n```", true)
+                                send("Order update:\n```json\n${json(msg)}\n```", true)
                             }
                         }
 
@@ -133,14 +134,14 @@ class AlgorithmBobblesIndicator(
                                     val price = if (side == SIDE.BUY) kline.low else kline.high
 
                                     if (ratio.buyRatio > BigDecimal.ZERO && side == SIDE.BUY) {
-                                        sentOrder(
+                                        sentOrderTEMPLATE(
                                             price = price,
                                             amount = order.amount.toBigDecimal() * ratio.buyRatio,
                                             orderSide = side,
                                             orderType = TYPE.LIMIT
                                         )
                                     } else if (ratio.sellRatio > BigDecimal.ZERO && side == SIDE.SELL) {
-                                        sentOrder(
+                                        sentOrderTEMPLATE(
                                             price = price,
                                             amount = order.amount.toBigDecimal() * ratio.sellRatio,
                                             orderSide = side,
@@ -183,6 +184,42 @@ class AlgorithmBobblesIndicator(
         } finally {
             interruptThis()
         }
+    }
+
+    fun sentOrderTEMPLATE(
+        price: BigDecimal,
+        amount: BigDecimal,
+        orderSide: SIDE,
+        orderType: TYPE,
+        isStaticUpdate: Boolean = false,
+        isCloseOrder: Boolean = false
+    ): Order? {
+
+        log?.info("${botSettings.name} Sent $orderType order with params: price = $price; amount = $amount; side = $orderSide")
+
+        var order = Order(
+            orderId = "",
+            pair = botSettings.pair,
+            price = price,
+            origQty = amount,
+            executedQty = BigDecimal(0),
+            side = orderSide,
+            type = orderType,
+            status = STATUS.NEW
+        )
+
+            try {
+                order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
+                log?.debug("${botSettings.name} Order sent: $order")
+                return order
+            } catch (e: ExchangeException) {
+                log?.info("${botSettings.name} ${e.message}")
+                return null
+            } catch (t: Throwable) {
+                log?.error("${botSettings.name} ${t.message}", t)
+                send("#Error_${botSettings.name}: \n${printTrace(t)}")
+                throw t
+            }
     }
 
     private fun getKlineWithIndicator(): Candlestick {

@@ -37,8 +37,8 @@ abstract class Algorithm(
     private val log = if (isLog) KotlinLogging.logger {} else null
 
     val waitTime = conf.getDuration("interval.wait_socket_time")!!
-    private val formatAmount = "%.${botSettings.countOfDigitsAfterDotForAmount}f"
-    private val formatPrice = "%.${botSettings.countOfDigitsAfterDotForPrice}f"
+    val formatAmount = "%.${botSettings.countOfDigitsAfterDotForAmount}f"
+    val formatPrice = "%.${botSettings.countOfDigitsAfterDotForPrice}f"
     private val retryGetOrderCount = conf.getInt("retry.get_order_count")
     private val retrySentOrderCount: Int = conf.getInt("retry.sent_order_count")
     private val retryGetOrderInterval = conf.getDuration("retry.get_order_interval")
