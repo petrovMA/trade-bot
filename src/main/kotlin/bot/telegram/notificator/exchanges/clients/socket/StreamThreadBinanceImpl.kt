@@ -2,6 +2,7 @@ package bot.telegram.notificator.exchanges.clients.socket
 
 import bot.telegram.notificator.exchanges.clients.*
 import info.bitrich.xchangestream.binance.BinanceStreamingExchange
+import info.bitrich.xchangestream.binancefuture.BinanceFutureStreamingExchange
 import info.bitrich.xchangestream.core.ProductSubscription
 import info.bitrich.xchangestream.core.StreamingExchangeFactory
 import mu.KotlinLogging
@@ -11,13 +12,13 @@ import org.knowm.xchange.dto.trade.LimitOrder
 import org.knowm.xchange.dto.trade.MarketOrder
 import java.util.concurrent.BlockingQueue
 
-class SocketThreadBinanceImpl(
+class StreamThreadBinanceImpl(
     val pair: CurrencyPair,
     private val queue: BlockingQueue<CommonExchangeData>,
     private val api: String?,
     private val sec: String?,
     private val isFuture: Boolean = false
-) : SocketThread() {
+) : Stream() {
 
     private val log = KotlinLogging.logger {}
 
@@ -32,7 +33,15 @@ class SocketThreadBinanceImpl(
             api?.also { spec.apiKey = it }
             sec?.also { spec.secretKey = it }
 
+            val specFutures = StreamingExchangeFactory.INSTANCE
+                .createExchange(BinanceFutureStreamingExchange::class.java)
+                .defaultExchangeSpecification
+
+            api?.also { specFutures.apiKey = it }
+            sec?.also { specFutures.secretKey = it }
+
             val exchange = StreamingExchangeFactory.INSTANCE.createExchange(spec) as BinanceStreamingExchange
+            val exchangeFutures = StreamingExchangeFactory.INSTANCE.createExchange(spec) as BinanceStreamingExchange
 
             val subscription = ProductSubscription.create()
                 .addTrades(pair)
@@ -95,6 +104,7 @@ class SocketThreadBinanceImpl(
                                         status = STATUS.valueOf(order.status)
                                     )
                                 )
+
                                 is MarketOrder -> queue.add(
                                     Order(
                                         orderId = order.id,
@@ -114,6 +124,14 @@ class SocketThreadBinanceImpl(
                         log.warn("Order stream Error:", error)
                     }
                 )
+
+            exchangeFutures.streamingTradeService.getOrderChanges(true).subscribe(
+                { oc: Order? ->
+                    log.info("Futures Order change: {}", oc)
+                }, { error ->
+                    log.warn("Order stream Error:", error)
+                }
+            )
 
         } catch (e: Exception) {
             log.error("Socket $pair connection Exception: ", e)

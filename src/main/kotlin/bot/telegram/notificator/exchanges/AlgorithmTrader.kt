@@ -239,9 +239,9 @@ class AlgorithmTrader(
                                                 it.lastBorderPrice = BigDecimal.ZERO
                                             }
 
-                                            send("Executed LIMIT order:\n```json\n${json(order)}\n```", true)
+                                            send("Executed LIMIT order:\n```json\n$order\n```", true)
                                         }
-                                    } else send("Executed MARKET order:\n```json\n${json(msg)}\n```", true)
+                                    } else send("Executed MARKET order:\n```json\n$msg\n```", true)
                                 }
                             }
                         }

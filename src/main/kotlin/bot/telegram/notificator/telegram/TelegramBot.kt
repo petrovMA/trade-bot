@@ -2,6 +2,7 @@ package bot.telegram.notificator.telegram
 
 import bot.telegram.notificator.Communicator
 import bot.telegram.notificator.exchanges.clients.ExchangeEnum
+import bot.telegram.notificator.libs.escapeMarkdownV2Text
 import mu.KotlinLogging
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument
@@ -47,11 +48,14 @@ class TelegramBot(
 
     override fun getBotUsername(): String = botUsername
 
-    fun sendMessage(messageText: String, isMarkDown: Boolean = false): Unit = try {
+    private fun sendMessage(messageText: String, isMarkDown: Boolean = false): Unit = try {
         execute(SendMessage().also {
             log.debug("Send to chatId = $chatId\nMessage: \"$messageText\"")
             it.chatId = chatId
-            it.text = messageText
+            it.text = messageText.let { text ->
+                if (isMarkDown) escapeMarkdownV2Text(text)
+                else text
+            }
             it.enableMarkdownV2(isMarkDown)
         })
         Unit

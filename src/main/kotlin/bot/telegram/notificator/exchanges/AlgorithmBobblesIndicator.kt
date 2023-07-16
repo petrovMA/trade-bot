@@ -80,7 +80,7 @@ class AlgorithmBobblesIndicator(
 
                         is Order -> {
                             if (msg.pair == botSettings.pair) {
-                                send("Order update:\n```json\n${json(msg)}\n```", true)
+                                send("#${msg.status} Order update:\n```json\n$msg\n```", true)
                             }
                         }
 

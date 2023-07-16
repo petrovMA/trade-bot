@@ -64,11 +64,11 @@ class MainController {
         val response = MyResponse("success", "Received $request")
         log.info("Response for /endpoint/trade = $response")
 
-        val notification = request.deserialize<Notification>()
+//        val notification = request.deserialize<Notification>()
 
         bot.communicator.sendOrder(request)
 
-        bot.sendMessage("Order:\n```json\n${json(notification)}```", true)
+//        bot.sendMessage("Order:\n```json\n${json(notification)}```", true)
 
         return ResponseEntity.ok(response)
     }

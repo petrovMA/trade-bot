@@ -1,5 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
+import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import org.knowm.xchange.currency.CurrencyPair
@@ -22,7 +23,35 @@ data class Order(
     var stopPrice: BigDecimal? = null,
     var lastBorderPrice: BigDecimal? = null,
     var fee: BigDecimal? = null
-) : CommonExchangeData
+) : CommonExchangeData {
+    override fun toString(): String = StringOrder(
+        orderId = orderId,
+        pair = pair.toString(),
+        price = price,
+        origQty = origQty,
+        executedQty = executedQty,
+        side = side,
+        type = type,
+        status = status,
+        stopPrice = stopPrice,
+        lastBorderPrice = lastBorderPrice,
+        fee = fee
+    ).let { json(it) }
+
+    data class StringOrder(
+        val orderId: String,
+        val pair: String,
+        val price: BigDecimal?,
+        val origQty: BigDecimal,
+        val executedQty: BigDecimal,
+        val side: SIDE,
+        val type: TYPE,
+        val status: STATUS,
+        val stopPrice: BigDecimal? = null,
+        val lastBorderPrice: BigDecimal? = null,
+        val fee: BigDecimal? = null
+    )
+}
 
 data class TradePair(val first: String, val second: String) {
 

@@ -2,7 +2,7 @@ package bot.telegram.notificator.exchanges
 
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.exchanges.clients.*
-import bot.telegram.notificator.exchanges.clients.socket.SocketThread
+import bot.telegram.notificator.exchanges.clients.socket.Stream
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
@@ -58,7 +58,7 @@ abstract class Algorithm(
         )
         else mutableMapOf()
 
-    var socket: SocketThread = client.socket(botSettings.pair, interval, queue)
+    var socket: Stream = client.socket(botSettings.pair, interval, queue)
 
     fun interruptThis(msg: String? = null) {
         socket.interrupt()

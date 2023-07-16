@@ -1,7 +1,7 @@
 package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.BotEvent
-import bot.telegram.notificator.exchanges.clients.socket.SocketThread
+import bot.telegram.notificator.exchanges.clients.socket.Stream
 import java.util.concurrent.BlockingQueue
 
 interface Client {
@@ -22,7 +22,7 @@ interface Client {
      * @param interval time interval for candlestick events
      * @param queue container for all income events
      * */
-    fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): SocketThread
+    fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream
 
     /**
      * This method only for tests (emulate) trading

@@ -8,14 +8,14 @@ import mu.KotlinLogging
 import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
-class SocketThreadBitmaxImpl(
+class StreamThreadBitmaxImpl(
     val pair: TradePair,
     var client: BitMaxApiWebSocketListener,
     val interval: INTERVAL,
     private val queue: BlockingQueue<CommonExchangeData>,
     var asks: MutableMap<BigDecimal, BigDecimal> = mutableMapOf(),
     var bids: MutableMap<BigDecimal, BigDecimal> = mutableMapOf()
-) : SocketThread() {
+) : Stream() {
 
     private val log = KotlinLogging.logger {}
 

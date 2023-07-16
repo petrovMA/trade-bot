@@ -1,7 +1,7 @@
 package bot.telegram.notificator.exchanges.emulate
 
-import bot.telegram.notificator.exchanges.clients.socket.SocketThread
+import bot.telegram.notificator.exchanges.clients.socket.Stream
 
-class SocketThreadStub : SocketThread() {
+class SocketThreadStub : Stream() {
     override fun run() {}
 }

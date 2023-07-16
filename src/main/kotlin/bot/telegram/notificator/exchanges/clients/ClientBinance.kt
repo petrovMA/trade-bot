@@ -1,6 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
-import bot.telegram.notificator.exchanges.clients.socket.SocketThreadBinanceImpl
+import bot.telegram.notificator.exchanges.clients.socket.StreamThreadBinanceImpl
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import bot.telegram.notificator.libs.UnsupportedOrderTypeException
@@ -270,7 +270,7 @@ class ClientBinance(
 
 
     override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
-        SocketThreadBinanceImpl(
+        StreamThreadBinanceImpl(
             pair = pair.toCurrencyPair(),
             queue = queue,
             sec = sec,
