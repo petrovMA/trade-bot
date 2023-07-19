@@ -6,12 +6,14 @@ import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.rest_controller.Notification
 import bot.telegram.notificator.rest_controller.RatioSetting
 import com.typesafe.config.Config
+import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
 import mu.KotlinLogging
-import org.knowm.xchange.exceptions.ExchangeException
+import org.knowm.xchange.derivative.FuturesContract
 import java.io.File
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
+import kotlin.collections.HashMap
 import kotlin.math.abs
 
 
@@ -38,6 +40,7 @@ class AlgorithmBobblesIndicator(
     isEmulate = isEmulate,
     sendMessage = sendMessage
 ) {
+    override val botSettings: BotSettingsBobblesIndicator = super.botSettings as BotSettingsBobblesIndicator
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
@@ -47,10 +50,12 @@ class AlgorithmBobblesIndicator(
     private var lastTradePrice: BigDecimal = 0.toBigDecimal()
     private var klineConstructor = KlineConstructor(interval)
     private var candlestickList = ListLimit<Candlestick>(limit = 50)
+    override val orders: MutableMap<String, Order> = HashMap<String, Order>()
 
     private var ratio = RatioSetting()
 
-    lateinit var positions: VirtualPositions
+    private var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+    private var exchangePosition: ExchangePosition? = null
 
     override fun run() {
 //        saveBotSettings(botSettings)
@@ -58,9 +63,9 @@ class AlgorithmBobblesIndicator(
         try {
 //            if (File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
 
-//            synchronizeOrders()
+            synchronizeOrders()
 
-            socket.run { start() }
+            stream.run { start() }
 
             var msg = if (isEmulate) client.nextEvent() /* only for test */
             else queue.poll(waitTime)
@@ -81,9 +86,47 @@ class AlgorithmBobblesIndicator(
                             }
                         }
 
+                        is BinanceFuturesPosition -> {
+                            if (TradePair(msg.futuresContract) == botSettings.pair) {
+                                exchangePosition = ExchangePosition(msg)
+                                log?.info("ExchangePosition:\n$msg")
+                            }
+                        }
+
                         is Order -> {
                             if (msg.pair == botSettings.pair) {
-                                send("#${msg.status} Order update:\n```json\n$msg\n```", true)
+
+                                log?.info("OrderUpdate:\n$msg")
+
+                                when (msg.status) {
+                                    STATUS.NEW -> orders[msg.orderId] = msg
+                                    STATUS.PARTIALLY_FILLED -> {
+                                        if (orders[msg.orderId] == null)
+                                            synchronizeOrders()
+                                    }
+
+                                    STATUS.FILLED -> {
+                                        orders.remove(msg.orderId)
+                                        // todo ADD FILLED ORDER TO DB
+
+                                        updatePositions(
+                                            Notification(
+                                                price = msg.price!!,
+                                                amount = msg.executedQty - msg.executedQty.percent(botSettings.feePercent),
+                                                pair = botSettings.pair.toString(),
+                                                type = msg.side.toString(),
+                                            ),
+                                            price = msg.price!!
+                                        )
+                                    }
+
+                                    STATUS.CANCELED, STATUS.REJECTED -> orders.remove(msg.orderId)
+                                    else -> log?.info("${botSettings.name} Unsupported order status: ${msg.status}")
+                                }
+
+                                send("#${msg.status} Order update:\n```json\n$msg\n```\n\n" +
+                                        "Position:\n```${exchangePosition?.let { json(it) }}```", true
+                                )
                             }
                         }
 
@@ -128,39 +171,38 @@ class AlgorithmBobblesIndicator(
                                 }
 
                                 BotEvent.Type.CREATE_ORDER -> {
-                                    val order = msg.text.deserialize<Notification>()
+                                    val notification = msg.text.deserialize<Notification>()
+                                    // todo ADD SIGNAL TO DB
 
                                     // find kline with indicator
                                     val kline = getKlineWithIndicator()
                                     log?.info("Kline with indicator:\n$kline")
-                                    val side = if (order.type == "buy") SIDE.BUY else SIDE.SELL
+                                    val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
                                     val price = if (side == SIDE.BUY) kline.low else kline.high
 
-                                    if (order.amount > 0.005 && order.price == null && order.placeOrder) {
+                                    if (notification.amount > botSettings.minOrderSize
+                                        && notification.price == null
+                                        && notification.placeOrder
+                                    ) {
 
                                         if (ratio.buyRatio > BigDecimal.ZERO && side == SIDE.BUY) {
-                                            sentOrderTEMPLATE(
+                                            sentOrder(
                                                 price = price,
-                                                amount = order.amount.toBigDecimal() * ratio.buyRatio,
+                                                amount = notification.amount * ratio.buyRatio,
                                                 orderSide = side,
                                                 orderType = TYPE.LIMIT
                                             )
                                         } else if (ratio.sellRatio > BigDecimal.ZERO && side == SIDE.SELL) {
-                                            sentOrderTEMPLATE(
+                                            sentOrder(
                                                 price = price,
-                                                amount = order.amount.toBigDecimal() * ratio.sellRatio,
+                                                amount = notification.amount * ratio.sellRatio,
                                                 orderSide = side,
                                                 orderType = TYPE.LIMIT
                                             )
                                         }
                                     }
 
-                                    positions =
-                                        readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
-
-                                    updatePositions(order, order.price?.toBigDecimal() ?: price)
-
-                                    reWriteObject(positions, File("$path/positions.json"))
+                                    updatePositions(notification, notification.price ?: price)
 
                                     log?.info("Positions After update:\n$positions")
 
@@ -173,7 +215,7 @@ class AlgorithmBobblesIndicator(
                                 }
 
                                 BotEvent.Type.INTERRUPT -> {
-                                    socket.interrupt()
+                                    stream.interrupt()
                                     return
                                 }
 
@@ -202,40 +244,12 @@ class AlgorithmBobblesIndicator(
         }
     }
 
-    fun sentOrderTEMPLATE(
-        price: BigDecimal,
-        amount: BigDecimal,
-        orderSide: SIDE,
-        orderType: TYPE,
-        isStaticUpdate: Boolean = false,
-        isCloseOrder: Boolean = false
-    ): Order? {
+    override fun synchronizeOrders() {
+        orders.clear()
 
-        log?.info("${botSettings.name} Sent $orderType order with params: price = $price; amount = $amount; side = $orderSide")
-
-        var order = Order(
-            orderId = "",
-            pair = botSettings.pair,
-            price = price,
-            origQty = amount,
-            executedQty = BigDecimal(0),
-            side = orderSide,
-            type = orderType,
-            status = STATUS.NEW
-        )
-
-        try {
-            order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
-            log?.debug("${botSettings.name} Order sent: $order")
-            return order
-        } catch (e: ExchangeException) {
-            log?.info("${botSettings.name} ${e.message}")
-            return null
-        } catch (t: Throwable) {
-            log?.error("${botSettings.name} ${t.message}", t)
-            send("#Error_${botSettings.name}: \n${printTrace(t)}")
-            throw t
-        }
+        client
+            .getAllOpenOrders(listOf(botSettings.pair))[botSettings.pair]
+            ?.forEach { orders[it.orderId] = it }
     }
 
     private fun getKlineWithIndicator(): Candlestick {
@@ -253,36 +267,65 @@ class AlgorithmBobblesIndicator(
         var buyPrice: BigDecimal = BigDecimal.ZERO
     )
 
-    private fun updatePositions(order: Notification, price: BigDecimal): VirtualPositions =
-        if (order.type.equals("buy", true)) {
-            if (positions.sellPrice < price && positions.sellAmount > order.amount.toBigDecimal()) {
+    private fun updatePositions(order: Notification, price: BigDecimal) {
+        positions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+
+        positions = if (order.type.equals("buy", true)) {
+            if (positions.sellPrice < price && positions.sellAmount > order.amount) {
                 positions.apply {
                     sellPrice =
-                        (positions.sellPrice + (price - positions.sellPrice) * (order.amount.toBigDecimal() / positions.sellAmount)).round()
-                    sellAmount = (positions.sellAmount - order.amount.toBigDecimal()).round()
+                        (positions.sellPrice + (price - positions.sellPrice) * (order.amount / positions.sellAmount)).round()
+                    sellAmount = (positions.sellAmount - order.amount).round()
                 }
             } else {
-                val newOrderAmount = positions.buyAmount + order.amount.toBigDecimal()
-                val priceChange = (price - positions.buyPrice) * (order.amount.toBigDecimal() / newOrderAmount)
+                val newOrderAmount = positions.buyAmount + order.amount
+                val priceChange = (price - positions.buyPrice) * (order.amount / newOrderAmount)
                 positions.apply {
                     buyAmount = newOrderAmount.round()
                     buyPrice = (positions.buyPrice + priceChange).round()
                 }
             }
         } else {
-            if (positions.buyPrice > price && positions.buyAmount > order.amount.toBigDecimal()) {
+            if (positions.buyPrice > price && positions.buyAmount > order.amount) {
                 positions.apply {
                     buyPrice =
-                        (positions.buyPrice + (price - positions.buyPrice) * (order.amount.toBigDecimal() / positions.buyAmount)).round()
-                    buyAmount = (positions.buyAmount - order.amount.toBigDecimal()).round()
+                        (positions.buyPrice + (price - positions.buyPrice) * (order.amount / positions.buyAmount)).round()
+                    buyAmount = (positions.buyAmount - order.amount).round()
                 }
             } else {
-                val newOrderAmount = positions.sellAmount + order.amount.toBigDecimal()
-                val priceChange = (price - positions.sellPrice) * (order.amount.toBigDecimal() / newOrderAmount)
+                val newOrderAmount = positions.sellAmount + order.amount
+                val priceChange = (price - positions.sellPrice) * (order.amount / newOrderAmount)
                 positions.apply {
                     sellAmount = newOrderAmount.round()
                     sellPrice = (positions.sellPrice + priceChange).round()
                 }
             }
         }
+
+        reWriteObject(positions, File("$path/positions.json"))
+    }
+
+    data class ExchangePosition(
+        val contract: FuturesContract,
+        val positionAmount: BigDecimal,
+        val entryPrice: BigDecimal,
+        val accumulatedRealized: BigDecimal,
+        val unrealizedPnl: BigDecimal,
+        val marginType: String,
+        val isolatedWallet: BigDecimal,
+        val positionSide: String?
+    ) {
+        constructor(position: BinanceFuturesPosition) : this(
+            position.futuresContract,
+            position.positionAmount.round(),
+            position.entryPrice.round(),
+            position.accumulatedRealized.round(),
+            position.unrealizedPnl.round(),
+            position.marginType,
+            position.isolatedWallet.round(),
+            position.positionSide
+        )
+    }
+
+    override fun toString(): String = "status = $state, settings = $botSettings"
 }

@@ -1,7 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
-import bot.telegram.notificator.exchanges.clients.stream.Stream
-import bot.telegram.notificator.exchanges.clients.stream.StreamBinanceImpl
+import bot.telegram.notificator.exchanges.clients.stream.StreamBinanceFuturesImpl
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import bot.telegram.notificator.libs.UnsupportedOrderTypeException
@@ -11,14 +10,11 @@ import org.knowm.xchange.ExchangeFactory
 import org.knowm.xchange.binance.BinanceExchange
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.marketdata.KlineInterval
+import org.knowm.xchange.binance.dto.meta.exchangeinfo.BinanceExchangeInfo
 import org.knowm.xchange.binance.dto.trade.OrderSide
-import org.knowm.xchange.binance.service.BinanceAccountService
-import org.knowm.xchange.binance.service.BinanceMarketDataService
-import org.knowm.xchange.binance.service.BinanceTradeService
 import org.knowm.xchange.currency.Currency
 import org.knowm.xchange.currency.CurrencyPair
-import org.knowm.xchange.dto.account.AccountInfo
-import org.knowm.xchange.dto.account.Wallet
+import org.knowm.xchange.derivative.FuturesContract
 import org.knowm.xchange.dto.trade.LimitOrder
 import org.knowm.xchange.dto.trade.MarketOrder
 import org.knowm.xchange.instrument.Instrument
@@ -28,23 +24,20 @@ import java.util.*
 import java.util.concurrent.BlockingQueue
 
 
-open class ClientBinance(
+class ClientBinanceFutures(
     private val api: String? = null,
     private val sec: String? = null,
     private val instance: Exchange = ExchangeFactory.INSTANCE.createExchange(BinanceExchange::class.java, api, sec)
-) : Client {
-
-    val tradeService: BinanceTradeService = instance.tradeService as BinanceTradeService
-    val marketDataService: BinanceMarketDataService = instance.marketDataService as BinanceMarketDataService
-    val accountService: BinanceAccountService = instance.accountService as BinanceAccountService
-    val accountInfo: AccountInfo? = if (sec == null) null else accountService.accountInfo
-    val wallets: Map<String, Wallet>? = if (sec == null) null else accountInfo!!.wallets
+) : ClientBinance(api, sec, instance) {
 
     private val log = KotlinLogging.logger {}
 
-    override fun getAllPairs(): List<TradePair> =
-        instance.exchangeMetaData.instruments.map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
+    override fun getAllPairs(): List<TradePair> = instance
+        .exchangeMetaData
+        .instruments
+        .map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
 
+    fun getFutureExchangeInfo(): BinanceExchangeInfo = accountService.futureExchangeInfo
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
         marketDataService.klines(
@@ -158,8 +151,9 @@ open class ClientBinance(
     )
 
 
-    override fun getOrder(pair: TradePair, orderId: String): Order {
-        return tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
+    override fun getOrder(pair: TradePair, orderId: String): Order = tradeService
+        .getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId))
+        .map {
             it as LimitOrder
             Order(
                 price = it.limitPrice,
@@ -187,17 +181,21 @@ open class ClientBinance(
                 }
             )
         }.first()
-    }
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order {
+    override fun newOrder(
+        order: Order,
+        isStaticUpdate: Boolean,
+        formatCount: String,
+        formatPrice: String
+    ): Order {
         val typeX = order.side.toType()
-        val currPair = CurrencyPair(order.pair.first, order.pair.second)
+        val instrument = FuturesContract(order.pair.toCurrencyPair(), "PERPETUAL")
         val orderId = when (order.type) {
             TYPE.LIMIT -> tradeService.placeLimitOrder(
                 LimitOrder(
                     typeX,
                     String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
-                    currPair,
+                    instrument,
                     null,
                     Date(),
                     String.format(formatPrice, order.price).replace(',', '.').toBigDecimal()
@@ -208,7 +206,7 @@ open class ClientBinance(
                 MarketOrder(
                     typeX,
                     String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
-                    currPair
+                    instrument
                 )
             )
 
@@ -263,9 +261,9 @@ open class ClientBinance(
     }
 
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
-        StreamBinanceImpl(
-            pair = pair.toCurrencyPair(),
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+        StreamBinanceFuturesImpl(
+            pair = FuturesContract(pair.toCurrencyPair(), "PERPETUAL"),
             queue = queue,
             sec = sec,
             api = api

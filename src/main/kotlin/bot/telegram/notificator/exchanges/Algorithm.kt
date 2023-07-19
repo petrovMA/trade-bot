@@ -15,7 +15,7 @@ import kotlin.math.absoluteValue
 
 
 abstract class Algorithm(
-    val botSettings: BotSettings,
+    open val botSettings: BotSettings,
     val queue: LinkedBlockingDeque<CommonExchangeData>,
     val exchangeEnum: ExchangeEnum,
     val conf: Config,
@@ -27,9 +27,6 @@ abstract class Algorithm(
     val sendMessage: (String, Boolean) -> Unit
 ) : Thread() {
     val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
-    private val firstBalanceForOrderAmount = botSettings.orderBalanceType == "first"
-    val minRange = botSettings.tradingRange.first
-    val maxRange = botSettings.tradingRange.second
     val ordersListForRemove: MutableList<Pair<String, Order>> = mutableListOf()
 
     protected val path: String = "exchangeBots/${botSettings.name}"
@@ -39,6 +36,9 @@ abstract class Algorithm(
     val waitTime = conf.getDuration("interval.wait_socket_time")!!
     val formatAmount = "%.${botSettings.countOfDigitsAfterDotForAmount}f"
     val formatPrice = "%.${botSettings.countOfDigitsAfterDotForPrice}f"
+
+    val firstBalanceForOrderAmount = botSettings.orderBalanceType == "first"
+
     private val retryGetOrderCount = conf.getInt("retry.get_order_count")
     private val retrySentOrderCount: Int = conf.getInt("retry.sent_order_count")
     private val retryGetOrderInterval = conf.getDuration("retry.get_order_interval")
@@ -50,7 +50,7 @@ abstract class Algorithm(
     private val settingsPath = "$path/settings.json"
 
     val ordersPath = "$path/orders"
-    val orders: MutableMap<String, Order> =
+    open val orders: MutableMap<String, Order> =
         if (isEmulate.not()) ObservableHashMap(
             filePath = ordersPath,
             keyToFileName = { key -> key.replace('.', '_') + ".json" },
@@ -58,12 +58,12 @@ abstract class Algorithm(
         )
         else mutableMapOf()
 
-    var socket: Stream = client.socket(botSettings.pair, interval, queue)
+    var stream: Stream = client.stream(botSettings.pair, interval, queue)
 
     fun interruptThis(msg: String? = null) {
-        socket.interrupt()
-        var msgErr = "#Interrupt_${botSettings.pair} Thread, socket.status = ${socket.state}"
-        var logErr = "Thread for ${botSettings.pair} Interrupt, socket.status = ${socket.state}"
+        stream.interrupt()
+        var msgErr = "#Interrupt_${botSettings.pair} Thread, socket.status = ${stream.state}"
+        var logErr = "Thread for ${botSettings.pair} Interrupt, socket.status = ${stream.state}"
         msg?.let { msgErr = "$msgErr\nMessage: $it"; logErr = "$logErr\nMessage: $it"; }
         send(msgErr)
         log?.warn(logErr)
@@ -137,85 +137,7 @@ abstract class Algorithm(
         throw Exception("${botSettings.name} Error: Can't send order.")
     }
 
-    fun synchronizeOrders() {
-        when (orders) {
-            is ObservableHashMap -> {
-                orders.readFromFile()
-
-                var price = minRange
-                val openOrders = client.getOpenOrders(botSettings.pair)
-                while (price <= maxRange) {
-                    val priceIn = price.toPrice()
-                    openOrders.find { it.price == priceIn.toBigDecimal() }?.let { openOrder ->
-                        orders[priceIn] ?: run {
-                            if (botSettings.direction == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
-                                val orderSize = if (firstBalanceForOrderAmount) botSettings.orderSize
-                                else botSettings.orderSize.div8(price)
-
-                                val qty = orderSize.percent(10.toBigDecimal())
-
-                                if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
-                                    orders[price.toPrice()] = openOrder
-                                    log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
-                                }
-                            } else if (botSettings.direction == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
-                                val orderSize = if (firstBalanceForOrderAmount) botSettings.orderSize
-                                else botSettings.orderSize.div8(price)
-
-                                val qty = orderSize.percent(10.toBigDecimal())
-
-                                if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
-                                    orders[price.toPrice()] = openOrder
-                                    log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
-                                }
-                            }
-                        }
-                    }
-                    price += botSettings.orderDistance
-                }
-
-                orders.forEach { (k, v) ->
-                    openOrders
-                        .find { (v.orderId == it.orderId || v.type == TYPE.MARKET) && v.price?.run { this in minRange..maxRange } ?: false }
-                        ?: run {
-                            ordersListForRemove.add(k to v)
-                            log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
-                        }
-                }
-
-                ordersListForRemove.forEach { orders.remove(it.first) }
-                ordersListForRemove.clear()
-
-                if (botSettings.setCloseOrders) {
-                    price = minRange
-                    while (price <= maxRange) {
-                        val priceIn = price.toPrice()
-
-                        orders[priceIn]?.let { order -> log?.trace("${botSettings.name} Order already exist: $order") }
-                            ?: run {
-                                orders[priceIn] = Order(
-                                    orderId = "",
-                                    pair = botSettings.pair,
-                                    price = priceIn.toBigDecimal(),
-                                    origQty = if (firstBalanceForOrderAmount) botSettings.orderSize
-                                    else botSettings.orderSize.div8(price),
-                                    executedQty = BigDecimal(0),
-                                    side = if (botSettings.direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
-                                    type = TYPE.MARKET,
-                                    status = STATUS.FILLED,
-                                    lastBorderPrice = BigDecimal.ZERO
-                                )
-                            }
-
-
-                        price += botSettings.orderDistance
-                    }
-                }
-            }
-
-            else -> {}
-        }
-    }
+    abstract fun synchronizeOrders()
 
     fun getOrder(pair: TradePair, orderId: String): Order? {
         var retryCount = retryGetOrderCount
@@ -254,5 +176,5 @@ abstract class Algorithm(
 
     fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 
-    override fun toString(): String = "status = ${socket.state}, settings = $botSettings"
+    override fun toString(): String = "status = $state, settings = $botSettings"
 }

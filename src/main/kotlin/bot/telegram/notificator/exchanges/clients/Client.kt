@@ -22,7 +22,7 @@ interface Client {
      * @param interval time interval for candlestick events
      * @param queue container for all income events
      * */
-    fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream
+    fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream
 
     /**
      * This method only for tests (emulate) trading

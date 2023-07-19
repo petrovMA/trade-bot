@@ -35,6 +35,9 @@ class AlgorithmTrader(
     isEmulate = isEmulate,
     sendMessage = sendMessage
 ) {
+    override val botSettings: BotSettingsTrader = super.botSettings as BotSettingsTrader
+    private val minRange = this.botSettings.tradingRange.first
+    private val maxRange = this.botSettings.tradingRange.second
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
@@ -49,7 +52,7 @@ class AlgorithmTrader(
 
             synchronizeOrders()
 
-            socket.run { start() }
+            stream.run { start() }
 
             var msg = if (isEmulate) client.nextEvent() /* only for test */
             else queue.poll(waitTime)
@@ -284,7 +287,7 @@ class AlgorithmTrader(
                                 }
 
                                 BotEvent.Type.INTERRUPT -> {
-                                    socket.interrupt()
+                                    stream.interrupt()
                                     return
                                 }
 
@@ -310,6 +313,86 @@ class AlgorithmTrader(
             send("#Error_${botSettings.name}: \n${printTrace(e)}")
         } finally {
             interruptThis()
+        }
+    }
+
+    override fun synchronizeOrders() {
+        when (orders) {
+            is ObservableHashMap -> {
+                (orders as ObservableHashMap).readFromFile()
+
+                var price = minRange
+                val openOrders = client.getOpenOrders(botSettings.pair)
+                while (price <= maxRange) {
+                    val priceIn = price.toPrice()
+                    openOrders.find { it.price == priceIn.toBigDecimal() }?.let { openOrder ->
+                        orders[priceIn] ?: run {
+                            if (botSettings.direction == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
+                                val orderSize = if (firstBalanceForOrderAmount) botSettings.orderSize
+                                else botSettings.orderSize.div8(price)
+
+                                val qty = orderSize.percent(10.toBigDecimal())
+
+                                if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
+                                    orders[price.toPrice()] = openOrder
+                                    log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
+                                }
+                            } else if (botSettings.direction == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
+                                val orderSize = if (firstBalanceForOrderAmount) botSettings.orderSize
+                                else botSettings.orderSize.div8(price)
+
+                                val qty = orderSize.percent(10.toBigDecimal())
+
+                                if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
+                                    orders[price.toPrice()] = openOrder
+                                    log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
+                                }
+                            }
+                        }
+                    }
+                    price += botSettings.orderDistance
+                }
+
+                orders.forEach { (k, v) ->
+                    openOrders
+                        .find { (v.orderId == it.orderId || v.type == TYPE.MARKET) && v.price?.run { this in minRange..maxRange } ?: false }
+                        ?: run {
+                            ordersListForRemove.add(k to v)
+                            log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
+                        }
+                }
+
+                ordersListForRemove.forEach { orders.remove(it.first) }
+                ordersListForRemove.clear()
+
+                if (botSettings.setCloseOrders) {
+                    price = minRange
+                    while (price <= maxRange) {
+                        val priceIn = price.toPrice()
+
+                        orders[priceIn]?.let { order -> log?.trace("${botSettings.name} Order already exist: $order") }
+                            ?: run {
+                                orders[priceIn] = Order(
+                                    orderId = "",
+                                    pair = botSettings.pair,
+                                    price = priceIn.toBigDecimal(),
+                                    origQty = if (firstBalanceForOrderAmount) botSettings.orderSize
+                                    else botSettings.orderSize.div8(price),
+                                    executedQty = BigDecimal(0),
+                                    side = if (botSettings.direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
+                                    type = TYPE.MARKET,
+                                    status = STATUS.FILLED,
+                                    lastBorderPrice = BigDecimal.ZERO
+                                )
+                            }
+
+
+                        price += botSettings.orderDistance
+                    }
+                }
+            }
+
+            else -> {}
         }
     }
 }

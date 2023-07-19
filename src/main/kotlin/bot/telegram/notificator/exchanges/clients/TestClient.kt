@@ -255,7 +255,7 @@ class TestClient(
         }
     }
 
-    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamThreadStub()
 
     private fun check(prev: Candlestick, current: Candlestick) {

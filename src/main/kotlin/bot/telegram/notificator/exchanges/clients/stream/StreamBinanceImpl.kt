@@ -11,7 +11,7 @@ import org.knowm.xchange.dto.trade.LimitOrder
 import org.knowm.xchange.dto.trade.MarketOrder
 import java.util.concurrent.BlockingQueue
 
-class StreamThreadBinanceImpl(
+class StreamBinanceImpl(
     val pair: CurrencyPair,
     private val queue: BlockingQueue<CommonExchangeData>,
     private val api: String?,
@@ -44,9 +44,9 @@ class StreamThreadBinanceImpl(
 //                StreamingExchangeFactory.INSTANCE.createExchange(specFutures) as BinanceFutureStreamingExchange
 
             val subscription = ProductSubscription.create()
-                .addTrades(pair)
-                .addOrderbook(pair)
-                .apply { if (api != null && sec != null) addOrders(pair) }
+                .addTrades(TradePair("ETH_USDT").toCurrencyPair())
+                .addOrderbook(TradePair("ETH_USDT").toCurrencyPair())
+                .apply { if (api != null && sec != null) addOrders(TradePair("ETH_USDT").toCurrencyPair()) }
                 .build()
 
             exchange.connect(subscription).blockingAwait()

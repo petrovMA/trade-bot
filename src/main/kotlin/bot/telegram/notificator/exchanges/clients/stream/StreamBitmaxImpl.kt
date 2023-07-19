@@ -8,7 +8,7 @@ import mu.KotlinLogging
 import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
-class StreamThreadBitmaxImpl(
+class StreamBitmaxImpl(
     val pair: TradePair,
     var client: BitMaxApiWebSocketListener,
     val interval: INTERVAL,

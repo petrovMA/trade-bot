@@ -23,6 +23,7 @@ import java.text.SimpleDateFormat
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.*
+import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 
@@ -117,6 +118,7 @@ fun BigDecimal.div8(by: BigDecimal): BigDecimal = this.divide(by, 8, RoundingMod
 
 fun BigDecimal.percent(amountOfPercents: BigDecimal = 1.0.toBigDecimal()): BigDecimal =
     this.divide(100.toBigDecimal(), 8, RoundingMode.HALF_UP) * amountOfPercents
+
 fun BigDecimal.round(scale: Int = 8): BigDecimal = setScale(scale, RoundingMode.HALF_EVEN)
 
 fun Int.ms(): Duration = Duration.ofMillis(this.toLong())
@@ -213,7 +215,7 @@ fun calcExecuted(orderB: Order, orderS: Order, balanceTrade: BigDecimal): String
                 }%"
     }
 
-fun <E> LinkedBlockingDeque<E>.poll(time: Duration): E? = this.poll(time.seconds, TimeUnit.SECONDS)
+fun <E> BlockingQueue<E>.poll(time: Duration): E? = this.poll(time.seconds, TimeUnit.SECONDS)
 
 fun wait(time: Duration) = Thread.sleep(time.toMillis())
 

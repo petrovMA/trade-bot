@@ -1,7 +1,7 @@
 package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.clients.stream.Stream
-import bot.telegram.notificator.exchanges.clients.stream.StreamThreadBitmaxImpl
+import bot.telegram.notificator.exchanges.clients.stream.StreamBitmaxImpl
 import bot.telegram.notificator.exchanges.libs.bitmax.Product
 import bot.telegram.notificator.libs.*
 import io.bitmax.api.Authorization
@@ -175,7 +175,7 @@ class ClientBitmax(
             throw RuntimeException("Error placeOrderResponse: $resp")
     }
 
-    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream {
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream {
 
         val url = "wss://ascendex.com/$accountGroup/api/pro/v1/stream"
 
@@ -185,7 +185,7 @@ class ClientBitmax(
 
         val authMsg = Authorization(api, sec).getAuthSocketMsg(System.currentTimeMillis())
 
-        return StreamThreadBitmaxImpl(
+        return StreamBitmaxImpl(
             pair = pair,
             client = BitMaxApiWebSocketListener(
                 authMsg, url, 5000, true,
