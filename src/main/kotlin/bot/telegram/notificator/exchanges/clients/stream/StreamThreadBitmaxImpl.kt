@@ -1,4 +1,4 @@
-package bot.telegram.notificator.exchanges.clients.socket
+package bot.telegram.notificator.exchanges.clients.stream
 
 import bot.telegram.notificator.exchanges.clients.*
 import io.bitmax.api.websocket.BitMaxApiWebSocketListener

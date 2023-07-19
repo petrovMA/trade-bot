@@ -1,7 +1,7 @@
 package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.BotEvent
-import bot.telegram.notificator.exchanges.clients.socket.Stream
+import bot.telegram.notificator.exchanges.clients.stream.Stream
 import java.util.concurrent.BlockingQueue
 
 interface Client {

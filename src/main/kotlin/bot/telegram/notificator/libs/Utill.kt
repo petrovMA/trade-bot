@@ -50,6 +50,11 @@ fun <T> readObjectFromFile(file: File, valueType: Class<T>): T =
     if (file.exists() && !file.isDirectory) asObject(file, valueType)
     else throw Exception("Can't find file: ${file.absolutePath}")
 
+inline fun <reified T> readObject(file: String): T? = File(file).let {
+    if (it.exists() && !it.isDirectory) asObject(it, T::class.java)
+    else null
+}
+
 inline fun <reified T> String.deserialize(): T = asObject(this, T::class.java)
 
 fun readListObjectsFromFile(file: File, type: Type): List<Candlestick> =
@@ -112,7 +117,7 @@ fun BigDecimal.div8(by: BigDecimal): BigDecimal = this.divide(by, 8, RoundingMod
 
 fun BigDecimal.percent(amountOfPercents: BigDecimal = 1.0.toBigDecimal()): BigDecimal =
     this.divide(100.toBigDecimal(), 8, RoundingMode.HALF_UP) * amountOfPercents
-
+fun BigDecimal.round(scale: Int = 8): BigDecimal = setScale(scale, RoundingMode.HALF_EVEN)
 
 fun Int.ms(): Duration = Duration.ofMillis(this.toLong())
 fun Long.ms(): Duration = Duration.ofMillis(this)

@@ -1,6 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
-import bot.telegram.notificator.exchanges.emulate.SocketThreadStub
+import bot.telegram.notificator.exchanges.emulate.StreamThreadStub
 import bot.telegram.notificator.exchanges.emulate.TestBalance
 import bot.telegram.notificator.exchanges.emulate.libs.NotSupportedCandlestickIntervalException
 import bot.telegram.notificator.exchanges.emulate.libs.UnsupportedStateException
@@ -256,7 +256,7 @@ class TestClient(
     }
 
     override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
-        SocketThreadStub()
+        StreamThreadStub()
 
     private fun check(prev: Candlestick, current: Candlestick) {
         if (prev.closeTime + 1 != current.openTime)

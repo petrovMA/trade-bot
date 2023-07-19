@@ -1,6 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
-import bot.telegram.notificator.exchanges.clients.socket.StreamThreadBinanceImpl
+import bot.telegram.notificator.exchanges.clients.stream.StreamThreadBinanceImpl
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import bot.telegram.notificator.libs.UnsupportedOrderTypeException

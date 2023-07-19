@@ -8,6 +8,7 @@ import bot.telegram.notificator.rest_controller.RatioSetting
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import org.knowm.xchange.exceptions.ExchangeException
+import java.io.File
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
@@ -48,6 +49,8 @@ class AlgorithmBobblesIndicator(
     private var candlestickList = ListLimit<Candlestick>(limit = 50)
 
     private var ratio = RatioSetting()
+
+    lateinit var positions: VirtualPositions
 
     override fun run() {
 //        saveBotSettings(botSettings)
@@ -133,21 +136,34 @@ class AlgorithmBobblesIndicator(
                                     val side = if (order.type == "buy") SIDE.BUY else SIDE.SELL
                                     val price = if (side == SIDE.BUY) kline.low else kline.high
 
-                                    if (ratio.buyRatio > BigDecimal.ZERO && side == SIDE.BUY) {
-                                        sentOrderTEMPLATE(
-                                            price = price,
-                                            amount = order.amount.toBigDecimal() * ratio.buyRatio,
-                                            orderSide = side,
-                                            orderType = TYPE.LIMIT
-                                        )
-                                    } else if (ratio.sellRatio > BigDecimal.ZERO && side == SIDE.SELL) {
-                                        sentOrderTEMPLATE(
-                                            price = price,
-                                            amount = order.amount.toBigDecimal() * ratio.sellRatio,
-                                            orderSide = side,
-                                            orderType = TYPE.LIMIT
-                                        )
+                                    if (order.amount > 0.005 && order.price == null && order.placeOrder) {
+
+                                        if (ratio.buyRatio > BigDecimal.ZERO && side == SIDE.BUY) {
+                                            sentOrderTEMPLATE(
+                                                price = price,
+                                                amount = order.amount.toBigDecimal() * ratio.buyRatio,
+                                                orderSide = side,
+                                                orderType = TYPE.LIMIT
+                                            )
+                                        } else if (ratio.sellRatio > BigDecimal.ZERO && side == SIDE.SELL) {
+                                            sentOrderTEMPLATE(
+                                                price = price,
+                                                amount = order.amount.toBigDecimal() * ratio.sellRatio,
+                                                orderSide = side,
+                                                orderType = TYPE.LIMIT
+                                            )
+                                        }
                                     }
+
+                                    positions =
+                                        readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+
+                                    updatePositions(order, order.price?.toBigDecimal() ?: price)
+
+                                    reWriteObject(positions, File("$path/positions.json"))
+
+                                    log?.info("Positions After update:\n$positions")
+
                                 }
 
                                 BotEvent.Type.SET_SETTINGS -> {
@@ -208,18 +224,18 @@ class AlgorithmBobblesIndicator(
             status = STATUS.NEW
         )
 
-            try {
-                order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
-                log?.debug("${botSettings.name} Order sent: $order")
-                return order
-            } catch (e: ExchangeException) {
-                log?.info("${botSettings.name} ${e.message}")
-                return null
-            } catch (t: Throwable) {
-                log?.error("${botSettings.name} ${t.message}", t)
-                send("#Error_${botSettings.name}: \n${printTrace(t)}")
-                throw t
-            }
+        try {
+            order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
+            log?.debug("${botSettings.name} Order sent: $order")
+            return order
+        } catch (e: ExchangeException) {
+            log?.info("${botSettings.name} ${e.message}")
+            return null
+        } catch (t: Throwable) {
+            log?.error("${botSettings.name} ${t.message}", t)
+            send("#Error_${botSettings.name}: \n${printTrace(t)}")
+            throw t
+        }
     }
 
     private fun getKlineWithIndicator(): Candlestick {
@@ -229,4 +245,44 @@ class AlgorithmBobblesIndicator(
         else
             candlestickList.last()
     }
+
+    data class VirtualPositions(
+        var sellAmount: BigDecimal = BigDecimal.ZERO,
+        var sellPrice: BigDecimal = BigDecimal.ZERO,
+        var buyAmount: BigDecimal = BigDecimal.ZERO,
+        var buyPrice: BigDecimal = BigDecimal.ZERO
+    )
+
+    private fun updatePositions(order: Notification, price: BigDecimal): VirtualPositions =
+        if (order.type.equals("buy", true)) {
+            if (positions.sellPrice < price && positions.sellAmount > order.amount.toBigDecimal()) {
+                positions.apply {
+                    sellPrice =
+                        (positions.sellPrice + (price - positions.sellPrice) * (order.amount.toBigDecimal() / positions.sellAmount)).round()
+                    sellAmount = (positions.sellAmount - order.amount.toBigDecimal()).round()
+                }
+            } else {
+                val newOrderAmount = positions.buyAmount + order.amount.toBigDecimal()
+                val priceChange = (price - positions.buyPrice) * (order.amount.toBigDecimal() / newOrderAmount)
+                positions.apply {
+                    buyAmount = newOrderAmount.round()
+                    buyPrice = (positions.buyPrice + priceChange).round()
+                }
+            }
+        } else {
+            if (positions.buyPrice > price && positions.buyAmount > order.amount.toBigDecimal()) {
+                positions.apply {
+                    buyPrice =
+                        (positions.buyPrice + (price - positions.buyPrice) * (order.amount.toBigDecimal() / positions.buyAmount)).round()
+                    buyAmount = (positions.buyAmount - order.amount.toBigDecimal()).round()
+                }
+            } else {
+                val newOrderAmount = positions.sellAmount + order.amount.toBigDecimal()
+                val priceChange = (price - positions.sellPrice) * (order.amount.toBigDecimal() / newOrderAmount)
+                positions.apply {
+                    sellAmount = newOrderAmount.round()
+                    sellPrice = (positions.sellPrice + priceChange).round()
+                }
+            }
+        }
 }

@@ -39,7 +39,7 @@ class Communicator(
     private var symbols = File("pairsSet").useLines { it.toList() }
 
     private var propertyPairs: Map<String, String> = scanAll(exchangeFiles, symbols)
-    private var tradePairs: MutableMap<TradePair, Algorithm> = emptyMap<TradePair, Algorithm>().toMutableMap()
+    private var tradePairs: MutableMap<String, Algorithm> = emptyMap<String, Algorithm>().toMutableMap()
 
     var candlestickDataCommand: Command = candlestickDataCommandStr?.let {
         try {
@@ -62,9 +62,9 @@ class Communicator(
 //        repeatEvery({ getStatistics() }, this.intervalStatistic, this.timeDifference)
 
         // todo ETH_USDT just for test:
-        tradePairs[TradePair("ETH_USDT")] = AlgorithmBobblesIndicator(
+        tradePairs["test_ETH_USDT"] = AlgorithmBobblesIndicator(
             botSettings = BotSettings(
-                name = "test ETH_USDT",
+                name = "test_ETH_USDT",
                 pair = TradePair("ETH_USDT"),
                 exchange = "BINANCE",
                 direction = DIRECTION.SHORT,
@@ -81,7 +81,7 @@ class Communicator(
             sendMessage = sendMessage,
         )
 
-        tradePairs[TradePair("ETH_USDT")]?.start()
+        tradePairs["test_ETH_USDT"]?.start()
     }
 
     fun onUpdate(message: String) {
@@ -177,7 +177,7 @@ class Communicator(
                 val (msgErrors, tradeBotSettings) = parseTradeBotSettings(params)
 
                 tradeBotSettings?.let {
-                    tradePairs[TradePair(it.name)] = AlgorithmTrader(tradeBotSettings, sendMessage = sendMessage)
+                    tradePairs[it.name] = AlgorithmTrader(tradeBotSettings, sendMessage = sendMessage)
                 } ?: run { msg += "Parse params errors:\n$msgErrors" }
 
                 log.info(msg)
@@ -189,7 +189,7 @@ class Communicator(
                 val tradeBotSettings =
                     readObjectFromFile(File("exchangeBots/${params[1]}/settings.json"), BotSettings::class.java)
 
-                tradePairs[TradePair(tradeBotSettings.name)] =
+                tradePairs[tradeBotSettings.name] =
                     AlgorithmTrader(tradeBotSettings, sendMessage = sendMessage)
 
                 msg += "Trade bot ${tradeBotSettings.name} loaded, settings:\n```json\n${json(tradeBotSettings)}\n```"
@@ -203,7 +203,7 @@ class Communicator(
                 val param = message.split("\\s+".toRegex())
                 if (param.size == 2) {
                     val key = param[1]
-                    msg = tradePairs[TradePair(key)]?.start()?.let {
+                    msg = tradePairs[key]?.start()?.let {
                         log.info("$key started")
                         "$key started"
                     } ?: run {
@@ -298,7 +298,7 @@ class Communicator(
                         val param = message.split("\\s+".toRegex())
                         if (param.size == 2) {
                             val key = param[1].uppercase()
-                            msg = get(TradePair(key))?.start()?.let {
+                            msg = get(key)?.start()?.let {
                                 log.info("$key started")
                                 "$key started"
                             } ?: run {
@@ -315,7 +315,7 @@ class Communicator(
                         val param = message.split("\\s+".toRegex())
                         if (param.size == 2) {
                             val key = param[1].uppercase()
-                            msg = get(TradePair(key))?.run {
+                            msg = get(key)?.run {
                                 this.queue.add(BotEvent(message, BotEvent.Type.SHOW_GAP))
                                 return
                             } ?: run {
@@ -418,7 +418,7 @@ class Communicator(
                         val param = message.split("\\s+".toRegex())
                         if (param.size == 2) {
                             val key = param[1]
-                            msg = get(TradePair(key))?.let { value ->
+                            msg = get(key)?.let { value ->
                                 value.queue.add(BotEvent(type = BotEvent.Type.INTERRUPT))
                                 log.info("$key stopped")
                                 "$key stopped"
@@ -435,7 +435,7 @@ class Communicator(
                     cmd.commandDelete.matches(message) -> {
                         val param = message.split("\\s+".toRegex())
                         if (param.size == 2) {
-                            val key = TradePair(param[1])
+                            val key = param[1]
                             msg = get(key)?.let { value ->
                                 value.queue.add(BotEvent(type = BotEvent.Type.INTERRUPT))
                                 log.info("$key stopped")
@@ -455,7 +455,7 @@ class Communicator(
                     cmd.commandOrders.matches(message) -> {
                         val param = message.uppercase().split("\\s+".toRegex())
                         if (param.size == 3) {
-                            val key = TradePair(param[1].uppercase())
+                            val key = param[1].uppercase()
                             val trade = get(key) ?: values.first()
                             trade.queue.add(BotEvent(param[2], BotEvent.Type.GET_PAIR_OPEN_ORDERS))
                         } else {
@@ -472,7 +472,7 @@ class Communicator(
                     cmd.commandQueueSize.matches(message) -> {
                         val params = message.split("\\s+".toRegex())
                         msg = if (params.size > 1)
-                            "${params[1]} queueSize = ${get(TradePair(params[1]))?.queue?.size}"
+                            "${params[1]} queueSize = ${get(params[1])?.queue?.size}"
                         else
                             "command 'queueSize' must have one param"
                     }
@@ -481,7 +481,7 @@ class Communicator(
                         val params = message.split("\\n+".toRegex(), limit = 2)
                         val param = params[0].split("\\s+".toRegex())
                         if (param.size == 2) {
-                            val key = TradePair(param[1].uppercase())
+                            val key = param[1]
                             get(key)?.let { tradePair ->
 
                                 val settings = params[1].deserialize<RatioSetting>()
@@ -514,13 +514,11 @@ class Communicator(
 
         val notification = message.deserialize<Notification>()
 
-
         log.info("tradePairs:\n $tradePairs")
 
-        tradePairs[TradePair(notification.pair)]
-            ?.queue
-            ?.add(BotEvent(message, BotEvent.Type.CREATE_ORDER))
-            ?: sendMessage("TradePair ${notification.pair} not found", false)
+        tradePairs
+            .filter { it.value.botSettings.pair == TradePair(notification.pair) }
+            .forEach { (_, v) -> v.queue.add(BotEvent(message, BotEvent.Type.CREATE_ORDER)) }
     }
 
     private fun parseTradeBotSettings(p: List<String>): Pair<String, BotSettings?> {
@@ -665,6 +663,8 @@ class Communicator(
         }
         return msg to null
     }
+
+    fun getInfo() = tradePairs.values.map { it.botSettings to (it as AlgorithmBobblesIndicator).positions }
 
     private fun getBotStartParam(params: List<String>, paramName: String, prevMsg: String): Pair<String, String> {
         var msg = prevMsg

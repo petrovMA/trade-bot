@@ -1,8 +1,7 @@
-package bot.telegram.notificator.exchanges.clients.socket
+package bot.telegram.notificator.exchanges.clients.stream
 
 import bot.telegram.notificator.exchanges.clients.*
 import info.bitrich.xchangestream.binance.BinanceStreamingExchange
-import info.bitrich.xchangestream.binancefuture.BinanceFutureStreamingExchange
 import info.bitrich.xchangestream.core.ProductSubscription
 import info.bitrich.xchangestream.core.StreamingExchangeFactory
 import mu.KotlinLogging
@@ -33,15 +32,16 @@ class StreamThreadBinanceImpl(
             api?.also { spec.apiKey = it }
             sec?.also { spec.secretKey = it }
 
-            val specFutures = StreamingExchangeFactory.INSTANCE
-                .createExchange(BinanceFutureStreamingExchange::class.java)
-                .defaultExchangeSpecification
-
-            api?.also { specFutures.apiKey = it }
-            sec?.also { specFutures.secretKey = it }
+//            val specFutures = StreamingExchangeFactory.INSTANCE
+//                .createExchange(BinanceFutureStreamingExchange::class.java)
+//                .defaultExchangeSpecification
+//
+//            api?.also { specFutures.apiKey = it }
+//            sec?.also { specFutures.secretKey = it }
 
             val exchange = StreamingExchangeFactory.INSTANCE.createExchange(spec) as BinanceStreamingExchange
-            val exchangeFutures = StreamingExchangeFactory.INSTANCE.createExchange(spec) as BinanceStreamingExchange
+//            val exchangeFutures =
+//                StreamingExchangeFactory.INSTANCE.createExchange(specFutures) as BinanceFutureStreamingExchange
 
             val subscription = ProductSubscription.create()
                 .addTrades(pair)
@@ -50,6 +50,13 @@ class StreamThreadBinanceImpl(
                 .build()
 
             exchange.connect(subscription).blockingAwait()
+
+//            exchangeFutures.connect(
+//                ProductSubscription
+//                    .create()
+//                    .apply { if (api != null && sec != null) addOrders(FuturesContract(pair, null)) }
+//                    .build()
+//            ).blockingAwait()
 
             exchange.streamingMarketDataService.getTrades(pair).subscribe(
                 { trade ->
@@ -85,7 +92,7 @@ class StreamThreadBinanceImpl(
                 }
             )*/
 
-            if (api != null && sec != null)
+            if (api != null && sec != null) {
                 exchange.streamingTradeService.getOrderChanges(isFuture).subscribe(
                     { oc: Order? ->
                         log.info("Order change: {}", oc)
@@ -125,13 +132,14 @@ class StreamThreadBinanceImpl(
                     }
                 )
 
-            exchangeFutures.streamingTradeService.getOrderChanges(true).subscribe(
-                { oc: Order? ->
-                    log.info("Futures Order change: {}", oc)
-                }, { error ->
-                    log.warn("Order stream Error:", error)
-                }
-            )
+//                exchangeFutures.streamingTradeService.getOrderChanges(true).subscribe(
+//                    { oc: Order? ->
+//                        log.info("Futures Order change: {}", oc)
+//                    }, { error ->
+//                        log.warn("Order stream Error:", error)
+//                    }
+//                )
+            }
 
         } catch (e: Exception) {
             log.error("Socket $pair connection Exception: ", e)

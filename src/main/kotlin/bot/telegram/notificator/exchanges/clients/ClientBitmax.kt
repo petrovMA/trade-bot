@@ -1,7 +1,7 @@
 package bot.telegram.notificator.exchanges.clients
 
-import bot.telegram.notificator.exchanges.clients.socket.Stream
-import bot.telegram.notificator.exchanges.clients.socket.StreamThreadBitmaxImpl
+import bot.telegram.notificator.exchanges.clients.stream.Stream
+import bot.telegram.notificator.exchanges.clients.stream.StreamThreadBitmaxImpl
 import bot.telegram.notificator.exchanges.libs.bitmax.Product
 import bot.telegram.notificator.libs.*
 import io.bitmax.api.Authorization

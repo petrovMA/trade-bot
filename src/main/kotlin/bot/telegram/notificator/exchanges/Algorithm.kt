@@ -2,7 +2,7 @@ package bot.telegram.notificator.exchanges
 
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.exchanges.clients.*
-import bot.telegram.notificator.exchanges.clients.socket.Stream
+import bot.telegram.notificator.exchanges.clients.stream.Stream
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
@@ -32,7 +32,7 @@ abstract class Algorithm(
     val maxRange = botSettings.tradingRange.second
     val ordersListForRemove: MutableList<Pair<String, Order>> = mutableListOf()
 
-    private val path: String = "exchangeBots/${botSettings.name}"
+    protected val path: String = "exchangeBots/${botSettings.name}"
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 

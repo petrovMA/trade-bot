@@ -1,6 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
-import bot.telegram.notificator.exchanges.clients.socket.StreamThreadBinanceImpl
+import bot.telegram.notificator.exchanges.clients.stream.StreamThreadBinanceImpl
 import bot.telegram.notificator.libs.UnknownOrderSide
 import mu.KotlinLogging
 import okhttp3.OkHttpClient

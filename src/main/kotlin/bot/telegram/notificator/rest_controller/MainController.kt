@@ -3,10 +3,8 @@ package bot.telegram.notificator.rest_controller
 import bot.telegram.notificator.TaskExecutor
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.exchanges.clients.*
-import bot.telegram.notificator.exchanges.getConfigByExchange
 import bot.telegram.notificator.libs.readConf
 import bot.telegram.notificator.telegram.TelegramBot
-import com.typesafe.config.Config
 import mu.KLogger
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
@@ -54,31 +52,28 @@ class MainController {
             throw e
         }
     }
-    data class MyResponse(val status: String, val data: Any)
+    data class Response(val status: String, val data: Any)
+    data class BotsInfoResponse(val settings: BotSettings, val position: Any)
 
     @PostMapping("/endpoint/trade")
-    fun receivePostTrade(@RequestBody request: String): ResponseEntity<MyResponse> {
+    fun receivePostTrade(@RequestBody request: String): ResponseEntity<Response> {
         log.info("Request for /endpoint/trade = $request")
 
         // process the request here and prepare the response
-        val response = MyResponse("success", "Received $request")
-        log.info("Response for /endpoint/trade = $response")
-
-//        val notification = request.deserialize<Notification>()
+        val response = Response("success", "Received $request")
+        log.debug("Response for /endpoint/trade = $response")
 
         bot.communicator.sendOrder(request)
-
-//        bot.sendMessage("Order:\n```json\n${json(notification)}```", true)
 
         return ResponseEntity.ok(response)
     }
 
-    @GetMapping("/test")
-    fun receiveGet(): ResponseEntity<MyResponse> {
+    @GetMapping("/positions")
+    fun positionsGet(): ResponseEntity<Any> {
         // process the request here and prepare the response
-        val response = MyResponse("success", "Response: 'Hi!'")
-        log.info("Response for /test = $response")
+        val infoResponse = bot.communicator.getInfo().map { BotsInfoResponse(it.first, it.second) }
+        log.info("Response for /positions = $infoResponse")
 
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(infoResponse)
     }
 }
