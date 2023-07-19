@@ -253,4 +253,6 @@ abstract class Algorithm(
     }
 
     fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
+
+    override fun toString(): String = "status = ${socket.state}, settings = $botSettings"
 }

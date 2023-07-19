@@ -64,6 +64,11 @@ data class TradePair(val first: String, val second: String) {
 
     override fun toString(): String = "${first}_$second"
     fun toCurrencyPair() = CurrencyPair(first, second)
+
+    override fun equals(other: Any?) =
+        other is TradePair && other.first.equals(first, true) && other.second.equals(second, true)
+
+    override fun hashCode(): Int = 31 * first.hashCode() + second.hashCode()
 }
 
 fun stub(pair: TradePair = TradePair("none", "none")): Order = Order(
