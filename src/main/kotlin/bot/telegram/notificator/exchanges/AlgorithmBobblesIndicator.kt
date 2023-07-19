@@ -50,7 +50,7 @@ class AlgorithmBobblesIndicator(
 
     private var ratio = RatioSetting()
 
-    lateinit var positions: VirtualPositions
+    var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
 
     override fun run() {
 //        saveBotSettings(botSettings)
@@ -285,4 +285,6 @@ class AlgorithmBobblesIndicator(
                 }
             }
         }
+
+    override fun toString(): String = "status = $state, settings = $botSettings"
 }

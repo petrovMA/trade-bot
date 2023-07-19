@@ -516,9 +516,18 @@ class Communicator(
 
         log.info("tradePairs:\n $tradePairs")
 
-        tradePairs
-            .filter { it.value.botSettings.pair == TradePair(notification.pair) }
-            .forEach { (_, v) -> v.queue.add(BotEvent(message, BotEvent.Type.CREATE_ORDER)) }
+        val founded = tradePairs.filter { it.value.botSettings.pair == TradePair(notification.pair) }
+//            .forEach { (_, v) -> v.queue.add(BotEvent(message, BotEvent.Type.CREATE_ORDER)) }
+
+        log.info("founded by filter:\n $founded")
+
+        val getByKey = tradePairs["test_ETH_USDT"]
+
+        log.info("get by key test_ETH_USDT:\n $getByKey")
+
+        getByKey?.queue
+            ?.add(BotEvent(message, BotEvent.Type.CREATE_ORDER))
+            ?: sendMessage("TradePair ${notification.pair} not found", false)
     }
 
     private fun parseTradeBotSettings(p: List<String>): Pair<String, BotSettings?> {
