@@ -1,6 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
-import bot.telegram.notificator.exchanges.clients.stream.StreamThreadBinanceImpl
+import bot.telegram.notificator.exchanges.clients.stream.StreamBinanceImpl
 import bot.telegram.notificator.libs.UnknownOrderSide
 import mu.KotlinLogging
 import okhttp3.OkHttpClient
@@ -245,7 +245,7 @@ class ClientByBit(
 
 
     override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
-        StreamThreadBinanceImpl(
+        StreamBinanceImpl(
             pair = pair.toCurrencyPair(),
             queue = queue,
             sec = sec,

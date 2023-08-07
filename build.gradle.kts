@@ -1,7 +1,7 @@
 plugins {
     id("org.springframework.boot") version "3.1.0"
-    kotlin("jvm") version "1.8.0"
-    id("org.jetbrains.kotlin.plugin.spring") version "1.8.0"
+    kotlin("jvm") version "1.9.0"
+    id("org.jetbrains.kotlin.plugin.spring") version "1.9.0"
     application
 }
 
@@ -22,6 +22,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation("org.springframework.boot:spring-boot-starter-web:3.1.0") {
         exclude(group = "ch.qos.logback", module = "logback-classic")
+        exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
     }
     implementation("org.apache.commons:commons-lang3:3.12.0")
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
@@ -33,13 +34,13 @@ dependencies {
     implementation("org.apache.poi:poi:5.2.2") // exel table
 
     // exchanges
-    implementation("org.knowm.xchange:xchange-core:5.1.0")
-    implementation("org.knowm.xchange:xchange-binance:5.1.0")
-    implementation("org.knowm.xchange:xchange-stream-binance:5.1.0")
-    implementation("org.knowm.xchange:xchange-huobi:5.1.0")
-    implementation("org.knowm.xchange:xchange-gateio:5.1.0")
+    implementation("org.knowm.xchange:xchange-core:5.1.1-SNAPSHOT")
+    implementation("org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT")
+    implementation("org.knowm.xchange:xchange-stream-binance:5.1.1-SNAPSHOT")
+    implementation("org.knowm.xchange:xchange-huobi:5.1.1-SNAPSHOT")
+    implementation("org.knowm.xchange:xchange-gateio:5.1.1-SNAPSHOT")
 //    implementation("org.knowm.xchange:xchange-bybit:5.0.12")
-    implementation("org.knowm.xchange:xchange-stream-huobi:5.1.0")
+    implementation("org.knowm.xchange:xchange-stream-huobi:5.1.1-SNAPSHOT")
 
     implementation("org.slf4j:slf4j-api:2.0.5")
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")

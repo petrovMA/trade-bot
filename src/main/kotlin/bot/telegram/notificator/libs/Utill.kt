@@ -23,6 +23,7 @@ import java.text.SimpleDateFormat
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.*
+import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 
@@ -213,7 +214,7 @@ fun calcExecuted(orderB: Order, orderS: Order, balanceTrade: BigDecimal): String
                 }%"
     }
 
-fun <E> LinkedBlockingDeque<E>.poll(time: Duration): E? = this.poll(time.seconds, TimeUnit.SECONDS)
+fun <E> BlockingQueue<E>.poll(time: Duration): E? = this.poll(time.seconds, TimeUnit.SECONDS)
 
 fun wait(time: Duration) = Thread.sleep(time.toMillis())
 

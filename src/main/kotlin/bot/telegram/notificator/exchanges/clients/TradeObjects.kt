@@ -3,6 +3,7 @@ package bot.telegram.notificator.exchanges.clients
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
+import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
 import java.math.BigDecimal
 
@@ -93,6 +94,11 @@ enum class SIDE {
             org.knowm.xchange.dto.Order.OrderType.ASK -> SELL
             else -> throw UnknownOrderSide("Error, type: $type")
         }
+        fun valueOf(side: OrderSide) = when (side) {
+            OrderSide.BUY -> BUY
+            OrderSide.SELL -> SELL
+            else -> throw UnknownOrderSide("Error, side: $side")
+        }
     }
 
     fun toType() = when (this) {
@@ -127,6 +133,18 @@ enum class STATUS {
 
             org.knowm.xchange.dto.Order.OrderStatus.FILLED -> FILLED
             org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> PARTIALLY_FILLED
+            else -> throw UnknownOrderStatus("Error: Unknown status '$status'!")
+        }
+        fun valueOf(status: org.knowm.xchange.binance.dto.trade.OrderStatus) = when (status) {
+            org.knowm.xchange.binance.dto.trade.OrderStatus.NEW -> NEW
+
+            org.knowm.xchange.binance.dto.trade.OrderStatus.CANCELED -> CANCELED
+            org.knowm.xchange.binance.dto.trade.OrderStatus.REJECTED -> CANCELED
+            org.knowm.xchange.binance.dto.trade.OrderStatus.EXPIRED -> CANCELED
+            org.knowm.xchange.binance.dto.trade.OrderStatus.PENDING_CANCEL -> CANCELED
+
+            org.knowm.xchange.binance.dto.trade.OrderStatus.FILLED -> FILLED
+            org.knowm.xchange.binance.dto.trade.OrderStatus.PARTIALLY_FILLED -> PARTIALLY_FILLED
             else -> throw UnknownOrderStatus("Error: Unknown status '$status'!")
         }
     }
@@ -176,6 +194,7 @@ data class OrderBook(val bids: List<Offer>, val asks: List<Offer>) : CommonExcha
 
 enum class ExchangeEnum {
     BINANCE,
+    BINANCE_FUTURES,
     BITMAX,
     HUOBI,
     GATE,
