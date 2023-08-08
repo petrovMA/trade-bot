@@ -50,7 +50,7 @@ abstract class Algorithm(
     private val settingsPath = "$path/settings.json"
 
     val ordersPath = "$path/orders"
-    val orders: MutableMap<String, Order> =
+    open val orders: MutableMap<String, Order> =
         if (isEmulate.not()) ObservableHashMap(
             filePath = ordersPath,
             keyToFileName = { key -> key.replace('.', '_') + ".json" },
@@ -137,10 +137,10 @@ abstract class Algorithm(
         throw Exception("${botSettings.name} Error: Can't send order.")
     }
 
-    fun synchronizeOrders() {
+    open fun synchronizeOrders() {
         when (orders) {
             is ObservableHashMap -> {
-                orders.readFromFile()
+                (orders as ObservableHashMap).readFromFile()
 
                 var price = minRange
                 val openOrders = client.getOpenOrders(botSettings.pair)

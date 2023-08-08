@@ -12,6 +12,7 @@ import java.io.File
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
+import kotlin.collections.HashMap
 import kotlin.math.abs
 
 
@@ -47,6 +48,7 @@ class AlgorithmBobblesIndicator(
     private var lastTradePrice: BigDecimal = 0.toBigDecimal()
     private var klineConstructor = KlineConstructor(interval)
     private var candlestickList = ListLimit<Candlestick>(limit = 50)
+    override val orders: MutableMap<String, Order> = HashMap<String, Order>()
 
     private var ratio = RatioSetting()
 
@@ -58,7 +60,7 @@ class AlgorithmBobblesIndicator(
         try {
 //            if (File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
 
-//            synchronizeOrders()
+            synchronizeOrders()
 
             socket.run { start() }
 
@@ -84,6 +86,11 @@ class AlgorithmBobblesIndicator(
                         is Order -> {
                             if (msg.pair == botSettings.pair) {
                                 send("#${msg.status} Order update:\n```json\n$msg\n```", true)
+
+                                if (msg.status != STATUS.NEW && orders[msg.orderId] == null)
+                                    synchronizeOrders()
+                                else
+                                    orders[msg.orderId] = msg
                             }
                         }
 
@@ -139,14 +146,14 @@ class AlgorithmBobblesIndicator(
                                     if (order.amount > 0.005 && order.price == null && order.placeOrder) {
 
                                         if (ratio.buyRatio > BigDecimal.ZERO && side == SIDE.BUY) {
-                                            sentOrderTEMPLATE(
+                                            sentOrder(
                                                 price = price,
                                                 amount = order.amount.toBigDecimal() * ratio.buyRatio,
                                                 orderSide = side,
                                                 orderType = TYPE.LIMIT
                                             )
                                         } else if (ratio.sellRatio > BigDecimal.ZERO && side == SIDE.SELL) {
-                                            sentOrderTEMPLATE(
+                                            sentOrder(
                                                 price = price,
                                                 amount = order.amount.toBigDecimal() * ratio.sellRatio,
                                                 orderSide = side,
@@ -202,40 +209,12 @@ class AlgorithmBobblesIndicator(
         }
     }
 
-    fun sentOrderTEMPLATE(
-        price: BigDecimal,
-        amount: BigDecimal,
-        orderSide: SIDE,
-        orderType: TYPE,
-        isStaticUpdate: Boolean = false,
-        isCloseOrder: Boolean = false
-    ): Order? {
+    override fun synchronizeOrders() {
+        orders.clear()
 
-        log?.info("${botSettings.name} Sent $orderType order with params: price = $price; amount = $amount; side = $orderSide")
-
-        var order = Order(
-            orderId = "",
-            pair = botSettings.pair,
-            price = price,
-            origQty = amount,
-            executedQty = BigDecimal(0),
-            side = orderSide,
-            type = orderType,
-            status = STATUS.NEW
-        )
-
-        try {
-            order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
-            log?.debug("${botSettings.name} Order sent: $order")
-            return order
-        } catch (e: ExchangeException) {
-            log?.info("${botSettings.name} ${e.message}")
-            return null
-        } catch (t: Throwable) {
-            log?.error("${botSettings.name} ${t.message}", t)
-            send("#Error_${botSettings.name}: \n${printTrace(t)}")
-            throw t
-        }
+        client
+            .getAllOpenOrders(listOf(botSettings.pair))[botSettings.pair]
+            ?.forEach { orders[it.orderId] = it }
     }
 
     private fun getKlineWithIndicator(): Candlestick {
