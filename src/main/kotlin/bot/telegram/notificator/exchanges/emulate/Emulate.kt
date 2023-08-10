@@ -94,7 +94,7 @@ class Emulate(
 
         return writeIntoExcelNew(
             file = File(
-                "exchange/emulate/results/${botSettings.direction}_${botSettings.ordersType}_${pair}_start_${startDate}___end_${endDate}___time_" +
+                "exchange/emulate/results/${botSettings.name}_${botSettings.pair}_start_${startDate}___end_${endDate}___time_" +
                         "${convertTime(LocalDateTime.now(), "yyyy_MM_dd__HH_mm_ss")}.xls"
             ),
             head = listOf(

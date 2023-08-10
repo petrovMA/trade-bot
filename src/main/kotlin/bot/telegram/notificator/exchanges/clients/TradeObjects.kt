@@ -3,6 +3,7 @@ package bot.telegram.notificator.exchanges.clients
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
+import com.google.gson.annotations.SerializedName
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.derivative.FuturesContract
@@ -217,13 +218,14 @@ data class Candlestick(
 ) : CommonExchangeData
 
 abstract class BotSettings(
-    open val name: String,
-    open val pair: TradePair,
-    open val exchange: String,
-    open val orderBalanceType: String,
-    open val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
-    open val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    open val feePercent: BigDecimal // fee for calc profit
+    val type: String = "",
+    @SerializedName("settings_name") open val name: String,
+    @SerializedName("settings_pair") open val pair: TradePair,
+    @SerializedName("settings_exchange") open val exchange: String,
+    @SerializedName("settings_orderBalanceType") open val orderBalanceType: String,
+    @SerializedName("settings_countOfDigitsAfterDotForAmount") open val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    @SerializedName("settings_countOfDigitsAfterDotForPrice") open val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    @SerializedName("settings_feePercent") open val feePercent: BigDecimal // fee for calc profit
 )
 
 data class BotSettingsTrader(
@@ -253,7 +255,7 @@ data class BotSettingsTrader(
     feePercent = feePercent
 )
 
-abstract class BotSettingsBobblesIndicator(
+data class BotSettingsBobblesIndicator(
     override val name: String,
     override val pair: TradePair,
     override val exchange: String,
@@ -261,7 +263,9 @@ abstract class BotSettingsBobblesIndicator(
     override val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
     override val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
     override val feePercent: BigDecimal, // fee for calc profit
-    val minOrderSize: BigDecimal // min order size
+    val minOrderSize: BigDecimal, // min order size
+    val buyAmountMultiplication: BigDecimal, // buy order size Multiplication
+    val sellAmountMultiplication: BigDecimal // sell order size Multiplication
 ) : BotSettings(
     name = name,
     pair = pair,

@@ -26,7 +26,7 @@ fun main() {
     PropertyConfigurator.configure("log4j.properties")
 
 //    val conf = readConf("exchangeConfigs/BYBIT.conf")!!
-    val conf = readConf("exchangeConfigs/BINANCE.conf")!!
+    val conf = readConf("exchangeConfigs/BINANCE_FUTURES.conf")!!
 
     val api = conf.getString("api")
     val sec = conf.getString("sec")

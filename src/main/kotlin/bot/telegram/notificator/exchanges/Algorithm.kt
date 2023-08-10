@@ -29,7 +29,7 @@ abstract class Algorithm(
     val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
     val ordersListForRemove: MutableList<Pair<String, Order>> = mutableListOf()
 
-    protected val path: String = "exchangeBots/${botSettings.name}"
+    protected val path: String = "exchangeBots/${botSettings.name}".also { File(it).mkdirs() }
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 

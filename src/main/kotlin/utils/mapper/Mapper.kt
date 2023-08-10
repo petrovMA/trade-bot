@@ -1,6 +1,12 @@
 package utils.mapper
 
+import bot.telegram.notificator.exchanges.clients.BotSettings
+import bot.telegram.notificator.exchanges.clients.BotSettingsBobblesIndicator
+import bot.telegram.notificator.exchanges.clients.BotSettingsTrader
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonDeserializationContext
+import com.google.gson.JsonDeserializer
+import com.google.gson.JsonElement
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -10,7 +16,10 @@ import java.lang.reflect.Type
  * Converts json to java object and vice versa
  */
 object Mapper {
-    private val gson = GsonBuilder().setPrettyPrinting().create()
+    private val gson = GsonBuilder()
+        .setPrettyPrinting()
+        .registerTypeAdapter(BotSettings::class.java, BotSettingsDeserializer())
+        .create()
 
     @JvmStatic
     fun <T> asObject(json: String, clazz: Class<T>): T = gson.fromJson(json, clazz)
@@ -36,6 +45,17 @@ object Mapper {
             gson.toJson(message, it)
             it.flush()
             it.close()
+        }
+    }
+
+    class BotSettingsDeserializer : JsonDeserializer<BotSettings> {
+        override fun deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext): BotSettings {
+            val jsonObject = json.asJsonObject
+
+            return when (jsonObject.get("type").asString) {
+                "bobbles" -> context.deserialize(json, BotSettingsBobblesIndicator::class.java)
+                else -> context.deserialize(json, BotSettingsTrader::class.java)
+            }
         }
     }
 }

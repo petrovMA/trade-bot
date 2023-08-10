@@ -11,7 +11,8 @@ data class Commands(
         val commandStatus: Regex = "/?status".toRegex(),
         val commandScan: Regex = "/?scan".toRegex(),
         val commandCreateAll: Regex = "/?create all".toRegex(),
-        val commandCreate: Regex = "/?create\\s+[\\w-]{3,15}".toRegex(),
+        val commandCreate: Regex = "/?[Cc]reate\\s+[\\w:,\"{}\\.\\s]+".toRegex(),
+        val commandUpdate: Regex = "/?[Uu]pdate\\s+[\\w:,\"{}\\.\\s]+".toRegex(),
         val commandStart: Regex = "/?start\\s+[\\w-]{3,15}".toRegex(),
         val commandStartAll: Regex = "/?start all".toRegex(),
         val commandBalance: Regex = "/?[Bb]alance(\\s([\\w-]{3,15}))*".toRegex(),
@@ -31,7 +32,7 @@ data class Commands(
         val commandFindParams: Regex = "/?[Ff]indParams\\s+[A-z]{4,11}\\s+.{1,50}\\s+\\d{4}_\\d{2}_\\d{2}\\s+\\d{4}_\\d{2}_\\d{2}".toRegex(),
         val commandTradePairsInit: Regex = "/?[Tt]radePairs\\s+[Ii]nit".toRegex(),
         val commandCollect: Regex = "/?[Cc]ollect\\s+[A-z]{4,11}\\s+[A-z]{3,100}".toRegex(),
-        val commandSettings: Regex = "/?[Ss]ettings\\s+[\\w-]{3,15}[\\w\\d:,\"{}\\.\\s]+".toRegex()
+        val commandSettings: Regex = "/?[Ss]ettings\\s+[\\w:,\"{}\\.\\s]+".toRegex()
 ) {
     override fun toString(): String = """
         commandStatus = $commandStatus

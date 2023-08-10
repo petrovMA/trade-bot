@@ -4,7 +4,6 @@ import bot.telegram.notificator.ListLimit
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.rest_controller.Notification
-import bot.telegram.notificator.rest_controller.RatioSetting
 import com.typesafe.config.Config
 import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
 import mu.KotlinLogging
@@ -40,7 +39,7 @@ class AlgorithmBobblesIndicator(
     isEmulate = isEmulate,
     sendMessage = sendMessage
 ) {
-    override val botSettings: BotSettingsBobblesIndicator = super.botSettings as BotSettingsBobblesIndicator
+    private var settings: BotSettingsBobblesIndicator = super.botSettings as BotSettingsBobblesIndicator
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
@@ -50,11 +49,9 @@ class AlgorithmBobblesIndicator(
     private var lastTradePrice: BigDecimal = 0.toBigDecimal()
     private var klineConstructor = KlineConstructor(interval)
     private var candlestickList = ListLimit<Candlestick>(limit = 50)
-    override val orders: MutableMap<String, Order> = HashMap<String, Order>()
+    override val orders: MutableMap<String, Order> = HashMap()
 
-    private var ratio = RatioSetting()
-
-    private var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+    var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
     private var exchangePosition: ExchangePosition? = null
 
     override fun run() {
@@ -76,25 +73,27 @@ class AlgorithmBobblesIndicator(
                     when (msg) {
                         is Trade -> {
                             lastTradePrice = msg.price
-                            log?.trace("${botSettings.pair} TradeEvent:\n$msg")
+                            log?.trace("${settings.pair} TradeEvent:\n$msg")
 
                             klineConstructor.nextKline(msg).forEach { kline ->
                                 if (kline.isClosed) {
                                     candlestickList.add(kline.candlestick)
-                                    log?.debug("${botSettings.pair} Kline closed:\n${kline.candlestick}")
+                                    log?.debug("${settings.pair} Kline closed:\n${kline.candlestick}")
                                 }
                             }
                         }
 
                         is BinanceFuturesPosition -> {
-                            if (TradePair(msg.futuresContract) == botSettings.pair) {
+                            if (TradePair(msg.futuresContract) == settings.pair) {
                                 exchangePosition = ExchangePosition(msg)
                                 log?.info("ExchangePosition:\n$msg")
                             }
                         }
+                        // todo ADD Balance listener
+                        // todo ADD BinanceFuturesPositions listener
 
                         is Order -> {
-                            if (msg.pair == botSettings.pair) {
+                            if (msg.pair == settings.pair) {
 
                                 log?.info("OrderUpdate:\n$msg")
 
@@ -112,8 +111,8 @@ class AlgorithmBobblesIndicator(
                                         updatePositions(
                                             Notification(
                                                 price = msg.price!!,
-                                                amount = msg.executedQty - msg.executedQty.percent(botSettings.feePercent),
-                                                pair = botSettings.pair.toString(),
+                                                amount = msg.executedQty - msg.executedQty.percent(settings.feePercent),
+                                                pair = settings.pair.toString(),
                                                 type = msg.side.toString(),
                                             ),
                                             price = msg.price!!
@@ -121,11 +120,12 @@ class AlgorithmBobblesIndicator(
                                     }
 
                                     STATUS.CANCELED, STATUS.REJECTED -> orders.remove(msg.orderId)
-                                    else -> log?.info("${botSettings.name} Unsupported order status: ${msg.status}")
+                                    else -> log?.info("${settings.name} Unsupported order status: ${msg.status}")
                                 }
 
-                                send("#${msg.status} Order update:\n```json\n$msg\n```\n\n" +
-                                        "Position:\n```${exchangePosition?.let { json(it) }}```", true
+                                send(
+                                    "#${msg.status} Order update:\n```json\n$msg\n```\n\n" +
+                                            "Position:\n```${exchangePosition?.let { json(it) }}```", true
                                 )
                             }
                         }
@@ -180,22 +180,22 @@ class AlgorithmBobblesIndicator(
                                     val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
                                     val price = if (side == SIDE.BUY) kline.low else kline.high
 
-                                    if (notification.amount > botSettings.minOrderSize
+                                    if (notification.amount > settings.minOrderSize
                                         && notification.price == null
                                         && notification.placeOrder
                                     ) {
 
-                                        if (ratio.buyRatio > BigDecimal.ZERO && side == SIDE.BUY) {
+                                        if (settings.buyAmountMultiplication > BigDecimal.ZERO && side == SIDE.BUY) {
                                             sentOrder(
                                                 price = price,
-                                                amount = notification.amount * ratio.buyRatio,
+                                                amount = notification.amount * settings.buyAmountMultiplication,
                                                 orderSide = side,
                                                 orderType = TYPE.LIMIT
                                             )
-                                        } else if (ratio.sellRatio > BigDecimal.ZERO && side == SIDE.SELL) {
+                                        } else if (settings.sellAmountMultiplication > BigDecimal.ZERO && side == SIDE.SELL) {
                                             sentOrder(
                                                 price = price,
-                                                amount = notification.amount * ratio.sellRatio,
+                                                amount = notification.amount * settings.sellAmountMultiplication,
                                                 orderSide = side,
                                                 orderType = TYPE.LIMIT
                                             )
@@ -209,9 +209,9 @@ class AlgorithmBobblesIndicator(
                                 }
 
                                 BotEvent.Type.SET_SETTINGS -> {
-                                    ratio = msg.text.deserialize()
+                                    updateSettings(msg.text.deserialize())
 
-                                    send("Settings:\n```json\n${json(ratio)}```", true)
+                                    send("Settings:\n```json\n${json(settings)}```", true)
                                 }
 
                                 BotEvent.Type.INTERRUPT -> {
@@ -219,26 +219,26 @@ class AlgorithmBobblesIndicator(
                                     return
                                 }
 
-                                else -> send("${botSettings.name} Unsupported command: ${msg.type}")
+                                else -> send("${settings.name} Unsupported command: ${msg.type}")
                             }
                         }
 
-                        else -> log?.warn("${botSettings.name} Unsupported message: $msg")
+                        else -> log?.warn("${settings.name} Unsupported message: $msg")
                     }
 
                     msg = if (isEmulate) client.nextEvent() /* only for test */
                     else queue.poll(waitTime)
 
                 } catch (e: InterruptedException) {
-                    log?.error("${botSettings.name} ${e.message}", e)
-                    send("#Error_${botSettings.name}: \n${printTrace(e)}")
+                    log?.error("${settings.name} ${e.message}", e)
+                    send("#Error_${settings.name}: \n${printTrace(e)}")
                     if (stopThread) return
                 }
             } while (true)
 
         } catch (e: Exception) {
-            log?.error("${botSettings.name} MAIN ERROR:\n", e)
-            send("#Error_${botSettings.name}: \n${printTrace(e)}")
+            log?.error("${settings.name} MAIN ERROR:\n", e)
+            send("#Error_${settings.name}: \n${printTrace(e)}")
         } finally {
             interruptThis()
         }
@@ -248,7 +248,7 @@ class AlgorithmBobblesIndicator(
         orders.clear()
 
         client
-            .getAllOpenOrders(listOf(botSettings.pair))[botSettings.pair]
+            .getAllOpenOrders(listOf(settings.pair))[settings.pair]
             ?.forEach { orders[it.orderId] = it }
     }
 
@@ -327,5 +327,10 @@ class AlgorithmBobblesIndicator(
         )
     }
 
-    override fun toString(): String = "status = $state, settings = $botSettings"
+    override fun toString(): String = "status = $state, settings = $settings"
+
+    private fun updateSettings(botSettings: BotSettingsBobblesIndicator) {
+        settings = botSettings
+        saveBotSettings(settings)
+    }
 }

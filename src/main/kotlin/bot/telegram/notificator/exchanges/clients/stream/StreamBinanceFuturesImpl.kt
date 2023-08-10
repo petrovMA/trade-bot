@@ -23,7 +23,7 @@ class StreamBinanceFuturesImpl(
 
     override fun run() {
         if (pair is FuturesContract) pair
-        else throw RuntimeException("")
+        else throw RuntimeException("Instrument: $pair is not FuturesContract")
 
         try {
             val specFutures = StreamingExchangeFactory.INSTANCE

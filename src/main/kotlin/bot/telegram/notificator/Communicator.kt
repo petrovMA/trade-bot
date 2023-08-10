@@ -5,7 +5,6 @@ import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.exchanges.emulate.Emulate
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.rest_controller.Notification
-import bot.telegram.notificator.rest_controller.RatioSetting
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
@@ -62,26 +61,26 @@ class Communicator(
 //        repeatEvery({ getStatistics() }, this.intervalStatistic, this.timeDifference)
 
         // todo ETH_USDT just for test:
-        tradePairs["test_ETH_USDT"] = AlgorithmBobblesIndicator(
-            botSettings = BotSettings(
-                name = "test_ETH_USDT",
-                pair = TradePair("ETH_USDT"),
-                exchange = "BINANCE",
-                direction = DIRECTION.SHORT,
-                ordersType = TYPE.LIMIT,
-                tradingRange = 0.0.toBigDecimal() to 0.0.toBigDecimal(),
-                orderSize = 0.toBigDecimal(), // Order Quantity:: order size
-                orderBalanceType = "first",
-                orderDistance = 0.toBigDecimal(),
-                triggerDistance = 0.toBigDecimal(),
-                orderMaxQuantity = 0,
-                countOfDigitsAfterDotForAmount = 4,
-                countOfDigitsAfterDotForPrice = 2
-            ),
-            sendMessage = sendMessage,
-        )
-
-        tradePairs["test_ETH_USDT"]?.start()
+//        tradePairs["test_ETH_USDT"] = AlgorithmBobblesIndicator(
+//            botSettings = BotSettingsTrader(
+//                name = "test_ETH_USDT",
+//                pair = TradePair("ETH_USDT"),
+//                exchange = "BINANCE",
+//                direction = DIRECTION.SHORT,
+//                ordersType = TYPE.LIMIT,
+//                tradingRange = 0.0.toBigDecimal() to 0.0.toBigDecimal(),
+//                orderSize = 0.toBigDecimal(), // Order Quantity:: order size
+//                orderBalanceType = "first",
+//                orderDistance = 0.toBigDecimal(),
+//                triggerDistance = 0.toBigDecimal(),
+//                orderMaxQuantity = 0,
+//                countOfDigitsAfterDotForAmount = 4,
+//                countOfDigitsAfterDotForPrice = 2
+//            ),
+//            sendMessage = sendMessage,
+//        )
+//
+//        tradePairs["test_ETH_USDT"]?.start()
     }
 
     fun onUpdate(message: String) {
@@ -281,7 +280,47 @@ class Communicator(
                     }
 
                     cmd.commandCreate.matches(message) -> {
-                        msg += "Command '${cmd.commandCreate}' not supported yet!"
+                        val params = message.split("\\n+".toRegex(), limit = 2)
+
+                        try {
+                            params[1].deserialize<BotSettings>()
+                        } catch (t: Throwable) {
+                            msg = "Incorrect settings format:\n${params[1]}"
+                            log.warn("Incorrect settings format:\n${params[1]}", t)
+                            null
+                        }?.let { botSettings ->
+
+                            if (tradePairs[botSettings.name] == null) {
+                                tradePairs[botSettings.name] =
+                                    AlgorithmBobblesIndicator(botSettings, sendMessage = sendMessage)
+
+                                log.info("new AlgorithmBobblesIndicator: $botSettings")
+
+                            } else {
+                                msg = "TradePair with name '${botSettings.name}' already exist!"
+                                log.info("TradePair with name '${botSettings.name}' already exist!")
+                            }
+                        }
+                    }
+
+                    cmd.commandUpdate.matches(message) -> {
+                        val params = message.split("\\n+".toRegex(), limit = 2)
+
+                        try {
+                            params[1].deserialize<BotSettings>()
+                        } catch (t: Throwable) {
+                            msg = "Incorrect settings format:\n${params[1]}"
+                            log.warn("Incorrect settings format:\n${params[1]}", t)
+                            null
+                        }?.let { botSettings ->
+                            tradePairs[botSettings.name]
+                                ?.queue
+                                ?.add(BotEvent(json(botSettings), BotEvent.Type.SET_SETTINGS))
+                                ?: run {
+                                    msg = "TradePair with name '${botSettings.name}' not exist!"
+                                    log.info("TradePair with name '${botSettings.name}' not exist!")
+                                }
+                        }
                     }
 
                     cmd.commandStartAll.matches(message) -> {
@@ -297,7 +336,7 @@ class Communicator(
                     cmd.commandStart.matches(message) -> {
                         val param = message.split("\\s+".toRegex())
                         if (param.size == 2) {
-                            val key = param[1].uppercase()
+                            val key = param[1]
                             msg = get(key)?.start()?.let {
                                 log.info("$key started")
                                 "$key started"
@@ -484,7 +523,7 @@ class Communicator(
                             val key = param[1]
                             get(key)?.let { tradePair ->
 
-                                val settings = params[1].deserialize<RatioSetting>()
+                                val settings = params[1].deserialize<BotSettings>()
 
                                 log.info("new settings: $settings\nfor tradePair: $key")
 
@@ -652,7 +691,7 @@ class Communicator(
                 && countOfDigitsAfterDotForAmount != null
                 && countOfDigitsAfterDotForPrice != null
             ) {
-                return msg to BotSettings(
+                return msg to BotSettingsTrader(
                     name = name,
                     pair = TradePair(pair),
                     exchange = exchange,
