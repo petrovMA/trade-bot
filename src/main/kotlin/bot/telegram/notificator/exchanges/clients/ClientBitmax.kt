@@ -175,7 +175,7 @@ class ClientBitmax(
             throw RuntimeException("Error placeOrderResponse: $resp")
     }
 
-    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream {
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream {
 
         val url = "wss://ascendex.com/$accountGroup/api/pro/v1/stream"
 

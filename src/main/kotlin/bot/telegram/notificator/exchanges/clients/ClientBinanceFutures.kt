@@ -1,7 +1,6 @@
 package bot.telegram.notificator.exchanges.clients
 
 import bot.telegram.notificator.exchanges.clients.stream.StreamBinanceFuturesImpl
-import bot.telegram.notificator.exchanges.clients.stream.StreamBinanceImpl
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import bot.telegram.notificator.libs.UnsupportedOrderTypeException
@@ -34,9 +33,9 @@ class ClientBinanceFutures(
     private val log = KotlinLogging.logger {}
 
     override fun getAllPairs(): List<TradePair> = instance
-            .exchangeMetaData
-            .instruments
-            .map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
+        .exchangeMetaData
+        .instruments
+        .map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
 
     fun getFutureExchangeInfo(): BinanceExchangeInfo = accountService.futureExchangeInfo
 
@@ -262,7 +261,7 @@ class ClientBinanceFutures(
     }
 
 
-    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamBinanceFuturesImpl(
             pair = FuturesContract(pair.toCurrencyPair(), "PERPETUAL"),
             queue = queue,

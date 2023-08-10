@@ -118,6 +118,7 @@ fun BigDecimal.div8(by: BigDecimal): BigDecimal = this.divide(by, 8, RoundingMod
 
 fun BigDecimal.percent(amountOfPercents: BigDecimal = 1.0.toBigDecimal()): BigDecimal =
     this.divide(100.toBigDecimal(), 8, RoundingMode.HALF_UP) * amountOfPercents
+
 fun BigDecimal.round(scale: Int = 8): BigDecimal = setScale(scale, RoundingMode.HALF_EVEN)
 
 fun Int.ms(): Duration = Duration.ofMillis(this.toLong())

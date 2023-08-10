@@ -244,7 +244,7 @@ class ClientByBit(
     }*/
 
 
-    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamBinanceImpl(
             pair = pair.toCurrencyPair(),
             queue = queue,

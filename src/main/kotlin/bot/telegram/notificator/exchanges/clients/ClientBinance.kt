@@ -28,7 +28,7 @@ import java.util.*
 import java.util.concurrent.BlockingQueue
 
 
-class ClientBinance(
+open class ClientBinance(
     private val api: String? = null,
     private val sec: String? = null,
     private val instance: Exchange = ExchangeFactory.INSTANCE.createExchange(BinanceExchange::class.java, api, sec)
@@ -263,7 +263,7 @@ class ClientBinance(
     }
 
 
-    override fun socket(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
         StreamBinanceImpl(
             pair = pair.toCurrencyPair(),
             queue = queue,

@@ -5,6 +5,7 @@ import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
+import org.knowm.xchange.derivative.FuturesContract
 import java.math.BigDecimal
 
 interface CommonExchangeData
@@ -63,6 +64,8 @@ data class TradePair(val first: String, val second: String) {
 
     constructor(pair: CurrencyPair) : this(pair.base.currencyCode, pair.counter.currencyCode)
 
+    constructor(pair: FuturesContract) : this(pair.toString())
+
     override fun toString(): String = "${first}_$second"
     fun toCurrencyPair() = CurrencyPair(first, second)
 
@@ -94,6 +97,7 @@ enum class SIDE {
             org.knowm.xchange.dto.Order.OrderType.ASK -> SELL
             else -> throw UnknownOrderSide("Error, type: $type")
         }
+
         fun valueOf(side: OrderSide) = when (side) {
             OrderSide.BUY -> BUY
             OrderSide.SELL -> SELL
@@ -135,6 +139,7 @@ enum class STATUS {
             org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> PARTIALLY_FILLED
             else -> throw UnknownOrderStatus("Error: Unknown status '$status'!")
         }
+
         fun valueOf(status: org.knowm.xchange.binance.dto.trade.OrderStatus) = when (status) {
             org.knowm.xchange.binance.dto.trade.OrderStatus.NEW -> NEW
 
@@ -211,20 +216,58 @@ data class Candlestick(
     val volume: BigDecimal
 ) : CommonExchangeData
 
-data class BotSettings(
-    val name: String,
-    val pair: TradePair,
-    val exchange: String,
+abstract class BotSettings(
+    open val name: String,
+    open val pair: TradePair,
+    open val exchange: String,
+    open val orderBalanceType: String,
+    open val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    open val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    open val feePercent: BigDecimal // fee for calc profit
+)
+
+data class BotSettingsTrader(
+    override val name: String,
+    override val pair: TradePair,
+    override val exchange: String,
     val direction: DIRECTION,
     val ordersType: TYPE,
     val tradingRange: Pair<BigDecimal, BigDecimal>,
     val orderSize: BigDecimal, // Order Quantity:: order size
-    val orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
+    override val orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
     val orderDistance: BigDecimal, // Order Distance:: distance between every order
     val triggerDistance: BigDecimal, // Trigger Distance:: distance between order and stop-order
     val enableStopOrderDistance: BigDecimal = BigDecimal(0), // enable stop order distance (stopOrderDistance = triggerDistance + enableStopOrderDistance)
     val orderMaxQuantity: Int, // Max Order count:: max amount of orders
-    val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
-    val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    val setCloseOrders: Boolean = true // set close position orders when bot starts
+    override val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    override val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    val setCloseOrders: Boolean = true, // set close position orders when bot starts
+    override val feePercent: BigDecimal = BigDecimal(0.1) // fee for calc profit
+) : BotSettings(
+    name = name,
+    pair = pair,
+    exchange = exchange,
+    orderBalanceType = orderBalanceType,
+    countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
+    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice,
+    feePercent = feePercent
+)
+
+abstract class BotSettingsBobblesIndicator(
+    override val name: String,
+    override val pair: TradePair,
+    override val exchange: String,
+    override val orderBalanceType: String,
+    override val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    override val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    override val feePercent: BigDecimal, // fee for calc profit
+    val minOrderSize: BigDecimal // min order size
+) : BotSettings(
+    name = name,
+    pair = pair,
+    exchange = exchange,
+    orderBalanceType = orderBalanceType,
+    countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
+    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice,
+    feePercent = feePercent
 )

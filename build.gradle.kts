@@ -11,7 +11,7 @@ application {
 
 group = "bot.exchange"
 version = "2.0-SNAPSHOT"
-java.sourceCompatibility = JavaVersion.VERSION_19
+java.sourceCompatibility = JavaVersion.VERSION_18
 
 repositories {
     mavenCentral()
