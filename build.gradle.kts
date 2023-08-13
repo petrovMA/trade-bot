@@ -25,7 +25,10 @@ dependencies {
         exclude(group = "ch.qos.logback", module = "logback-classic")
         exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
     }
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.1.2")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.1.2") {
+        exclude(group = "ch.qos.logback", module = "logback-classic")
+        exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
+    }
     implementation("com.h2database:h2:2.2.220")
     implementation("org.apache.commons:commons-lang3:3.12.0")
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
