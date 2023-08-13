@@ -16,6 +16,7 @@ import java.util.concurrent.BlockingQueue
 
 class Communicator(
     private val exchangeFiles: File,
+    private val exchangeBotsFiles: String,
     intervalCandlestick: Duration?,
     intervalStatistic: Duration?,
     timeDifference: Duration?,
@@ -35,10 +36,8 @@ class Communicator(
     private val intervalCandlestickUpdate: Duration = intervalCandlestick ?: 2.d()
     private val intervalStatistic: Duration = intervalStatistic ?: 4.h()
     private val timeDifference: Duration = timeDifference ?: 0.ms()
-    private var symbols = File("pairsSet").useLines { it.toList() }
 
-    private var propertyPairs: Map<String, String> = scanAll(exchangeFiles, symbols)
-    private var tradePairs: MutableMap<String, Algorithm> = emptyMap<String, Algorithm>().toMutableMap()
+    private var tradeBots: MutableMap<String, Algorithm> = emptyMap<String, Algorithm>().toMutableMap()
 
     var candlestickDataCommand: Command = candlestickDataCommandStr?.let {
         try {
@@ -88,14 +87,42 @@ class Communicator(
 
         when {
             cmd.commandScan.matches(message) -> {
-                symbols = File("pairsSet").useLines { it.toList() }
-                this.propertyPairs = scanAll(this.exchangeFiles, symbols)
-                    .mapValues {
-                        msg += "${it.key}\n"
-                        it.value
+                msg = File(exchangeBotsFiles)
+                    .run {
+                        if (exists() && isDirectory) listFiles()
+                        else emptyArray()
                     }
+                    .joinToString("\n") { it.name }
                 msg = "scanned:\n$msg"
                 log.info(msg)
+            }
+
+            cmd.commandCreate.matches(message) -> {
+                val params = message.split("\\n+".toRegex(), limit = 2)
+
+                try {
+                    params[1].deserialize<BotSettings>()
+                } catch (t: Throwable) {
+                    msg = "Incorrect settings format:\n${params[1]}"
+                    log.warn("Incorrect settings format:\n${params[1]}", t)
+                    null
+                }?.let { botSettings ->
+
+                    if (tradeBots[botSettings.name] == null) {
+                        tradeBots[botSettings.name] =
+                            AlgorithmBobblesIndicator(
+                                botSettings,
+                                exchangeBotsFiles = exchangeBotsFiles,
+                                sendMessage = sendMessage
+                            )
+
+                        log.info("new AlgorithmBobblesIndicator: $botSettings")
+
+                    } else {
+                        msg = "TradePair with name '${botSettings.name}' already exist!"
+                        log.info("TradePair with name '${botSettings.name}' already exist!")
+                    }
+                }
             }
 
             cmd.commandHelp.matches(message) -> {
@@ -176,7 +203,7 @@ class Communicator(
                 val (msgErrors, tradeBotSettings) = parseTradeBotSettings(params)
 
                 tradeBotSettings?.let {
-                    tradePairs[it.name] = AlgorithmTrader(tradeBotSettings, sendMessage = sendMessage)
+                    tradeBots[it.name] = AlgorithmTrader(tradeBotSettings, exchangeBotsFiles, sendMessage = sendMessage)
                 } ?: run { msg += "Parse params errors:\n$msgErrors" }
 
                 log.info(msg)
@@ -186,10 +213,12 @@ class Communicator(
 
                 val params = message.split("\\s+".toRegex())
                 val tradeBotSettings =
-                    readObjectFromFile(File("exchangeBots/${params[1]}/settings.json"), BotSettings::class.java)
+                    readObjectFromFile(File("$exchangeBotsFiles/${params[1]}/settings.json"), BotSettings::class.java)
 
-                tradePairs[tradeBotSettings.name] =
-                    AlgorithmTrader(tradeBotSettings, sendMessage = sendMessage)
+                tradeBots[tradeBotSettings.name] = when (tradeBotSettings.type) {
+                    "bobbles" -> AlgorithmBobblesIndicator(tradeBotSettings, exchangeBotsFiles, sendMessage = sendMessage)
+                    else -> AlgorithmTrader(tradeBotSettings, exchangeBotsFiles, sendMessage = sendMessage)
+                }
 
                 msg += "Trade bot ${tradeBotSettings.name} loaded, settings:\n```json\n${json(tradeBotSettings)}\n```"
                 send(msg, true)
@@ -202,7 +231,7 @@ class Communicator(
                 val param = message.split("\\s+".toRegex())
                 if (param.size == 2) {
                     val key = param[1]
-                    msg = tradePairs[key]?.start()?.let {
+                    msg = tradeBots[key]?.start()?.let {
                         log.info("$key started")
                         "$key started"
                     } ?: run {
@@ -212,16 +241,6 @@ class Communicator(
                 } else {
                     msg = "command 'start' must have one param"
                     log.info("command 'start' must have one param. Msg = $message")
-                }
-            }
-
-            cmd.commandShowProp.matches(message) -> {
-                propertyPairs[message.uppercase(Locale.getDefault()).split("\\s+".toRegex()).last()]?.let {
-                    msg = "properties:"
-                    readConf(it)
-                } ?: let {
-                    msg = "command must have to match RegExp '${cmd.commandShowProp}'"
-                    log.info("command must have to match RegExp '${cmd.commandShowProp}'")
                 }
             }
 
@@ -266,7 +285,7 @@ class Communicator(
                 msg += "Command '${cmd.commandTradePairsInit}' not supported yet!"
             }
 
-            else -> tradePairs.apply {
+            else -> tradeBots.apply {
 
                 when {
                     cmd.commandStatus.matches(message) -> {
@@ -279,30 +298,6 @@ class Communicator(
                         msg += "Command '${cmd.commandCreateAll}' not supported yet!"
                     }
 
-                    cmd.commandCreate.matches(message) -> {
-                        val params = message.split("\\n+".toRegex(), limit = 2)
-
-                        try {
-                            params[1].deserialize<BotSettings>()
-                        } catch (t: Throwable) {
-                            msg = "Incorrect settings format:\n${params[1]}"
-                            log.warn("Incorrect settings format:\n${params[1]}", t)
-                            null
-                        }?.let { botSettings ->
-
-                            if (tradePairs[botSettings.name] == null) {
-                                tradePairs[botSettings.name] =
-                                    AlgorithmBobblesIndicator(botSettings, sendMessage = sendMessage)
-
-                                log.info("new AlgorithmBobblesIndicator: $botSettings")
-
-                            } else {
-                                msg = "TradePair with name '${botSettings.name}' already exist!"
-                                log.info("TradePair with name '${botSettings.name}' already exist!")
-                            }
-                        }
-                    }
-
                     cmd.commandUpdate.matches(message) -> {
                         val params = message.split("\\n+".toRegex(), limit = 2)
 
@@ -313,7 +308,7 @@ class Communicator(
                             log.warn("Incorrect settings format:\n${params[1]}", t)
                             null
                         }?.let { botSettings ->
-                            tradePairs[botSettings.name]
+                            get(botSettings.name)
                                 ?.queue
                                 ?.add(BotEvent(json(botSettings), BotEvent.Type.SET_SETTINGS))
                                 ?: run {
@@ -553,20 +548,9 @@ class Communicator(
 
         val notification = message.deserialize<Notification>()
 
-        log.info("tradePairs:\n $tradePairs")
-
-        val founded = tradePairs.filter { it.value.botSettings.pair == TradePair(notification.pair) }
-//            .forEach { (_, v) -> v.queue.add(BotEvent(message, BotEvent.Type.CREATE_ORDER)) }
-
-        log.info("founded by filter:\n $founded")
-
-        val getByKey = tradePairs["test_ETH_USDT"]
-
-        log.info("get by key test_ETH_USDT:\n $getByKey")
-
-        getByKey?.queue
+        tradeBots[notification.botName]?.queue
             ?.add(BotEvent(message, BotEvent.Type.CREATE_ORDER))
-            ?: sendMessage("TradePair ${notification.pair} not found", false)
+            ?: sendMessage("TradeBot ${notification.botName} not found", false)
     }
 
     private fun parseTradeBotSettings(p: List<String>): Pair<String, BotSettings?> {
@@ -712,7 +696,7 @@ class Communicator(
         return msg to null
     }
 
-    fun getInfo() = tradePairs.values.map { it.botSettings to (it as AlgorithmBobblesIndicator).positions }
+    fun getInfo() = tradeBots.values.map { it.botSettings to (it as AlgorithmBobblesIndicator).positions }
 
     private fun getBotStartParam(params: List<String>, paramName: String, prevMsg: String): Pair<String, String> {
         var msg = prevMsg
@@ -736,7 +720,7 @@ class Communicator(
     private fun getStatistics() {
         var msg = "${cmd.commandStatus}:"
         msg += "\n${convertTime(System.currentTimeMillis())}\n"
-        tradePairs.let { pairs ->
+        tradeBots.let { pairs ->
             pairs.forEach {
 
                 msg += "\n${it.key} ${

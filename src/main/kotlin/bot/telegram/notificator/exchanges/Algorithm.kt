@@ -16,6 +16,7 @@ import kotlin.math.absoluteValue
 
 abstract class Algorithm(
     open val botSettings: BotSettings,
+    exchangeBotsFiles: String,
     val queue: LinkedBlockingDeque<CommonExchangeData>,
     val exchangeEnum: ExchangeEnum,
     val conf: Config,
@@ -29,7 +30,8 @@ abstract class Algorithm(
     val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
     val ordersListForRemove: MutableList<Pair<String, Order>> = mutableListOf()
 
-    protected val path: String = "exchangeBots/${botSettings.name}".also { File(it).mkdirs() }
+    protected val path: String = "$exchangeBotsFiles/${botSettings.name}".also { File(it).mkdirs() }
+    private val settingsPath = "$path/settings.json".also { saveBotSettings(botSettings, it) }
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
@@ -46,8 +48,6 @@ abstract class Algorithm(
     var stopThread = false
     var currentPrice: BigDecimal = 0.toBigDecimal()
     var prevPrice: BigDecimal = 0.toBigDecimal()
-
-    private val settingsPath = "$path/settings.json"
 
     val ordersPath = "$path/orders"
     open val orders: MutableMap<String, Order> =
@@ -164,7 +164,7 @@ abstract class Algorithm(
 
     fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
 
-    fun saveBotSettings(botSettings: BotSettings) {
+    fun saveBotSettings(botSettings: BotSettings, settingsPath: String = this.settingsPath) {
         val settingsDir = File(path)
 
         if (settingsDir.isDirectory.not()) Files.createDirectories(Paths.get(path))

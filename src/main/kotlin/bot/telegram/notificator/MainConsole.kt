@@ -15,6 +15,7 @@ fun main() {
     PropertyConfigurator.configure("log4j.properties")
 
     val exchangeFile = File("exchange")
+    val exchangeBotsFiles = "exchangeBots"
     val taskExecutor = TaskExecutor(LinkedBlockingDeque())
 
 
@@ -35,6 +36,7 @@ fun main() {
             ),
             taskQueue = taskExecutor.getQueue(),
             exchangeFiles = exchangeFile,
+            exchangeBotsFiles = exchangeBotsFiles,
             sendFile = {}
         ) { message, _ -> println(message) }
 

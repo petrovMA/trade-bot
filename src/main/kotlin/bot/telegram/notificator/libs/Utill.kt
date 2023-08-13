@@ -140,13 +140,6 @@ fun time() = System.currentTimeMillis().ms()
 
 fun Duration.format() = convertTime(this.toMillis())
 
-fun scanAll(directory: File, symbols: List<String>) = directory.listFiles()!!
-    .filter {
-        it.isDirectory && symbols.contains(it.name)
-    }
-    .associate {
-        it.name to "${directory.path}/${it.name}/exchange.conf"
-    }
 
 fun readConf(path: String?): Config? = try {
     path?.run {

@@ -126,6 +126,7 @@ class Emulate(
         try {
             val trade = AlgorithmTrader(
                 conf = conf,
+                exchangeBotsFiles = "emulateTestBots",
                 queue = client.queue,
                 botSettings = botSettings,
 //                firstSymbol = client.balance.tradePair.first,

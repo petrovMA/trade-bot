@@ -4,6 +4,7 @@ import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
 import com.google.gson.annotations.SerializedName
+import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.derivative.FuturesContract
@@ -12,7 +13,37 @@ import java.math.BigDecimal
 interface CommonExchangeData
 
 data class Balance(val asset: String, val total: BigDecimal, val free: BigDecimal, val locked: BigDecimal) :
-    CommonExchangeData
+    CommonExchangeData {
+    constructor(balance: org.knowm.xchange.dto.account.Balance) : this(
+        asset = balance.currency.symbol,
+        free = balance.available,
+        locked = balance.frozen,
+        total = balance.total
+    )
+}
+
+
+data class ExchangePosition(
+    val pair: TradePair,
+    val positionAmount: BigDecimal,
+    val entryPrice: BigDecimal,
+    val accumulatedRealized: BigDecimal,
+    val unrealizedPnl: BigDecimal,
+    val marginType: String,
+    val isolatedWallet: BigDecimal,
+    val positionSide: String?
+) : CommonExchangeData {
+    constructor(position: BinanceFuturesPosition) : this(
+        TradePair(position.futuresContract),
+        if (position.positionAmount == BigDecimal(0.0)) BigDecimal(0.0) else position.positionAmount.round(),
+        if (position.entryPrice == BigDecimal(0.0)) BigDecimal(0.0) else position.entryPrice.round(),
+        if (position.accumulatedRealized == BigDecimal(0.0)) BigDecimal(0.0) else position.accumulatedRealized.round(),
+        if (position.unrealizedPnl == BigDecimal(0.0)) BigDecimal(0.0) else position.unrealizedPnl.round(),
+        position.marginType,
+        if (position.isolatedWallet == BigDecimal(0.0)) BigDecimal(0.0) else position.isolatedWallet.round(),
+        position.positionSide
+    )
+}
 
 data class Order(
     val orderId: String,
@@ -219,32 +250,32 @@ data class Candlestick(
 
 abstract class BotSettings(
     val type: String = "",
-    @SerializedName("settings_name") open val name: String,
-    @SerializedName("settings_pair") open val pair: TradePair,
-    @SerializedName("settings_exchange") open val exchange: String,
-    @SerializedName("settings_orderBalanceType") open val orderBalanceType: String,
-    @SerializedName("settings_countOfDigitsAfterDotForAmount") open val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
-    @SerializedName("settings_countOfDigitsAfterDotForPrice") open val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    @SerializedName("settings_feePercent") open val feePercent: BigDecimal // fee for calc profit
+    val name: String,
+    val pair: TradePair,
+    val exchange: String,
+    val orderBalanceType: String,
+    val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    val feePercent: BigDecimal // fee for calc profit
 )
 
-data class BotSettingsTrader(
-    override val name: String,
-    override val pair: TradePair,
-    override val exchange: String,
+class BotSettingsTrader(
+    name: String,
+    pair: TradePair,
+    exchange: String,
+    orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
+    countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    feePercent: BigDecimal = BigDecimal(0.1), // fee for calc profit
     val direction: DIRECTION,
     val ordersType: TYPE,
     val tradingRange: Pair<BigDecimal, BigDecimal>,
     val orderSize: BigDecimal, // Order Quantity:: order size
-    override val orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
     val orderDistance: BigDecimal, // Order Distance:: distance between every order
     val triggerDistance: BigDecimal, // Trigger Distance:: distance between order and stop-order
     val enableStopOrderDistance: BigDecimal = BigDecimal(0), // enable stop order distance (stopOrderDistance = triggerDistance + enableStopOrderDistance)
     val orderMaxQuantity: Int, // Max Order count:: max amount of orders
-    override val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
-    override val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    val setCloseOrders: Boolean = true, // set close position orders when bot starts
-    override val feePercent: BigDecimal = BigDecimal(0.1) // fee for calc profit
+    val setCloseOrders: Boolean = true // set close position orders when bot starts
 ) : BotSettings(
     name = name,
     pair = pair,
@@ -255,17 +286,18 @@ data class BotSettingsTrader(
     feePercent = feePercent
 )
 
-data class BotSettingsBobblesIndicator(
-    override val name: String,
-    override val pair: TradePair,
-    override val exchange: String,
-    override val orderBalanceType: String,
-    override val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
-    override val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    override val feePercent: BigDecimal, // fee for calc profit
+class BotSettingsBobblesIndicator(
+    name: String,
+    pair: TradePair,
+    exchange: String,
+    orderBalanceType: String,
+    countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    feePercent: BigDecimal, // fee for calc profit
     val minOrderSize: BigDecimal, // min order size
     val buyAmountMultiplication: BigDecimal, // buy order size Multiplication
-    val sellAmountMultiplication: BigDecimal // sell order size Multiplication
+    val sellAmountMultiplication: BigDecimal, // sell order size Multiplication
+    val maxShortPosition: BigDecimal = BigDecimal(0.0) // max available short position
 ) : BotSettings(
     name = name,
     pair = pair,

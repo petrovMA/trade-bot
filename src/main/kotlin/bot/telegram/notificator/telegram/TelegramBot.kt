@@ -15,6 +15,7 @@ import java.util.concurrent.BlockingQueue
 
 class TelegramBot(
     private val chatId: String,
+    exchangeBotsFiles: String,
     private val botUsername: String,
     botToken: String,
     exchangeFiles: File,
@@ -31,6 +32,7 @@ class TelegramBot(
 
     val communicator: Communicator = Communicator(
         intervalCandlestick = intervalCandlestick,
+        exchangeBotsFiles = exchangeBotsFiles,
         intervalStatistic = intervalStatistic,
         timeDifference = timeDifference,
         candlestickDataCommandStr = candlestickDataCommandStr,

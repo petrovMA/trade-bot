@@ -14,6 +14,7 @@ import java.util.concurrent.LinkedBlockingDeque
 
 class AlgorithmTrader(
     botSettings: BotSettings,
+    exchangeBotsFiles: String,
     queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
     exchangeEnum: ExchangeEnum = ExchangeEnum.valueOf(botSettings.exchange.uppercase(Locale.getDefault())),
     conf: Config = getConfigByExchange(exchangeEnum)!!,
@@ -25,6 +26,7 @@ class AlgorithmTrader(
     sendMessage: (String, Boolean) -> Unit
 ) : Algorithm(
     botSettings = botSettings,
+    exchangeBotsFiles = exchangeBotsFiles,
     queue = queue,
     exchangeEnum = exchangeEnum,
     conf = conf,

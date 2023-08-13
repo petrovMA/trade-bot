@@ -263,7 +263,7 @@ class ClientBinanceFutures(
 
     override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamBinanceFuturesImpl(
-            pair = FuturesContract(pair.toCurrencyPair(), "PERPETUAL"),
+            pair = FuturesContract(pair.toCurrencyPair(), "PERP"),
             queue = queue,
             sec = sec,
             api = api

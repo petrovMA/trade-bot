@@ -24,6 +24,7 @@ class MainController {
 
     init {
         val exchangeFile = File("exchange")
+        val exchangeBotsFiles = "exchangeBots"
         val taskExecutor = TaskExecutor(LinkedBlockingDeque())
         val propConf = readConf("common.conf") ?: throw RuntimeException("Can't read Config File!")
 
@@ -32,6 +33,7 @@ class MainController {
         bot = try {
             TelegramBot(
                 chatId = propConf.getString("bot_properties.bot.chat_id"),
+                exchangeBotsFiles = exchangeBotsFiles,
                 botUsername = propConf.getString("bot_properties.bot.bot_name"),
                 botToken = propConf.getString("bot_properties.bot.bot_token"),
                 defaultCommands = mapOf(),

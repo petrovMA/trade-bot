@@ -7,7 +7,6 @@ import bot.telegram.notificator.rest_controller.Notification
 import com.typesafe.config.Config
 import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
 import mu.KotlinLogging
-import org.knowm.xchange.derivative.FuturesContract
 import java.io.File
 import java.math.BigDecimal
 import java.util.*
@@ -18,6 +17,7 @@ import kotlin.math.abs
 
 class AlgorithmBobblesIndicator(
     botSettings: BotSettings,
+    exchangeBotsFiles: String,
     queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
     exchangeEnum: ExchangeEnum = ExchangeEnum.valueOf(botSettings.exchange.uppercase(Locale.getDefault())),
     conf: Config = getConfigByExchange(exchangeEnum)!!,
@@ -29,6 +29,7 @@ class AlgorithmBobblesIndicator(
     sendMessage: (String, Boolean) -> Unit
 ) : Algorithm(
     botSettings = botSettings,
+    exchangeBotsFiles = exchangeBotsFiles,
     queue = queue,
     exchangeEnum = exchangeEnum,
     conf = conf,
@@ -50,6 +51,7 @@ class AlgorithmBobblesIndicator(
     private var klineConstructor = KlineConstructor(interval)
     private var candlestickList = ListLimit<Candlestick>(limit = 50)
     override val orders: MutableMap<String, Order> = HashMap()
+    private val balances: MutableMap<String, Balance> = HashMap()
 
     var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
     private var exchangePosition: ExchangePosition? = null
@@ -83,18 +85,13 @@ class AlgorithmBobblesIndicator(
                             }
                         }
 
-                        is BinanceFuturesPosition -> {
-                            if (TradePair(msg.futuresContract) == settings.pair) {
-                                exchangePosition = ExchangePosition(msg)
-                                log?.info("ExchangePosition:\n$msg")
-                            }
-                        }
-                        // todo ADD Balance listener
-                        // todo ADD BinanceFuturesPositions listener
+                        is ExchangePosition -> exchangePosition = msg
+
+                        is Balance -> balances[msg.asset] = msg
 
                         is Order -> {
                             if (msg.pair == settings.pair) {
-
+//                                AMENDMENT todo ADD AMENDMENT
                                 log?.info("OrderUpdate:\n$msg")
 
                                 when (msg.status) {
@@ -112,7 +109,7 @@ class AlgorithmBobblesIndicator(
                                             Notification(
                                                 price = msg.price!!,
                                                 amount = msg.executedQty - msg.executedQty.percent(settings.feePercent),
-                                                pair = settings.pair.toString(),
+                                                botName = settings.name,
                                                 type = msg.side.toString(),
                                             ),
                                             price = msg.price!!
@@ -124,8 +121,9 @@ class AlgorithmBobblesIndicator(
                                 }
 
                                 send(
-                                    "#${msg.status} Order update:\n```json\n$msg\n```\n\n" +
-                                            "Position:\n```${exchangePosition?.let { json(it) }}```", true
+                                    "#${msg.status} Order update:\n```json\n$msg```\n\n" +
+                                            "Position:\n```${exchangePosition?.let { json(it) }}```\n\n" +
+                                            "Balances:\n```${json(balances.map { it.value })}```", true
                                 )
                             }
                         }
@@ -175,36 +173,46 @@ class AlgorithmBobblesIndicator(
                                     // todo ADD SIGNAL TO DB
 
                                     // find kline with indicator
-                                    val kline = getKlineWithIndicator()
-                                    log?.info("Kline with indicator:\n$kline")
-                                    val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
-                                    val price = if (side == SIDE.BUY) kline.low else kline.high
+                                    getKlineWithIndicator()?.let { kline ->
+                                        log?.info("Kline with indicator:\n$kline")
+                                        val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
+                                        val price = if (side == SIDE.BUY) kline.low else kline.high
 
-                                    if (notification.amount > settings.minOrderSize
-                                        && notification.price == null
-                                        && notification.placeOrder
-                                    ) {
+                                        if (notification.amount > settings.minOrderSize
+                                            && notification.price == null
+                                            && notification.placeOrder
+                                        ) {
 
-                                        if (settings.buyAmountMultiplication > BigDecimal.ZERO && side == SIDE.BUY) {
-                                            sentOrder(
-                                                price = price,
-                                                amount = notification.amount * settings.buyAmountMultiplication,
-                                                orderSide = side,
-                                                orderType = TYPE.LIMIT
-                                            )
-                                        } else if (settings.sellAmountMultiplication > BigDecimal.ZERO && side == SIDE.SELL) {
-                                            sentOrder(
-                                                price = price,
-                                                amount = notification.amount * settings.sellAmountMultiplication,
-                                                orderSide = side,
-                                                orderType = TYPE.LIMIT
-                                            )
+                                            if (settings.buyAmountMultiplication > BigDecimal.ZERO && side == SIDE.BUY) {
+                                                sentOrder(
+                                                    price = price,
+                                                    amount = notification.amount * settings.buyAmountMultiplication,
+                                                    orderSide = side,
+                                                    orderType = TYPE.LIMIT
+                                                )
+                                            } else if (settings.sellAmountMultiplication > BigDecimal.ZERO && side == SIDE.SELL) {
+
+                                                val shortPositionAndShortOrders = ((exchangePosition?.positionAmount
+                                                    ?: 0.toBigDecimal()) - shortOrdersSum()).abs()
+
+                                                if (settings.maxShortPosition > shortPositionAndShortOrders)
+                                                    sentOrder(
+                                                        price = price,
+                                                        amount = notification.amount * settings.sellAmountMultiplication,
+                                                        orderSide = side,
+                                                        orderType = TYPE.LIMIT
+                                                    )
+                                                else send(
+                                                    "Short position and sum of short orders are too big: " +
+                                                            "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
+                                                )
+                                            }
                                         }
-                                    }
 
-                                    updatePositions(notification, notification.price ?: price)
+                                        updatePositions(notification, notification.price ?: price)
 
-                                    log?.info("Positions After update:\n$positions")
+                                        log?.info("Positions After update:\n$positions")
+                                    } ?: send("Can't generate Kline, not enough trades")
 
                                 }
 
@@ -252,12 +260,14 @@ class AlgorithmBobblesIndicator(
             ?.forEach { orders[it.orderId] = it }
     }
 
-    private fun getKlineWithIndicator(): Candlestick {
-        val now = System.currentTimeMillis()
-        return if (abs(now - candlestickList.last().closeTime) > abs(now - klineConstructor.getCandlestick().closeTime))
-            klineConstructor.getCandlestick()
-        else
-            candlestickList.last()
+    private fun getKlineWithIndicator(): Candlestick? {
+        return if (candlestickList.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            if (abs(now - candlestickList.last().closeTime) > abs(now - klineConstructor.getCandlestick().closeTime))
+                klineConstructor.getCandlestick()
+            else
+                candlestickList.last()
+        } else null
     }
 
     data class VirtualPositions(
@@ -279,10 +289,17 @@ class AlgorithmBobblesIndicator(
                 }
             } else {
                 val newOrderAmount = positions.buyAmount + order.amount
-                val priceChange = (price - positions.buyPrice) * (order.amount / newOrderAmount)
-                positions.apply {
-                    buyAmount = newOrderAmount.round()
-                    buyPrice = (positions.buyPrice + priceChange).round()
+                if (newOrderAmount > BigDecimal(0.0)) {
+                    val priceChange = (price - positions.buyPrice) * (order.amount / newOrderAmount)
+                    positions.apply {
+                        buyAmount = newOrderAmount.round()
+                        buyPrice = (positions.buyPrice + priceChange).round()
+                    }
+                } else {
+                    positions.apply {
+                        buyAmount = BigDecimal.ZERO
+                        buyPrice = BigDecimal.ZERO
+                    }
                 }
             }
         } else {
@@ -294,37 +311,22 @@ class AlgorithmBobblesIndicator(
                 }
             } else {
                 val newOrderAmount = positions.sellAmount + order.amount
-                val priceChange = (price - positions.sellPrice) * (order.amount / newOrderAmount)
-                positions.apply {
-                    sellAmount = newOrderAmount.round()
-                    sellPrice = (positions.sellPrice + priceChange).round()
+                if (newOrderAmount > BigDecimal(0.0)) {
+                    val priceChange = (price - positions.sellPrice) * (order.amount / newOrderAmount)
+                    positions.apply {
+                        sellAmount = newOrderAmount.round()
+                        sellPrice = (positions.sellPrice + priceChange).round()
+                    }
+                } else {
+                    positions.apply {
+                        sellAmount = BigDecimal.ZERO
+                        sellPrice = BigDecimal.ZERO
+                    }
                 }
             }
         }
 
         reWriteObject(positions, File("$path/positions.json"))
-    }
-
-    data class ExchangePosition(
-        val contract: FuturesContract,
-        val positionAmount: BigDecimal,
-        val entryPrice: BigDecimal,
-        val accumulatedRealized: BigDecimal,
-        val unrealizedPnl: BigDecimal,
-        val marginType: String,
-        val isolatedWallet: BigDecimal,
-        val positionSide: String?
-    ) {
-        constructor(position: BinanceFuturesPosition) : this(
-            position.futuresContract,
-            position.positionAmount.round(),
-            position.entryPrice.round(),
-            position.accumulatedRealized.round(),
-            position.unrealizedPnl.round(),
-            position.marginType,
-            position.isolatedWallet.round(),
-            position.positionSide
-        )
     }
 
     override fun toString(): String = "status = $state, settings = $settings"
@@ -333,4 +335,9 @@ class AlgorithmBobblesIndicator(
         settings = botSettings
         saveBotSettings(settings)
     }
+
+    private fun shortOrdersSum(): BigDecimal = orders
+        .map { it.value }
+        .filter { it.side == SIDE.SELL }
+        .sumOf { it.origQty }
 }

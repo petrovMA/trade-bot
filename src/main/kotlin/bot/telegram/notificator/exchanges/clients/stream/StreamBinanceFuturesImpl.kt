@@ -38,13 +38,30 @@ class StreamBinanceFuturesImpl(
 
             val subscription = ProductSubscription.create()
                 .addTrades(pair)
-                .addOrderbook(pair)
                 .apply { if (api != null && sec != null) addOrders(pair) }
                 .build()
 
             exchangeFutures.connect(subscription).blockingAwait()
 
             exchangeFutures.enableLiveSubscription()
+
+            exchangeFutures
+                .streamingMarketDataService
+                .getTrades(pair)
+                .subscribe(
+                    { trade ->
+                        queue.add(
+                            Trade(
+                                price = trade.price,
+                                qty = trade.originalAmount,
+                                time = trade.timestamp.time
+                            )
+                        )
+                    },
+                    { error ->
+                        log.warn("Trade stream Error:", error)
+                    }
+                )
 
             if (api != null && sec != null) {
                 exchangeFutures
@@ -80,14 +97,16 @@ class StreamBinanceFuturesImpl(
                     .balanceChanges
                     .subscribe({ balance ->
                         log.info("Balance change: {}", balance)
+                        queue.add(Balance(balance))
                     }, { error -> log.warn("Balance stream Error:", error) }
                     )
 
                 exchangeFutures
                     .streamingAccountService
                     .getPositionChanges(pair)
-                    .subscribe({ balance ->
-                        log.info("Position change: {}", balance)
+                    .subscribe({ position ->
+                        log.info("Position change: {}", position)
+                        queue.add(ExchangePosition(position))
                     }, { error -> log.warn("Position stream Error:", error) }
                     )
             }
