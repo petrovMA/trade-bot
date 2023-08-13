@@ -1,5 +1,6 @@
 package bot.telegram.notificator
 
+import bot.telegram.notificator.database.service.OrderService
 import bot.telegram.notificator.exchanges.*
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.exchanges.emulate.Emulate
@@ -17,6 +18,7 @@ import java.util.concurrent.BlockingQueue
 class Communicator(
     private val exchangeFiles: File,
     private val exchangeBotsFiles: String,
+    private val orderService: OrderService? = null,
     intervalCandlestick: Duration?,
     intervalStatistic: Duration?,
     timeDifference: Duration?,
@@ -113,6 +115,7 @@ class Communicator(
                             AlgorithmBobblesIndicator(
                                 botSettings,
                                 exchangeBotsFiles = exchangeBotsFiles,
+                                orderService = orderService,
                                 sendMessage = sendMessage
                             )
 
@@ -216,7 +219,13 @@ class Communicator(
                     readObjectFromFile(File("$exchangeBotsFiles/${params[1]}/settings.json"), BotSettings::class.java)
 
                 tradeBots[tradeBotSettings.name] = when (tradeBotSettings.type) {
-                    "bobbles" -> AlgorithmBobblesIndicator(tradeBotSettings, exchangeBotsFiles, sendMessage = sendMessage)
+                    "bobbles" -> AlgorithmBobblesIndicator(
+                        tradeBotSettings,
+                        exchangeBotsFiles,
+                        orderService,
+                        sendMessage = sendMessage
+                    )
+
                     else -> AlgorithmTrader(tradeBotSettings, exchangeBotsFiles, sendMessage = sendMessage)
                 }
 

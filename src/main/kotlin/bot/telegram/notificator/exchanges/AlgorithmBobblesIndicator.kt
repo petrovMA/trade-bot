@@ -1,14 +1,16 @@
 package bot.telegram.notificator.exchanges
 
 import bot.telegram.notificator.ListLimit
+import bot.telegram.notificator.database.data.entities.NotificationType
+import bot.telegram.notificator.database.service.OrderService
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.rest_controller.Notification
 import com.typesafe.config.Config
-import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
+import java.sql.Timestamp
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 import kotlin.collections.HashMap
@@ -18,6 +20,7 @@ import kotlin.math.abs
 class AlgorithmBobblesIndicator(
     botSettings: BotSettings,
     exchangeBotsFiles: String,
+    private val orderService: OrderService?,
     queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
     exchangeEnum: ExchangeEnum = ExchangeEnum.valueOf(botSettings.exchange.uppercase(Locale.getDefault())),
     conf: Config = getConfigByExchange(exchangeEnum)!!,
@@ -91,7 +94,7 @@ class AlgorithmBobblesIndicator(
 
                         is Order -> {
                             if (msg.pair == settings.pair) {
-//                                AMENDMENT todo ADD AMENDMENT
+
                                 log?.info("OrderUpdate:\n$msg")
 
                                 when (msg.status) {
@@ -103,17 +106,35 @@ class AlgorithmBobblesIndicator(
 
                                     STATUS.FILLED -> {
                                         orders.remove(msg.orderId)
-                                        // todo ADD FILLED ORDER TO DB
 
-                                        updatePositions(
-                                            Notification(
-                                                price = msg.price!!,
-                                                amount = msg.executedQty - msg.executedQty.percent(settings.feePercent),
-                                                botName = settings.name,
-                                                type = msg.side.toString(),
-                                            ),
-                                            price = msg.price!!
-                                        )
+                                        try {
+                                            orderService?.saveOrder(
+                                                bot.telegram.notificator.database.data.entities.Order(
+                                                    botName = settings.name,
+                                                    orderId = msg.orderId,
+                                                    tradePair = msg.pair.toString(),
+                                                    orderSide = msg.side,
+                                                    amount = msg.executedQty - msg.executedQty.percent(settings.feePercent),
+                                                    price = msg.price,
+                                                    notificationType = NotificationType.ORDER_FILLED,
+                                                    dateTime = Timestamp(System.currentTimeMillis())
+                                                )
+                                            )
+                                        } catch (t: Throwable) {
+                                            send("Error while saving order to db: ${t.message}")
+                                            log?.error("Error while saving order to db: ${t.message}")
+                                        }
+
+                                        positions =
+                                            readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+
+                                        if (msg.side == SIDE.BUY)
+                                            updatePositionsBuy(msg.executedQty - msg.executedQty.percent(settings.feePercent), msg.price!!)
+                                        else
+                                            updatePositionsSell(msg.executedQty - msg.executedQty.percent(settings.feePercent), msg.price!!)
+
+                                        reWriteObject(positions, File("$path/positions.json"))
+
                                     }
 
                                     STATUS.CANCELED, STATUS.REJECTED -> orders.remove(msg.orderId)
@@ -122,8 +143,8 @@ class AlgorithmBobblesIndicator(
 
                                 send(
                                     "#${msg.status} Order update:\n```json\n$msg```\n\n" +
-                                            "Position:\n```${exchangePosition?.let { json(it) }}```\n\n" +
-                                            "Balances:\n```${json(balances.map { it.value })}```", true
+                                            "Position:\n```json\n${exchangePosition?.let { json(it) }}```\n\n" +
+                                            "Balances:\n```json\n${json(balances.map { it.value })}```", true
                                 )
                             }
                         }
@@ -170,7 +191,23 @@ class AlgorithmBobblesIndicator(
 
                                 BotEvent.Type.CREATE_ORDER -> {
                                     val notification = msg.text.deserialize<Notification>()
-                                    // todo ADD SIGNAL TO DB
+
+                                    try {
+                                        orderService?.saveOrder(
+                                            bot.telegram.notificator.database.data.entities.Order(
+                                                botName = settings.name,
+                                                tradePair = settings.pair.toString(),
+                                                orderSide = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
+                                                amount = notification.amount,
+                                                price = notification.price,
+                                                notificationType = NotificationType.SIGNAL,
+                                                dateTime = Timestamp(System.currentTimeMillis())
+                                            )
+                                        )
+                                    } catch (t: Throwable) {
+                                        send("Error while saving order to db: ${t.message}")
+                                        log?.error("Error while saving order to db: ${t.message}")
+                                    }
 
                                     // find kline with indicator
                                     getKlineWithIndicator()?.let { kline ->
@@ -209,7 +246,15 @@ class AlgorithmBobblesIndicator(
                                             }
                                         }
 
-                                        updatePositions(notification, notification.price ?: price)
+                                        positions =
+                                            readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+
+                                        if (notification.type.equals("buy", true))
+                                            updatePositionsBuy(notification.amount, notification.price ?: price)
+                                        else
+                                            updatePositionsSell(notification.amount, notification.price ?: price)
+
+                                        reWriteObject(positions, File("$path/positions.json"))
 
                                         log?.info("Positions After update:\n$positions")
                                     } ?: send("Can't generate Kline, not enough trades")
@@ -277,56 +322,52 @@ class AlgorithmBobblesIndicator(
         var buyPrice: BigDecimal = BigDecimal.ZERO
     )
 
-    private fun updatePositions(order: Notification, price: BigDecimal) {
-        positions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
-
-        positions = if (order.type.equals("buy", true)) {
-            if (positions.sellPrice < price && positions.sellAmount > order.amount) {
-                positions.apply {
-                    sellPrice =
-                        (positions.sellPrice + (price - positions.sellPrice) * (order.amount / positions.sellAmount)).round()
-                    sellAmount = (positions.sellAmount - order.amount).round()
-                }
-            } else {
-                val newOrderAmount = positions.buyAmount + order.amount
-                if (newOrderAmount > BigDecimal(0.0)) {
-                    val priceChange = (price - positions.buyPrice) * (order.amount / newOrderAmount)
-                    positions.apply {
-                        buyAmount = newOrderAmount.round()
-                        buyPrice = (positions.buyPrice + priceChange).round()
-                    }
-                } else {
-                    positions.apply {
-                        buyAmount = BigDecimal.ZERO
-                        buyPrice = BigDecimal.ZERO
-                    }
-                }
+    private fun updatePositionsBuy(amount: BigDecimal, price: BigDecimal) {
+        positions = if (positions.sellPrice < price && positions.sellAmount > amount) {
+            positions.apply {
+                sellPrice =
+                    (positions.sellPrice + (price - positions.sellPrice) * (amount / positions.sellAmount)).round()
+                sellAmount = (positions.sellAmount - amount).round()
             }
         } else {
-            if (positions.buyPrice > price && positions.buyAmount > order.amount) {
+            val newOrderAmount = positions.buyAmount + amount
+            if (newOrderAmount > BigDecimal(0.0)) {
+                val priceChange = (price - positions.buyPrice) * (amount / newOrderAmount)
                 positions.apply {
-                    buyPrice =
-                        (positions.buyPrice + (price - positions.buyPrice) * (order.amount / positions.buyAmount)).round()
-                    buyAmount = (positions.buyAmount - order.amount).round()
+                    buyAmount = newOrderAmount.round()
+                    buyPrice = (positions.buyPrice + priceChange).round()
                 }
             } else {
-                val newOrderAmount = positions.sellAmount + order.amount
-                if (newOrderAmount > BigDecimal(0.0)) {
-                    val priceChange = (price - positions.sellPrice) * (order.amount / newOrderAmount)
-                    positions.apply {
-                        sellAmount = newOrderAmount.round()
-                        sellPrice = (positions.sellPrice + priceChange).round()
-                    }
-                } else {
-                    positions.apply {
-                        sellAmount = BigDecimal.ZERO
-                        sellPrice = BigDecimal.ZERO
-                    }
+                positions.apply {
+                    buyAmount = BigDecimal.ZERO
+                    buyPrice = BigDecimal.ZERO
                 }
             }
         }
+    }
 
-        reWriteObject(positions, File("$path/positions.json"))
+    private fun updatePositionsSell(amount: BigDecimal, price: BigDecimal) {
+        if (positions.buyPrice > price && positions.buyAmount > amount) {
+            positions.apply {
+                buyPrice =
+                    (positions.buyPrice + (price - positions.buyPrice) * (amount / positions.buyAmount)).round()
+                buyAmount = (positions.buyAmount - amount).round()
+            }
+        } else {
+            val newOrderAmount = positions.sellAmount + amount
+            if (newOrderAmount > BigDecimal(0.0)) {
+                val priceChange = (price - positions.sellPrice) * (amount / newOrderAmount)
+                positions.apply {
+                    sellAmount = newOrderAmount.round()
+                    sellPrice = (positions.sellPrice + priceChange).round()
+                }
+            } else {
+                positions.apply {
+                    sellAmount = BigDecimal.ZERO
+                    sellPrice = BigDecimal.ZERO
+                }
+            }
+        }
     }
 
     override fun toString(): String = "status = $state, settings = $settings"

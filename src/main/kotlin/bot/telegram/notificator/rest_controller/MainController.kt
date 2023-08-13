@@ -1,7 +1,7 @@
 package bot.telegram.notificator.rest_controller
 
 import bot.telegram.notificator.TaskExecutor
-import bot.telegram.notificator.libs.*
+import bot.telegram.notificator.database.service.OrderService
 import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.libs.readConf
 import bot.telegram.notificator.telegram.TelegramBot
@@ -18,7 +18,7 @@ import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 
 @RestController
-class MainController {
+class MainController(orderService: OrderService) {
     final val log: KLogger = KotlinLogging.logger {}
     final val bot: TelegramBot
 
@@ -34,6 +34,7 @@ class MainController {
             TelegramBot(
                 chatId = propConf.getString("bot_properties.bot.chat_id"),
                 exchangeBotsFiles = exchangeBotsFiles,
+                orderService = orderService,
                 botUsername = propConf.getString("bot_properties.bot.bot_name"),
                 botToken = propConf.getString("bot_properties.bot.bot_token"),
                 defaultCommands = mapOf(),

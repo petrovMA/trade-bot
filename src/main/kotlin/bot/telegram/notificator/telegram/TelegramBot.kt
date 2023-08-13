@@ -1,6 +1,7 @@
 package bot.telegram.notificator.telegram
 
 import bot.telegram.notificator.Communicator
+import bot.telegram.notificator.database.service.OrderService
 import bot.telegram.notificator.exchanges.clients.ExchangeEnum
 import bot.telegram.notificator.libs.escapeMarkdownV2Text
 import mu.KotlinLogging
@@ -16,6 +17,7 @@ import java.util.concurrent.BlockingQueue
 class TelegramBot(
     private val chatId: String,
     exchangeBotsFiles: String,
+    orderService: OrderService,
     private val botUsername: String,
     botToken: String,
     exchangeFiles: File,
@@ -33,6 +35,7 @@ class TelegramBot(
     val communicator: Communicator = Communicator(
         intervalCandlestick = intervalCandlestick,
         exchangeBotsFiles = exchangeBotsFiles,
+        orderService = orderService,
         intervalStatistic = intervalStatistic,
         timeDifference = timeDifference,
         candlestickDataCommandStr = candlestickDataCommandStr,

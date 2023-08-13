@@ -1,5 +1,6 @@
 package bot.telegram.notificator.database.data.entities
 
+import bot.telegram.notificator.exchanges.clients.SIDE
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.sql.Timestamp
@@ -14,7 +15,13 @@ data class Order(
 
     @Column(name = "BOT_NAME") val botName: String? = null,
 
+    @Column(name = "ORDER_ID", unique = true) val orderId: String? = null,
+
+    @Column(name = "TRADE_PAIR") val tradePair: String? = null,
+
     @Column(name = "AMOUNT") val amount: BigDecimal? = null,
+
+    @Column(name = "SIDE") val orderSide: SIDE? = null,
 
     @Column(name = "PRICE") val price: BigDecimal? = null,
 
@@ -27,7 +34,10 @@ data class Order(
             other.botName == this.botName &&
             other.amount == this.amount &&
             other.price == this.price &&
+            other.orderId == this.orderId &&
             other.dateTime == this.dateTime &&
+            other.tradePair == this.tradePair &&
+            other.orderSide == this.orderSide &&
             other.notificationType == this.notificationType
 
     override fun hashCode(): Int = javaClass.hashCode()
