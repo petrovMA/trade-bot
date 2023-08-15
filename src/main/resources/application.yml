@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:file:./database/onboarding-bot
+    url: jdbc:h2:file:./database/orders-history
     username:
     password:
     driverClassName: org.h2.Driver
