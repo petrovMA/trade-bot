@@ -44,7 +44,7 @@ fun main() {
 
         StreamBinanceFuturesImpl(
 //        StreamBinanceImpl(
-            FuturesContract(pair.toCurrencyPair(), "PERPETUAL"),
+            FuturesContract(pair.toCurrencyPair(), "PERP"),
 //            pair.toCurrencyPair(),
             queue,
             api,

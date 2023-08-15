@@ -75,7 +75,7 @@ class StreamBinanceFuturesImpl(
                                 Order(
                                     orderId = order.clientOrderId,
                                     pair = TradePair(oc.contract.toString()),
-                                    price = order.averagePrice,
+                                    price = order.originalPrice,
                                     origQty = order.originalQuantity,
                                     executedQty = order.orderFilledAccumulatedQuantity,
                                     side = SIDE.valueOf(order.side),

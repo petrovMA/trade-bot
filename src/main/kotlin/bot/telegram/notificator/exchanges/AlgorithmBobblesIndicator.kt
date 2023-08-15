@@ -178,7 +178,8 @@ class AlgorithmBobblesIndicator(
 
                                 send(
                                     "#${msg.status} Order update:\n```json\n$msg```\n\n" +
-                                            "Position:\n```json\n${exchangePosition?.let { json(it) }}```\n\n" +
+                                            "Exchange Position:\n```json\n${exchangePosition?.let { json(it) }}```\n\n" +
+                                            "Position:\n```json\n${json(positions)}```\n\n" +
                                             "Balances:\n```json\n${json(balances.map { it.value })}```", true
                                 )
                             }
