@@ -56,7 +56,36 @@ class AlgorithmBobblesIndicator(
     override val orders: MutableMap<String, Order> = HashMap()
     private val balances: MutableMap<String, Balance> = HashMap()
 
-    var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+    var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json")
+        ?: VirtualPositions().also {
+            var updatedPositions = VirtualPositions()
+
+            orderService
+                ?.getAllOrdersByBotNameAndNotificationType(botSettings.name, NotificationType.SIGNAL)
+                ?.forEach { order ->
+                    updatedPositions = if (order.orderSide == SIDE.BUY)
+                        updatePositionsBuy(order.amount!!, order.price!!, updatedPositions)
+                    else
+                        updatePositionsSell(order.amount!!, order.price!!, updatedPositions)
+                }
+
+            orderService
+                ?.getAllOrdersByBotNameAndNotificationType(botSettings.name, NotificationType.ORDER_FILLED)
+                ?.forEach { order ->
+                    updatedPositions = if (order.orderSide == SIDE.BUY)
+                        updatePositionsBuy(order.amount!!.negate(), order.price!!, updatedPositions)
+                    else
+                        updatePositionsSell(order.amount!!.negate(), order.price!!, updatedPositions)
+                }
+
+            it.buyAmount = updatedPositions.buyAmount
+            it.buyPrice = updatedPositions.buyPrice
+            it.sellAmount = updatedPositions.sellAmount
+            it.sellPrice = updatedPositions.sellPrice
+
+            reWriteObject(it, File("$path/positions.json"))
+        }
+
     private var exchangePosition: ExchangePosition? = null
 
     override fun run() {
@@ -78,12 +107,12 @@ class AlgorithmBobblesIndicator(
                     when (msg) {
                         is Trade -> {
                             lastTradePrice = msg.price
-                            log?.trace("${settings.pair} TradeEvent:\n$msg")
+                            log?.trace("{} TradeEvent:\n{}", settings.pair, msg)
 
                             klineConstructor.nextKline(msg).forEach { kline ->
                                 if (kline.isClosed) {
                                     candlestickList.add(kline.candlestick)
-                                    log?.debug("${settings.pair} Kline closed:\n${kline.candlestick}")
+                                    log?.debug("{} Kline closed:\n {}", settings.pair, kline.candlestick)
                                 }
                             }
                         }
@@ -128,10 +157,16 @@ class AlgorithmBobblesIndicator(
                                         positions =
                                             readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
 
-                                        if (msg.side == SIDE.BUY)
-                                            updatePositionsBuy(msg.executedQty - msg.executedQty.percent(settings.feePercent), msg.price!!)
+                                        positions = if (msg.side == SIDE.BUY)
+                                            updatePositionsBuy(
+                                                msg.executedQty - msg.executedQty.percent(settings.feePercent),
+                                                msg.price!!
+                                            )
                                         else
-                                            updatePositionsSell(msg.executedQty - msg.executedQty.percent(settings.feePercent), msg.price!!)
+                                            updatePositionsSell(
+                                                msg.executedQty - msg.executedQty.percent(settings.feePercent),
+                                                msg.price!!
+                                            )
 
                                         reWriteObject(positions, File("$path/positions.json"))
 
@@ -249,7 +284,7 @@ class AlgorithmBobblesIndicator(
                                         positions =
                                             readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
 
-                                        if (notification.type.equals("buy", true))
+                                        positions = if (notification.type.equals("buy", true))
                                             updatePositionsBuy(notification.amount, notification.price ?: price)
                                         else
                                             updatePositionsSell(notification.amount, notification.price ?: price)
@@ -322,8 +357,12 @@ class AlgorithmBobblesIndicator(
         var buyPrice: BigDecimal = BigDecimal.ZERO
     )
 
-    private fun updatePositionsBuy(amount: BigDecimal, price: BigDecimal) {
-        positions = if (positions.sellPrice < price && positions.sellAmount > amount) {
+    private fun updatePositionsBuy(
+        amount: BigDecimal,
+        price: BigDecimal,
+        positions: VirtualPositions = this.positions
+    ): VirtualPositions {
+        return if (positions.sellPrice < price && positions.sellAmount > amount) {
             positions.apply {
                 sellPrice =
                     (positions.sellPrice + (price - positions.sellPrice) * (amount / positions.sellAmount)).round()
@@ -346,8 +385,12 @@ class AlgorithmBobblesIndicator(
         }
     }
 
-    private fun updatePositionsSell(amount: BigDecimal, price: BigDecimal) {
-        if (positions.buyPrice > price && positions.buyAmount > amount) {
+    private fun updatePositionsSell(
+        amount: BigDecimal,
+        price: BigDecimal,
+        positions: VirtualPositions = this.positions
+    ): VirtualPositions {
+        return if (positions.buyPrice > price && positions.buyAmount > amount) {
             positions.apply {
                 buyPrice =
                     (positions.buyPrice + (price - positions.buyPrice) * (amount / positions.buyAmount)).round()

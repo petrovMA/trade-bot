@@ -19,11 +19,11 @@ data class Order(
 
     @Column(name = "TRADE_PAIR") val tradePair: String? = null,
 
-    @Column(name = "AMOUNT") val amount: BigDecimal? = null,
+    @Column(name = "AMOUNT", precision = 20, scale = 8) val amount: BigDecimal? = null,
 
     @Column(name = "SIDE") val orderSide: SIDE? = null,
 
-    @Column(name = "PRICE") val price: BigDecimal? = null,
+    @Column(name = "PRICE", precision = 20, scale = 8) val price: BigDecimal? = null,
 
     @Column(name = "DATE_TIME") val dateTime: Timestamp? = null,
 

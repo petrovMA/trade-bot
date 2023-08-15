@@ -21,6 +21,9 @@ class OrderServiceImpl(@Autowired open val ordersRepository: OrdersRepository) :
     override fun deleteById(id: Long): Order? = ordersRepository.deleteById(Order(id))
 
     @Transactional
+    override fun getAllOrdersByBotName(botName: String): Iterable<Order>? = ordersRepository.findAllByBotName(botName)
+
+    @Transactional
     override fun getAllOrdersByBotNameAndNotificationType(botName: String, notificationType: NotificationType): Iterable<Order>? =
         ordersRepository.findAllByBotNameAndNotificationType(botName, notificationType)
 }

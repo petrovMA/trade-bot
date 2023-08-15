@@ -64,7 +64,7 @@ class MainController(orderService: OrderService) {
 
         // process the request here and prepare the response
         val response = Response("success", "Received $request")
-        log.debug("Response for /endpoint/trade = $response")
+        log.debug("Response for /endpoint/trade = {}", response)
 
         bot.communicator.sendOrder(request)
 
