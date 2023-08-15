@@ -159,12 +159,12 @@ class AlgorithmBobblesIndicator(
 
                                         positions = if (msg.side == SIDE.BUY)
                                             updatePositionsBuy(
-                                                msg.executedQty - msg.executedQty.percent(settings.feePercent),
+                                                (msg.executedQty - msg.executedQty.percent(settings.feePercent)).negate(),
                                                 msg.price!!
                                             )
                                         else
                                             updatePositionsSell(
-                                                msg.executedQty - msg.executedQty.percent(settings.feePercent),
+                                                (msg.executedQty - msg.executedQty.percent(settings.feePercent)).negate(),
                                                 msg.price!!
                                             )
 
@@ -228,28 +228,28 @@ class AlgorithmBobblesIndicator(
                                 BotEvent.Type.CREATE_ORDER -> {
                                     val notification = msg.text.deserialize<Notification>()
 
-                                    try {
-                                        orderService?.saveOrder(
-                                            bot.telegram.notificator.database.data.entities.Order(
-                                                botName = settings.name,
-                                                tradePair = settings.pair.toString(),
-                                                orderSide = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
-                                                amount = notification.amount,
-                                                price = notification.price,
-                                                notificationType = NotificationType.SIGNAL,
-                                                dateTime = Timestamp(System.currentTimeMillis())
-                                            )
-                                        )
-                                    } catch (t: Throwable) {
-                                        send("Error while saving order to db: ${t.message}")
-                                        log?.error("Error while saving order to db: ${t.message}")
-                                    }
-
                                     // find kline with indicator
                                     getKlineWithIndicator()?.let { kline ->
                                         log?.info("Kline with indicator:\n$kline")
                                         val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
                                         val price = if (side == SIDE.BUY) kline.low else kline.high
+
+                                        try {
+                                            orderService?.saveOrder(
+                                                bot.telegram.notificator.database.data.entities.Order(
+                                                    botName = settings.name,
+                                                    tradePair = settings.pair.toString(),
+                                                    orderSide = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
+                                                    amount = notification.amount,
+                                                    price = price,
+                                                    notificationType = NotificationType.SIGNAL,
+                                                    dateTime = Timestamp(System.currentTimeMillis())
+                                                )
+                                            )
+                                        } catch (t: Throwable) {
+                                            send("Error while saving order to db: ${t.message}")
+                                            log?.error("Error while saving order to db: ${t.message}")
+                                        }
 
                                         if (notification.amount > settings.minOrderSize
                                             && notification.price == null
@@ -265,10 +265,10 @@ class AlgorithmBobblesIndicator(
                                                 )
                                             } else if (settings.sellAmountMultiplication > BigDecimal.ZERO && side == SIDE.SELL) {
 
-                                                val shortPositionAndShortOrders = ((exchangePosition?.positionAmount
-                                                    ?: 0.toBigDecimal()) - shortOrdersSum()).abs()
+                                                val shortPositionAndShortOrders = (exchangePosition?.positionAmount
+                                                    ?: 0.toBigDecimal()) - shortOrdersSum()
 
-                                                if (settings.maxShortPosition > shortPositionAndShortOrders)
+                                                if (settings.maxShortPosition.negate() <= shortPositionAndShortOrders)
                                                     sentOrder(
                                                         price = price,
                                                         amount = notification.amount * settings.sellAmountMultiplication,
