@@ -48,8 +48,7 @@ fun main() {
 //            pair.toCurrencyPair(),
             queue,
             api,
-            sec,
-            true
+            sec
         ).apply {
             start()
             do {

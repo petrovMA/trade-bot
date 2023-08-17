@@ -53,8 +53,7 @@ open class ClientBinance(
             countCandles,
             null,
             null
-        )
-            .map { asCandlestick(it) }
+        ).map { Candlestick(it) }
 
     override fun getOpenOrders(pair: TradePair): List<Order> = tradeService
         .getOpenOrders(pair.toCurrencyPair())
@@ -290,16 +289,6 @@ open class ClientBinance(
         INTERVAL.WEEKLY -> KlineInterval.w1
         INTERVAL.MONTHLY -> KlineInterval.M1
     }
-
-    private fun asCandlestick(kline: BinanceKline): Candlestick = Candlestick(
-        openTime = kline.openTime,
-        closeTime = kline.closeTime,
-        open = kline.open,
-        high = kline.high,
-        low = kline.low,
-        close = kline.close,
-        volume = kline.volume
-    )
 
     override fun toString(): String = "BINANCE"
 

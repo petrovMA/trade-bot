@@ -3,8 +3,8 @@ package bot.telegram.notificator.exchanges.clients
 import bot.telegram.notificator.libs.*
 import bot.telegram.notificator.libs.UnknownOrderSide
 import bot.telegram.notificator.libs.UnknownOrderStatus
-import com.google.gson.annotations.SerializedName
 import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
+import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.derivative.FuturesContract
@@ -246,7 +246,17 @@ data class Candlestick(
     val low: BigDecimal,
     val close: BigDecimal,
     val volume: BigDecimal
-) : CommonExchangeData
+) : CommonExchangeData {
+    constructor(kline: BinanceKline) : this(
+        openTime = kline.openTime,
+        closeTime = kline.closeTime,
+        open = kline.open,
+        high = kline.high,
+        low = kline.low,
+        close = kline.close,
+        volume = kline.volume
+    )
+}
 
 abstract class BotSettings(
     val type: String = "",

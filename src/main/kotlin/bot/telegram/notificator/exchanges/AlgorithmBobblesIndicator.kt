@@ -1,6 +1,5 @@
 package bot.telegram.notificator.exchanges
 
-import bot.telegram.notificator.ListLimit
 import bot.telegram.notificator.database.data.entities.NotificationType
 import bot.telegram.notificator.database.service.OrderService
 import bot.telegram.notificator.libs.*
@@ -8,6 +7,7 @@ import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.rest_controller.Notification
 import com.typesafe.config.Config
 import mu.KotlinLogging
+import org.knowm.xchange.exceptions.ExchangeException
 import java.io.File
 import java.math.BigDecimal
 import java.sql.Timestamp
@@ -50,9 +50,9 @@ class AlgorithmBobblesIndicator(
     var from: Long = Long.MAX_VALUE
     var to: Long = Long.MIN_VALUE
 
-    private var lastTradePrice: BigDecimal = 0.toBigDecimal()
-    private var klineConstructor = KlineConstructor(interval)
-    private var candlestickList = ListLimit<Candlestick>(limit = 50)
+    //    private var klineConstructor = KlineConstructor(interval)
+    private lateinit var currentKline: Candlestick
+    private lateinit var prevKline: Candlestick
     override val orders: MutableMap<String, Order> = HashMap()
     private val balances: MutableMap<String, Balance> = HashMap()
 
@@ -96,6 +96,12 @@ class AlgorithmBobblesIndicator(
 
 //            synchronizeOrders()
 
+            // todo: This takes only spot candles (not futures)
+            client.getCandlestickBars(settings.pair, INTERVAL.FIVE_MINUTES, 5).run {
+                currentKline = last()
+                prevKline = get(size - 2)
+            }
+
             stream.run { start() }
 
             var msg = if (isEmulate) client.nextEvent() /* only for test */
@@ -105,16 +111,13 @@ class AlgorithmBobblesIndicator(
                 if (stopThread) return
                 try {
                     when (msg) {
-                        is Trade -> {
-                            lastTradePrice = msg.price
-                            log?.trace("{} TradeEvent:\n{}", settings.pair, msg)
+                        is Candlestick -> {
+                            log?.trace("{} Kline:\n{}", settings.pair, msg)
 
-                            klineConstructor.nextKline(msg).forEach { kline ->
-                                if (kline.isClosed) {
-                                    candlestickList.add(kline.candlestick)
-                                    log?.debug("{} Kline closed:\n {}", settings.pair, kline.candlestick)
-                                }
-                            }
+                            if (msg.closeTime > currentKline.closeTime)
+                                prevKline = currentKline
+
+                            currentKline = msg
                         }
 
                         is ExchangePosition -> exchangePosition = msg
@@ -143,8 +146,8 @@ class AlgorithmBobblesIndicator(
                                                     orderId = msg.orderId,
                                                     tradePair = msg.pair.toString(),
                                                     orderSide = msg.side,
-                                                    amount = msg.executedQty - msg.executedQty.percent(settings.feePercent),
-                                                    price = msg.price,
+                                                    amount = msg.executedQty,
+                                                    price = calcPriceWithFee(msg.executedQty, msg.price!!, msg.side),
                                                     notificationType = NotificationType.ORDER_FILLED,
                                                     dateTime = Timestamp(System.currentTimeMillis())
                                                 )
@@ -159,13 +162,13 @@ class AlgorithmBobblesIndicator(
 
                                         positions = if (msg.side == SIDE.BUY)
                                             updatePositionsBuy(
-                                                (msg.executedQty - msg.executedQty.percent(settings.feePercent)).negate(),
-                                                msg.price!!
+                                                msg.executedQty.negate(),
+                                                calcPriceWithFee(msg.executedQty, msg.price!!, msg.side)
                                             )
                                         else
                                             updatePositionsSell(
-                                                (msg.executedQty - msg.executedQty.percent(settings.feePercent)).negate(),
-                                                msg.price!!
+                                                msg.executedQty.negate(),
+                                                calcPriceWithFee(msg.executedQty, msg.price!!, msg.side)
                                             )
 
                                         reWriteObject(positions, File("$path/positions.json"))
@@ -228,73 +231,87 @@ class AlgorithmBobblesIndicator(
                                 BotEvent.Type.CREATE_ORDER -> {
                                     val notification = msg.text.deserialize<Notification>()
 
-                                    // find kline with indicator
-                                    getKlineWithIndicator()?.let { kline ->
-                                        log?.info("Kline with indicator:\n$kline")
-                                        val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
-                                        val price = if (side == SIDE.BUY) kline.low else kline.high
+                                    val kline = if (
+                                        abs(currentKline.closeTime - System.currentTimeMillis())
+                                        < abs(prevKline.closeTime - System.currentTimeMillis())
+                                    )
+                                        currentKline
+                                    else
+                                        prevKline
 
-                                        try {
-                                            orderService?.saveOrder(
-                                                bot.telegram.notificator.database.data.entities.Order(
-                                                    botName = settings.name,
-                                                    tradePair = settings.pair.toString(),
-                                                    orderSide = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
-                                                    amount = notification.amount,
-                                                    price = price,
-                                                    notificationType = NotificationType.SIGNAL,
-                                                    dateTime = Timestamp(System.currentTimeMillis())
-                                                )
+                                    log?.info("Kline with indicator:\n$kline")
+                                    val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
+                                    val price = if (side == SIDE.BUY) kline.low else kline.high
+
+                                    try {
+                                        orderService?.saveOrder(
+                                            bot.telegram.notificator.database.data.entities.Order(
+                                                botName = settings.name,
+                                                tradePair = settings.pair.toString(),
+                                                orderSide = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
+                                                amount = notification.amount,
+                                                price = price,
+                                                notificationType = NotificationType.SIGNAL,
+                                                dateTime = Timestamp(System.currentTimeMillis())
                                             )
-                                        } catch (t: Throwable) {
-                                            send("Error while saving order to db: ${t.message}")
-                                            log?.error("Error while saving order to db: ${t.message}")
-                                        }
+                                        )
+                                    } catch (t: Throwable) {
+                                        send("Error while saving order to db: ${t.message}")
+                                        log?.error("Error while saving order to db: ${t.message}")
+                                    }
 
-                                        if (notification.amount > settings.minOrderSize
-                                            && notification.price == null
-                                            && notification.placeOrder
-                                        ) {
+                                    if (notification.amount > settings.minOrderSize
+                                        && notification.price == null
+                                        && notification.placeOrder
+                                    ) {
 
-                                            if (settings.buyAmountMultiplication > BigDecimal.ZERO && side == SIDE.BUY) {
+                                        if (settings.buyAmountMultiplication > BigDecimal.ZERO && side == SIDE.BUY) {
+                                            try {
                                                 sentOrder(
                                                     price = price,
                                                     amount = notification.amount * settings.buyAmountMultiplication,
                                                     orderSide = side,
                                                     orderType = TYPE.LIMIT
                                                 )
-                                            } else if (settings.sellAmountMultiplication > BigDecimal.ZERO && side == SIDE.SELL) {
+                                            } catch (e: ExchangeException) {
+                                                send("HttpStatusException:\n```\n${e.message}```", true)
+                                                log?.warn(e.stackTraceToString())
+                                            }
+                                        } else if (settings.sellAmountMultiplication > BigDecimal.ZERO && side == SIDE.SELL) {
 
-                                                val shortPositionAndShortOrders = (exchangePosition?.positionAmount
-                                                    ?: 0.toBigDecimal()) - shortOrdersSum()
+                                            val shortPositionAndShortOrders = (exchangePosition?.positionAmount
+                                                ?: 0.toBigDecimal()) - shortOrdersSum()
 
-                                                if (settings.maxShortPosition.negate() <= shortPositionAndShortOrders)
+                                            if (settings.maxShortPosition.negate() <= shortPositionAndShortOrders)
+                                                try {
                                                     sentOrder(
                                                         price = price,
                                                         amount = notification.amount * settings.sellAmountMultiplication,
                                                         orderSide = side,
                                                         orderType = TYPE.LIMIT
                                                     )
-                                                else send(
-                                                    "Short position and sum of short orders are too big: " +
-                                                            "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
-                                                )
-                                            }
+                                                } catch (e: ExchangeException) {
+                                                    send("HttpStatusException:\n```\n${e.message}```", true)
+                                                    log?.warn(e.stackTraceToString())
+                                                }
+                                            else send(
+                                                "Short position and sum of short orders are too big: " +
+                                                        "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
+                                            )
                                         }
+                                    }
 
-                                        positions =
-                                            readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+                                    positions =
+                                        readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
 
-                                        positions = if (notification.type.equals("buy", true))
-                                            updatePositionsBuy(notification.amount, notification.price ?: price)
-                                        else
-                                            updatePositionsSell(notification.amount, notification.price ?: price)
+                                    positions = if (notification.type.equals("buy", true))
+                                        updatePositionsBuy(notification.amount, notification.price ?: price)
+                                    else
+                                        updatePositionsSell(notification.amount, notification.price ?: price)
 
-                                        reWriteObject(positions, File("$path/positions.json"))
+                                    reWriteObject(positions, File("$path/positions.json"))
 
-                                        log?.info("Positions After update:\n$positions")
-                                    } ?: send("Can't generate Kline, not enough trades")
-
+                                    log?.info("Positions After update:\n$positions")
                                 }
 
                                 BotEvent.Type.SET_SETTINGS -> {
@@ -341,7 +358,7 @@ class AlgorithmBobblesIndicator(
             ?.forEach { orders[it.orderId] = it }
     }
 
-    private fun getKlineWithIndicator(): Candlestick? {
+    /*private fun getKlineWithIndicator(): Candlestick? {
         return if (candlestickList.isNotEmpty()) {
             val now = System.currentTimeMillis()
             if (abs(now - candlestickList.last().closeTime) > abs(now - klineConstructor.getCandlestick().closeTime))
@@ -349,7 +366,7 @@ class AlgorithmBobblesIndicator(
             else
                 candlestickList.last()
         } else null
-    }
+    }*/
 
     data class VirtualPositions(
         var sellAmount: BigDecimal = BigDecimal.ZERO,
@@ -425,4 +442,15 @@ class AlgorithmBobblesIndicator(
         .map { it.value }
         .filter { it.side == SIDE.SELL }
         .sumOf { it.origQty }
+
+    private fun calcPriceWithFee(
+        amount: BigDecimal,
+        price: BigDecimal,
+        side: SIDE,
+        feePercent: BigDecimal = settings.feePercent
+    ): BigDecimal = when (side) {
+        SIDE.BUY -> (amount * price).let { (it + it.percent(feePercent)) / amount }
+        SIDE.SELL -> (amount * price).let { (it - it.percent(feePercent)) / amount }
+        SIDE.UNSUPPORTED -> price
+    }
 }

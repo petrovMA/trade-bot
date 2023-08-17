@@ -5,6 +5,7 @@ import bot.telegram.notificator.exchanges.clients.*
 import bot.telegram.notificator.exchanges.clients.stream.Stream
 import com.typesafe.config.Config
 import mu.KotlinLogging
+import org.knowm.xchange.exceptions.ExchangeException
 import java.io.File
 import java.math.BigDecimal
 import java.nio.file.Files
@@ -103,8 +104,10 @@ abstract class Algorithm(
         do {
             try {
                 order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
-                log?.debug("${botSettings.name} Order sent: $order")
+                log?.debug("{} Order sent: {}", botSettings.name, order)
                 return order
+            } catch (be: ExchangeException) {
+                throw be
             } catch (e: Exception) {
 
                 if (e.message?.contains("Account has insufficient balance for requested action.") == true) {
@@ -121,7 +124,7 @@ abstract class Algorithm(
                 log?.error("${botSettings.name} Can't send: $order", e)
 
                 e.printStackTrace()
-                log?.debug("${botSettings.name} Orders:\n$orders")
+                log?.debug("{} Orders:\n{}", botSettings.name, orders)
                 client = newClient(exchangeEnum, api, sec)
                 synchronizeOrders()
             }

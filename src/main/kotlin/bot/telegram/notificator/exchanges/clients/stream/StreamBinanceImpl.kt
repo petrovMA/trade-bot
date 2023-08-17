@@ -32,16 +32,7 @@ class StreamBinanceImpl(
             api?.also { spec.apiKey = it }
             sec?.also { spec.secretKey = it }
 
-//            val specFutures = StreamingExchangeFactory.INSTANCE
-//                .createExchange(BinanceFutureStreamingExchange::class.java)
-//                .defaultExchangeSpecification
-//
-//            api?.also { specFutures.apiKey = it }
-//            sec?.also { specFutures.secretKey = it }
-
             val exchange = StreamingExchangeFactory.INSTANCE.createExchange(spec) as BinanceStreamingExchange
-//            val exchangeFutures =
-//                StreamingExchangeFactory.INSTANCE.createExchange(specFutures) as BinanceFutureStreamingExchange
 
             val subscription = ProductSubscription.create()
                 .addTrades(TradePair("ETH_USDT").toCurrencyPair())
@@ -50,13 +41,6 @@ class StreamBinanceImpl(
                 .build()
 
             exchange.connect(subscription).blockingAwait()
-
-//            exchangeFutures.connect(
-//                ProductSubscription
-//                    .create()
-//                    .apply { if (api != null && sec != null) addOrders(FuturesContract(pair, null)) }
-//                    .build()
-//            ).blockingAwait()
 
             exchange.streamingMarketDataService.getTrades(pair).subscribe(
                 { trade ->
@@ -73,9 +57,9 @@ class StreamBinanceImpl(
                 }
             )
 
-            /*exchange.streamingMarketDataService.getOrderBook(pair).subscribe(
+            exchange.streamingMarketDataService.getOrderBook(pair).subscribe(
                 { book ->
-                    log.trace("OrderBook: $book")
+                    log.trace("OrderBook: {}", book)
 
                     val ask = book.asks
                         .map { Offer(it.limitPrice, it.originalAmount) }
@@ -88,9 +72,9 @@ class StreamBinanceImpl(
                     queue.add(DepthEventOrders(bid = bid, ask = ask))
                 },
                 { error ->
-                    log.warn("OrderBook stream Error:", error)
+                    log.warn("Trade stream Error:", error)
                 }
-            )*/
+            )
 
             if (api != null && sec != null) {
                 exchange.streamingTradeService.getOrderChanges(isFuture).subscribe(
@@ -131,14 +115,6 @@ class StreamBinanceImpl(
                         log.warn("Order stream Error:", error)
                     }
                 )
-
-//                exchangeFutures.streamingTradeService.getOrderChanges(true).subscribe(
-//                    { oc: Order? ->
-//                        log.info("Futures Order change: {}", oc)
-//                    }, { error ->
-//                        log.warn("Order stream Error:", error)
-//                    }
-//                )
             }
 
         } catch (e: Exception) {

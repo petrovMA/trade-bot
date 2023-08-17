@@ -6,6 +6,7 @@ import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesOrderUpdateRaw
 import info.bitrich.xchangestream.core.ProductSubscription
 import info.bitrich.xchangestream.core.StreamingExchangeFactory
 import mu.KotlinLogging
+import org.knowm.xchange.binance.dto.marketdata.KlineInterval
 import org.knowm.xchange.binance.dto.trade.OrderType
 import org.knowm.xchange.derivative.FuturesContract
 import org.knowm.xchange.instrument.Instrument
@@ -15,8 +16,7 @@ class StreamBinanceFuturesImpl(
     val pair: Instrument,
     private val queue: BlockingQueue<CommonExchangeData>,
     private val api: String?,
-    private val sec: String?,
-    private val isFuture: Boolean = true
+    private val sec: String?
 ) : Stream() {
 
     private val log = KotlinLogging.logger {}
@@ -47,20 +47,12 @@ class StreamBinanceFuturesImpl(
 
             exchangeFutures
                 .streamingMarketDataService
-                .getTrades(pair)
-                .subscribe(
-                    { trade ->
-                        queue.add(
-                            Trade(
-                                price = trade.price,
-                                qty = trade.originalAmount,
-                                time = trade.timestamp.time
-                            )
-                        )
-                    },
-                    { error ->
-                        log.warn("Trade stream Error:", error)
-                    }
+                .getKlines(pair, KlineInterval.m5)
+                .subscribe({ kline ->
+                    queue.add(Candlestick(kline))
+                }, { error ->
+                    log.warn("Trade stream Error:", error)
+                }
                 )
 
             if (api != null && sec != null) {
