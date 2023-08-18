@@ -265,39 +265,50 @@ class AlgorithmBobblesIndicator(
                                         && notification.placeOrder
                                     ) {
 
-                                        if (settings.buyAmountMultiplication > BigDecimal.ZERO && side == SIDE.BUY) {
-                                            try {
-                                                sentOrder(
-                                                    price = price,
-                                                    amount = notification.amount * settings.buyAmountMultiplication,
-                                                    orderSide = side,
-                                                    orderType = TYPE.LIMIT
-                                                )
-                                            } catch (e: ExchangeException) {
-                                                send("HttpStatusException:\n```\n${e.message}```", true)
-                                                log?.warn(e.stackTraceToString())
-                                            }
-                                        } else if (settings.sellAmountMultiplication > BigDecimal.ZERO && side == SIDE.SELL) {
-
-                                            val shortPositionAndShortOrders = (exchangePosition?.positionAmount
-                                                ?: 0.toBigDecimal()) - shortOrdersSum()
-
-                                            if (settings.maxShortPosition.negate() <= shortPositionAndShortOrders)
-                                                try {
-                                                    sentOrder(
-                                                        price = price,
-                                                        amount = notification.amount * settings.sellAmountMultiplication,
-                                                        orderSide = side,
-                                                        orderType = TYPE.LIMIT
-                                                    )
-                                                } catch (e: ExchangeException) {
-                                                    send("HttpStatusException:\n```\n${e.message}```", true)
-                                                    log?.warn(e.stackTraceToString())
+                                        when (side) {
+                                            SIDE.BUY -> {
+                                                if (settings.buyAmountMultiplication > BigDecimal.ZERO) {
+                                                    try {
+                                                        sentOrder(
+                                                            price = price,
+                                                            amount = notification.amount * settings.buyAmountMultiplication,
+                                                            orderSide = side,
+                                                            orderType = TYPE.LIMIT
+                                                        )
+                                                    } catch (e: ExchangeException) {
+                                                        send("HttpStatusException:\n```\n${e.message}```", true)
+                                                        log?.warn(e.stackTraceToString())
+                                                    }
                                                 }
-                                            else send(
-                                                "Short position and sum of short orders are too big: " +
-                                                        "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
-                                            )
+                                                else send("Buy orders disabled, because of buyAmountMultiplication = ${settings.buyAmountMultiplication}")
+                                            }
+
+                                            SIDE.SELL -> {
+                                                if (settings.sellAmountMultiplication > BigDecimal.ZERO) {
+
+                                                    val shortPositionAndShortOrders = (exchangePosition?.positionAmount
+                                                        ?: 0.toBigDecimal()) - shortOrdersSum()
+
+                                                    if (settings.maxShortPosition.negate() <= shortPositionAndShortOrders)
+                                                        try {
+                                                            sentOrder(
+                                                                price = price,
+                                                                amount = notification.amount * settings.sellAmountMultiplication,
+                                                                orderSide = side,
+                                                                orderType = TYPE.LIMIT
+                                                            )
+                                                        } catch (e: ExchangeException) {
+                                                            send("HttpStatusException:\n```\n${e.message}```", true)
+                                                            log?.warn(e.stackTraceToString())
+                                                        }
+                                                    else send(
+                                                        "Short position and sum of short orders are too big: " +
+                                                                "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
+                                                    )
+                                                }
+                                                else send("Sell orders disabled, because of sellAmountMultiplication = ${settings.sellAmountMultiplication}")
+                                            }
+                                            else -> send("Unsupported OrderSide: $side")
                                         }
                                     }
 
