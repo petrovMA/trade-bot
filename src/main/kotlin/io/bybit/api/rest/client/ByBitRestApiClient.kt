@@ -56,15 +56,12 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         val builder = builder().apply {
             addPathSegment("order")
             addPathSegment("realtime")
-            addQueryParameter("category", category)
-            symbol?.let { addQueryParameter("symbol", it) }
-            coin?.let { addQueryParameter("coin", it) }
+            params.forEach(::addQueryParameter)
         }
             .build()
 
         val request: Request = Request.Builder().url(builder)
-            .apply { headers(params).forEach { (key, value) -> addHeader(key, value) } }
-            .addHeader("Content-Type", "application/json")
+            .apply { headers(params).forEach(::addHeader) }
             .build()
 
         return executeRequest<OpenOrders>(request).result
@@ -73,39 +70,50 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     fun getKline(
         symbol: String,
         category: String = "spot",
-        interval: String,
+        interval: INTERVAL,
         start: Long? = null,
         end: Long? = null,
         limit: Long? = null
-    ): KlineResponse {
+    ): KlineResponse.Result {
         val builder = builder().apply {
             addPathSegment("market")
             addPathSegment("kline")
             addQueryParameter("category", category)
             addQueryParameter("symbol", symbol)
-            addQueryParameter("interval", interval)
+            addQueryParameter("interval", interval.time)
             start?.let { addQueryParameter("start", it.toString()) }
             end?.let { addQueryParameter("end", it.toString()) }
             limit?.let { addQueryParameter("limit", it.toString()) }
         }.build()
 
         val request: Request = Request.Builder().url(builder).build()
-        return executeRequest(request)
+        return executeRequest<KlineResponse>(request).result
     }
 
-    fun getBalance(coin: String? = null): BalanceResponse {
+    fun getBalance(
+        accountType: String = "SPOT",
+        coin: String? = null,
+        memberId: String? = null
+    ): BalanceResponse.Result {
 
-        val requestParams = createMapParams(TreeMap<String, String>().apply { coin?.let { put("coin", it) } })
+        val params = TreeMap<String, String>().apply {
+            put("accountType", accountType)
+            coin?.let { put("coin", it) }
+            memberId?.let { put("memberId", it) }
+        }
 
         val builder = builder().apply {
             addPathSegment("asset")
             addPathSegment("transfer")
             addPathSegment("query-account-coins-balance")
-            requestParams.forEach { (key, value) -> addQueryParameter(key, value) }
+            params.forEach(::addQueryParameter)
         }.build()
 
-        val request: Request = Request.Builder().url(builder).build()
-        return executeRequest(request)
+        val request: Request = Request.Builder().url(builder)
+            .apply { headers(params).forEach(::addHeader) }
+            .build()
+
+        return executeRequest<BalanceResponse>(request).result
     }
 
     fun getOrderList(
@@ -246,6 +254,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         put("X-BAPI-SIGN-TYPE", "2")
         put("X-BAPI-TIMESTAMP", TIMESTAMP)
         put("X-BAPI-RECV-WINDOW", RECV_WINDOW)
+        put("Content-Type", "application/json")
     }
 
     enum class INTERVAL(val time: String) {

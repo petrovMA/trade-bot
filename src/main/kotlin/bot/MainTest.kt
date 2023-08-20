@@ -25,8 +25,8 @@ fun main() {
 
 // api rest
     ByBitRestApiClient(api, sec).apply {
-//        val balance = getBalance()
-//        println(balance)
+        val balance = getBalance("CONTRACT")
+        println(balance)
 
         val openOrders = getOpenOrders("linear", "ETHUSDT")
         println(openOrders)
@@ -34,7 +34,7 @@ fun main() {
         val resultOrderBook = getOrderBook("ETHUSDT", "linear")
         println(resultOrderBook)
 
-        val resultKline = getKline("ETHUSDT", "linear", "5")
+        val resultKline = getKline("ETHUSDT", "linear", ByBitRestApiClient.INTERVAL.FIVE_MINUTES)
         println(resultKline)
 
         /*
