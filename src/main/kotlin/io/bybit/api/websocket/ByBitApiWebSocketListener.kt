@@ -141,7 +141,7 @@ class ByBitApiWebSocketListener {
 //            }
                 orderBookPattern.containsMatchIn(message) ->
                     if (orderBookSnapshotPattern.containsMatchIn(message)) {
-                        asObject(message, OrderBookSnapshot::class.java).run {
+                        asObject<OrderBookSnapshot>(message).run {
                             OrderBook(
                                 cross_seq = cross_seq,
                                 timestamp_e6 = timestamp_e6,
@@ -156,17 +156,12 @@ class ByBitApiWebSocketListener {
                             ).let { orderBookCallback?.invoke(it) }
                         }
                     } else
-                        orderBookCallback?.invoke(asObject(message, OrderBook::class.java))
-                tradePattern.containsMatchIn(message) ->
-                    tradeCallback?.invoke(asObject(message, Trade::class.java))
-                insurancePattern.containsMatchIn(message) ->
-                    insuranceCallback?.invoke(asObject(message, Insurance::class.java))
-                instrumentInfoPattern.containsMatchIn(message) ->
-                    instrumentInfoCallback?.invoke(asObject(message, InstrumentInfo::class.java))
-                klinePattern.containsMatchIn(message) ->
-                    klineCallback?.invoke(asObject(message, Kline::class.java))
-                liquidationPattern.containsMatchIn(message) ->
-                    liquidationCallback?.invoke(asObject(message, Liquidation::class.java))
+                        orderBookCallback?.invoke(asObject(message))
+                tradePattern.containsMatchIn(message) -> tradeCallback?.invoke(asObject(message))
+                insurancePattern.containsMatchIn(message) -> insuranceCallback?.invoke(asObject(message))
+                instrumentInfoPattern.containsMatchIn(message) -> instrumentInfoCallback?.invoke(asObject(message))
+                klinePattern.containsMatchIn(message) -> klineCallback?.invoke(asObject(message))
+                liquidationPattern.containsMatchIn(message) -> liquidationCallback?.invoke(asObject(message))
                 else -> log.warn { "Not found pattern for message: $message" }
             }
         } catch (t: Throwable) {

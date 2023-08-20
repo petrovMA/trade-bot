@@ -1,12 +1,9 @@
 package utils.mapper
 
-import bot.telegram.notificator.exchanges.clients.BotSettings
-import bot.telegram.notificator.exchanges.clients.BotSettingsBobblesIndicator
-import bot.telegram.notificator.exchanges.clients.BotSettingsTrader
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonDeserializationContext
-import com.google.gson.JsonDeserializer
-import com.google.gson.JsonElement
+import bot.trade.exchanges.clients.BotSettings
+import bot.trade.exchanges.clients.BotSettingsBobblesIndicator
+import bot.trade.exchanges.clients.BotSettingsTrader
+import com.google.gson.*
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -16,13 +13,13 @@ import java.lang.reflect.Type
  * Converts json to java object and vice versa
  */
 object Mapper {
-    private val gson = GsonBuilder()
+    val gson: Gson = GsonBuilder()
         .setPrettyPrinting()
         .registerTypeAdapter(BotSettings::class.java, BotSettingsDeserializer())
         .create()
 
     @JvmStatic
-    fun <T> asObject(json: String, clazz: Class<T>): T = gson.fromJson(json, clazz)
+    inline fun <reified T> asObject(json: String): T = gson.fromJson(json, T::class.java)
 
     @JvmStatic
     fun <T> asListObjects(json: String, type: Type): List<T> = gson.fromJson(json, type)

@@ -2,100 +2,110 @@ package io.bybit.api.rest.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.bybit.api.Authorization
-import utils.mapper.Mapper
-import io.bybit.api.rest.messages.balance.BalanceResponse
-import io.bybit.api.rest.messages.cancel_order.CancelOrderRequest
-import io.bybit.api.rest.messages.cancel_order.CancelOrderResponse
-import io.bybit.api.rest.messages.create_order.CreateOrderRequest
-import io.bybit.api.rest.messages.create_order.CreateOrderResponse
-import io.bybit.api.rest.messages.kline.KlineResponse
-import io.bybit.api.rest.messages.order_book.OrderBookResponse
-import io.bybit.api.rest.messages.order_list.OrderListResponse
-import io.bybit.api.rest.messages.time.TimeResponse
-import io.netty.handler.codec.http.HttpHeaders.addHeader
+import io.bybit.api.rest.response.*
+import io.bybit.api.rest.response.cancel_order.CancelOrderRequest
+import io.bybit.api.rest.response.cancel_order.CancelOrderResponse
+import io.bybit.api.rest.response.create_order.CreateOrderRequest
+import io.bybit.api.rest.response.create_order.CreateOrderResponse
+import io.bybit.api.rest.response.order_list.OrderListResponse
+import io.bybit.api.rest.response.time.TimeResponse
 import mu.KotlinLogging
-import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.internal.addHeaderLenient
 import okio.Buffer
+import utils.mapper.Mapper
 import java.io.IOException
+import java.time.ZonedDateTime
 import java.util.*
 
 
 class ByBitRestApiClient(private val apikey: String, private val secret: String) {
     private val url = "api.bybit.com"
-    private val public = "public"
     private val version = "v5"
-    private val private = "private"
     private val client: OkHttpClient = OkHttpClient()
     private val objectMapper: ObjectMapper = ObjectMapper()
+    private val TIMESTAMP = ZonedDateTime.now().toInstant().toEpochMilli().toString()
+    private val RECV_WINDOW = "10000"
+    private fun builder() = HttpUrl.Builder().scheme("https").host(url).addPathSegment(version)
 
     private val log = KotlinLogging.logger {}
 
-    fun getOrderBook(pair: String): OrderBookResponse {
-        val builder = public()
-            .addPathSegment("orderBook")
-            .addPathSegment("L2")
-            .addQueryParameter("symbol", pair)
-            .build()
+    fun getOrderBook(pair: String, category: String = "spot"): OrderBookResponse.Result =
+        executeRequest<OrderBookResponse>(
+            Request.Builder().url(
+                builder()
+                    .addPathSegment("market")
+                    .addPathSegment("orderbook")
+                    .addQueryParameter("symbol", pair)
+                    .addQueryParameter("category", category)
+                    .build()
+            ).build()
+        ).result
 
-        val request: Request = Request.Builder().url(builder).build()
-        return executeRequest(request, OrderBookResponse::class.java)
-    }
+    fun getOpenOrders(category: String = "spot", symbol: String? = null, coin: String? = null): OpenOrders.Result {
 
+        val params = TreeMap<String, String>().apply {
+            put("category", category)
+            symbol?.let { put("symbol", it) }
+            coin?.let { put("symbol", it) }
+        }
 
-    fun getOpenOrders(category: String, pair: String? = null): Any {
-
-        val headers = createHeaderParams()
-
-        val builder = private().apply {
-            addPathSegment("account")
-            addPathSegment("wallet-balance")
-            addQueryParameter("accountType", "UNIFIED")
-            addQueryParameter("coin", "USDC")
-            pair?.let { addQueryParameter("pair", it) }
+        val builder = builder().apply {
+            addPathSegment("order")
+            addPathSegment("realtime")
+            addQueryParameter("category", category)
+            symbol?.let { addQueryParameter("symbol", it) }
+            coin?.let { addQueryParameter("coin", it) }
         }
             .build()
 
         val request: Request = Request.Builder().url(builder)
-            .apply { headers.forEach { (key, value) -> addHeader(key, value) } }
+            .apply { headers(params).forEach { (key, value) -> addHeader(key, value) } }
             .addHeader("Content-Type", "application/json")
             .build()
 
-        return executeRequest(request, Any::class.java)
+        return executeRequest<OpenOrders>(request).result
     }
 
-    fun getKline(pair: String, interval: INTERVAL, from: Long, limit: Long? = null): KlineResponse {
-        val builder = public().apply {
+    fun getKline(
+        symbol: String,
+        category: String = "spot",
+        interval: String,
+        start: Long? = null,
+        end: Long? = null,
+        limit: Long? = null
+    ): KlineResponse {
+        val builder = builder().apply {
             addPathSegment("market")
             addPathSegment("kline")
-            addQueryParameter("category", "inverse")
-            addQueryParameter("symbol", pair)
-            addQueryParameter("interval", "60")
-//            addQueryParameter("from", from.toString())
+            addQueryParameter("category", category)
+            addQueryParameter("symbol", symbol)
+            addQueryParameter("interval", interval)
+            start?.let { addQueryParameter("start", it.toString()) }
+            end?.let { addQueryParameter("end", it.toString()) }
             limit?.let { addQueryParameter("limit", it.toString()) }
         }.build()
 
         val request: Request = Request.Builder().url(builder).build()
-        return executeRequest(request, KlineResponse::class.java)
+        return executeRequest(request)
     }
 
     fun getBalance(coin: String? = null): BalanceResponse {
 
         val requestParams = createMapParams(TreeMap<String, String>().apply { coin?.let { put("coin", it) } })
 
-        val builder = private().apply {
-            addPathSegment("wallet")
-            addPathSegment("balance")
+        val builder = builder().apply {
+            addPathSegment("asset")
+            addPathSegment("transfer")
+            addPathSegment("query-account-coins-balance")
             requestParams.forEach { (key, value) -> addQueryParameter(key, value) }
         }.build()
 
         val request: Request = Request.Builder().url(builder).build()
-        return executeRequest(request, BalanceResponse::class.java)
+        return executeRequest(request)
     }
 
     fun getOrderList(
@@ -114,14 +124,14 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             cursor?.let { put("cursor", it) }
         })
 
-        val builder = private().apply {
+        val builder = builder().apply {
             addPathSegment("order")
             addPathSegment("list")
             requestParams.forEach { (key, value) -> addQueryParameter(key, value) }
         }.build()
 
         val request: Request = Request.Builder().url(builder).build()
-        return executeRequest(request, OrderListResponse::class.java)
+        return executeRequest(request)
     }
 
     fun orderCreate(
@@ -153,12 +163,12 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
 
         val body = body(requestBody)
 
-        val builder = private().apply {
+        val builder = builder().apply {
             addPathSegment("order")
             addPathSegment("create")
         }.build()
 
-        return executeRequest(Request.Builder().url(builder).post(body).build(), CreateOrderResponse::class.java)
+        return executeRequest(Request.Builder().url(builder).post(body).build())
     }
 
     fun orderCancel(symbol: String, orderId: String? = null, orderLinkId: String? = null): CancelOrderResponse {
@@ -183,20 +193,20 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
 
         val body = body(requestBody)
 
-        val builder = private().apply {
+        val builder = builder().apply {
             addPathSegment("order")
             addPathSegment("cancel")
         }.build()
 
-        return executeRequest(Request.Builder().url(builder).post(body).build(), CancelOrderResponse::class.java)
+        return executeRequest(Request.Builder().url(builder).post(body).build())
     }
 
     fun getTime(): TimeResponse {
-        val request: Request = Request.Builder().url(public().addPathSegment("time").build()).build()
-        return executeRequest(request, TimeResponse::class.java)
+        val request: Request = Request.Builder().url(builder().addPathSegment("time").build()).build()
+        return executeRequest<TimeResponse>(request)
     }
 
-    private fun <T> executeRequest(request: Request, clazz: Class<T>): T = try {
+    private inline fun <reified T : Response> executeRequest(request: Request): T = try {
         log.trace {
             try {
                 val buffer = Buffer()
@@ -211,19 +221,14 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
 
         val respBody = client.newCall(request).execute().body!!.string()
         log.trace("Response:\n$respBody")
-        Mapper.asObject(respBody, clazz)
-    } catch (e: Exception) {
-        e.printStackTrace()
-        throw e
+        val resp = Mapper.asObject<T>(respBody)
+        if ((resp.retCode == 0L || resp.retCode == null) && (resp.ret_code == 0L || resp.ret_code == null)) resp
+        else throw ByBitRestException(resp.retMsg ?: resp.ret_msg!!, resp.retCode ?: resp.ret_code!!)
+    } catch (t: Throwable) {
+        t.printStackTrace()
+        log.error("Error while executing request: $request", t)
+        throw t
     }
-
-    private fun private() = HttpUrl.Builder().scheme("https").host(url)
-        .addPathSegment(version)
-//        .addPathSegment(private)
-
-    private fun public() = HttpUrl.Builder().scheme("https").host(url)
-        .addPathSegment(version)
-//        .addPathSegment(public)
 
     private fun body(obj: Any) =
         objectMapper.writeValueAsString(obj).toRequestBody("application/json".toMediaTypeOrNull()!!)
@@ -234,11 +239,13 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         put("sign", Authorization.signForRest(this, secret))
     }
 
-    private fun createHeaderParams(params: TreeMap<String, String> = TreeMap()): TreeMap<String, String> = params.apply {
-        put("X-BAPI-RECV-WINDOW", "5000")
+    private fun headers(params: TreeMap<String, String> = TreeMap()) = params.apply {
+        val sign = Authorization.genGetSign(params, TIMESTAMP, apikey, RECV_WINDOW, secret)
         put("X-BAPI-API-KEY", apikey)
-        put("X-BAPI-TIMESTAMP", System.currentTimeMillis().toString())
-        put("X-BAPI-SIGN", Authorization.signForRest(this, secret))
+        put("X-BAPI-SIGN", sign)
+        put("X-BAPI-SIGN-TYPE", "2")
+        put("X-BAPI-TIMESTAMP", TIMESTAMP)
+        put("X-BAPI-RECV-WINDOW", RECV_WINDOW)
     }
 
     enum class INTERVAL(val time: String) {

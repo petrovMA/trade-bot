@@ -1,7 +1,7 @@
 package io.bitmax.api.rest.client
 
-import bot.telegram.notificator.exchanges.clients.INTERVAL
-import bot.telegram.notificator.libs.NotSupportedIntervalException
+import bot.trade.exchanges.clients.INTERVAL
+import bot.trade.libs.NotSupportedIntervalException
 import utils.mapper.Mapper.asObject
 import io.bitmax.api.rest.messages.requests.RestCancelOrderRequest
 import io.bitmax.api.rest.messages.requests.RestPlaceOrderRequest
@@ -30,7 +30,7 @@ open class BitMaxRestApiClient {
     val pathOrderStatus = "order/status"
     val client: OkHttpClient = OkHttpClient()
     val requestBuilder = Request.Builder()
-    private val log = KotlinLogging.logger {}
+    val log = KotlinLogging.logger {}
 
     /**
      * @return history of bars
@@ -41,11 +41,11 @@ open class BitMaxRestApiClient {
     fun getCandlestickBars(symbol: String, interval: INTERVAL, limit: Int): List<RestBarHist> {
         val params = "?symbol=$symbol&interval=${getInterval(interval)}&n=$limit"
         return try {
-            executeRequest(
+            executeRequest<RestBarHists>(
                 requestBuilder
                     .url(url + api + pathBars + params)
                     .get()
-                    .build(), RestBarHists::class.java
+                    .build()
             ).data
         } catch (e: IOException) {
             e.printStackTrace()
@@ -58,7 +58,7 @@ open class BitMaxRestApiClient {
      */
     fun getOrderBook(pair: String): OrderBook {
         val builder = requestBuilder.url("$url$api$depth?symbol=$pair").get()
-        return executeRequest(builder.build(), OrderBook::class.java)
+        return executeRequest<OrderBook>(builder.build())
     }
 
     /**
@@ -72,18 +72,18 @@ open class BitMaxRestApiClient {
                     .get()
                     .build()
             ).execute()
-            asObject(result.body!!.string(), Array<RestProduct>::class.java)
+            asObject<Array<RestProduct>>(result.body!!.string())
         } catch (e: IOException) {
             e.printStackTrace()
             throw RuntimeException(e)
         }
     val allAssets: Array<Asset>
         get() = try {
-            executeRequest(
+            executeRequest<Array<Asset>>(
                 requestBuilder
                     .url(url + api + assets)
                     .get()
-                    .build(), Array<Asset>::class.java
+                    .build()
             )
         } catch (e: IOException) {
             e.printStackTrace()
@@ -108,7 +108,7 @@ open class BitMaxRestApiClient {
         return null
     }
 
-    fun <T> executeRequest(request: Request, clazz: Class<T>): T = try {
+    inline fun <reified T> executeRequest(request: Request): T = try {
         log.trace {
             try {
                 val buffer = Buffer()
@@ -123,7 +123,7 @@ open class BitMaxRestApiClient {
 
         val respBody = client.newCall(request).execute().body!!.string()
         log.trace("Response:\n$respBody")
-        asObject(respBody, clazz)
+        asObject<T>(respBody)
     } catch (e: Exception) {
         e.printStackTrace()
         throw e

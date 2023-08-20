@@ -27,12 +27,12 @@ class BitMaxRestApiClientAccount(apiKey: String, secret: String) : BitMaxRestApi
         get() {
             val headers = authClient.getHeaderMap(pathInfo, System.currentTimeMillis())
             val builder = requestBuilder
-                    .url(url + api + pathInfo)
-                    .get()
+                .url(url + api + pathInfo)
+                .get()
             for ((key, value) in headers) {
                 builder.header(key, value)
             }
-            return executeRequest(builder.build(), RestUserInfo::class.java)
+            return executeRequest(builder.build())
         }
 
     /**
@@ -43,12 +43,12 @@ class BitMaxRestApiClientAccount(apiKey: String, secret: String) : BitMaxRestApi
         get() {
             val headers = authClient.getHeaderMap(balanceUrl, System.currentTimeMillis())
             val builder = requestBuilder
-                    .url("$url$accountGroup/$api$cash$balanceUrl")
-                    .get()
+                .url("$url$accountGroup/$api$cash$balanceUrl")
+                .get()
             for ((key, value) in headers) {
                 builder.header(key, value)
             }
-            return executeRequest(builder.build(), RestBalances::class.java)
+            return executeRequest(builder.build())
         }
 
     /**
@@ -59,12 +59,12 @@ class BitMaxRestApiClientAccount(apiKey: String, secret: String) : BitMaxRestApi
         get() {
             val headers = authClient.getHeaderMap(pathOrders, System.currentTimeMillis())
             val builder = requestBuilder
-                    .url("$url$accountGroup/$api$cash$pathOrders")
-                    .get()
+                .url("$url$accountGroup/$api$cash$pathOrders")
+                .get()
             for ((key, value) in headers) {
                 builder.header(key, value)
             }
-            return executeRequest(builder.build(), RestOpenOrdersList::class.java)
+            return executeRequest(builder.build())
         }
 
     /**
@@ -74,12 +74,12 @@ class BitMaxRestApiClientAccount(apiKey: String, secret: String) : BitMaxRestApi
     override fun getOrder(orderId: String): RestOrderDetails {
         val headers = authClient.getHeaderMap(pathOrderStatus, System.currentTimeMillis())
         val builder = requestBuilder
-                .url("$url$accountGroup/$api$cash$pathOrderStatus?orderId=$orderId")
-                .get()
+            .url("$url$accountGroup/$api$cash$pathOrderStatus?orderId=$orderId")
+            .get()
         for ((key, value) in headers) {
             builder.header(key, value)
         }
-        return executeRequest(builder.build(), RestOrderDetails::class.java)
+        return executeRequest(builder.build())
     }
 
     /**
@@ -95,7 +95,7 @@ class BitMaxRestApiClientAccount(apiKey: String, secret: String) : BitMaxRestApi
             .post(asString(order).toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
         headers.forEach { builder.header(it.key, it.value) }
         return try {
-            executeRequest(builder.build(), PlaceOrCancelOrder::class.java)
+            executeRequest(builder.build())
         } catch (e: Exception) {
             e.printStackTrace()
             throw RuntimeException(e)
@@ -111,11 +111,11 @@ class BitMaxRestApiClientAccount(apiKey: String, secret: String) : BitMaxRestApi
         val timestamp = System.currentTimeMillis()
         val headers = authClient.getHeaderMap(pathOrder, timestamp)
         val builder = requestBuilder
-                .url("$url$accountGroup/$api$cash$pathOrder")
-                .delete(asString(order).toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
+            .url("$url$accountGroup/$api$cash$pathOrder")
+            .delete(asString(order).toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
         headers.forEach { builder.header(it.key, it.value) }
         return try {
-            executeRequest(builder.build(), PlaceOrCancelOrder::class.java)
+            executeRequest(builder.build())
         } catch (e: Exception) {
             e.printStackTrace()
             throw RuntimeException(e)

@@ -111,16 +111,11 @@ class BitMaxApiWebSocketListener {
             pingPattern.matches(message) -> {
                 if (keepConnection) sendText("{ \"op\": \"pong\" }")
             }
-            summaryPattern.matches(message) ->
-                summaryCallback?.invoke(asObject(message, WebSocketSummary::class.java))
-            depthPattern.matches(message) ->
-                depthCallback?.invoke(asObject(message, WebSocketDepth::class.java))
-            marketTradesPattern.matches(message) ->
-                marketTradesCallback?.invoke(asObject(message, WebSocketMarketTrades::class.java))
-            barPattern.matches(message) ->
-                barCallback?.invoke(asObject(message, WebSocketBar::class.java))
-            orderPattern.matches(message) ->
-                orderCallback?.invoke(asObject(message, WebSocketOrder::class.java))
+            summaryPattern.matches(message) -> summaryCallback?.invoke(asObject<WebSocketSummary>(message))
+            depthPattern.matches(message) -> depthCallback?.invoke(asObject(message))
+            marketTradesPattern.matches(message) -> marketTradesCallback?.invoke(asObject(message))
+            barPattern.matches(message) -> barCallback?.invoke(asObject(message))
+            orderPattern.matches(message) -> orderCallback?.invoke(asObject(message))
         }
     }
 

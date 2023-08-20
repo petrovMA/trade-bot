@@ -1,6 +1,6 @@
 package io.bitmax.api.rest.client
 
-import bot.telegram.notificator.exchanges.clients.INTERVAL
+import bot.trade.exchanges.clients.INTERVAL
 
 /**
  * Interval enumeration interval's for bars history request
@@ -20,7 +20,7 @@ enum class BitmaxInterval(val interval: String) {
     MONTHLY("1m");
 
     companion object {
-        fun from(findValue: String) = values().first { it.interval == findValue }
+        fun from(findValue: String) = entries.first { it.interval == findValue }
     }
 
     fun toInterval(): INTERVAL = when (this) {
