@@ -3,12 +3,6 @@ package io.bybit.api.rest.client
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.bybit.api.Authorization
 import io.bybit.api.rest.response.*
-import io.bybit.api.rest.response.cancel_order.CancelOrderRequest
-import io.bybit.api.rest.response.cancel_order.CancelOrderResponse
-import io.bybit.api.rest.response.create_order.CreateOrderRequest
-import io.bybit.api.rest.response.create_order.CreateOrderResponse
-import io.bybit.api.rest.response.order_list.OrderListResponse
-import io.bybit.api.rest.response.time.TimeResponse
 import mu.KotlinLogging
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -27,30 +21,38 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     private val version = "v5"
     private val client: OkHttpClient = OkHttpClient()
     private val objectMapper: ObjectMapper = ObjectMapper()
-    private val TIMESTAMP = ZonedDateTime.now().toInstant().toEpochMilli().toString()
     private val RECV_WINDOW = "10000"
     private fun builder() = HttpUrl.Builder().scheme("https").host(url).addPathSegment(version)
+    private fun timestamp() = ZonedDateTime.now().toInstant().toEpochMilli().toString()
 
     private val log = KotlinLogging.logger {}
 
-    fun getOrderBook(pair: String, category: String = "spot"): OrderBookResponse.Result =
-        executeRequest<OrderBookResponse>(
-            Request.Builder().url(
-                builder()
-                    .addPathSegment("market")
-                    .addPathSegment("orderbook")
-                    .addQueryParameter("symbol", pair)
-                    .addQueryParameter("category", category)
-                    .build()
-            ).build()
-        ).result
+    fun getOrderBook(pair: String, category: String = "spot") = executeRequest<OrderBookResponse>(
+        Request.Builder().url(
+            builder()
+                .addPathSegment("market")
+                .addPathSegment("orderbook")
+                .addQueryParameter("symbol", pair)
+                .addQueryParameter("category", category)
+                .build()
+        ).build()
+    ).result
 
-    fun getOpenOrders(category: String = "spot", symbol: String? = null, coin: String? = null): OpenOrders.Result {
+
+    fun getOpenOrders(
+        category: String = "spot",
+        symbol: String? = null,
+        baseCoin: String? = null,
+        settleCoin: String? = null,
+        orderId: String? = null
+    ): OpenOrders.Result {
 
         val params = TreeMap<String, String>().apply {
             put("category", category)
             symbol?.let { put("symbol", it) }
-            coin?.let { put("symbol", it) }
+            baseCoin?.let { put("baseCoin", it) }
+            settleCoin?.let { put("settleCoin", it) }
+            orderId?.let { put("orderId", it) }
         }
 
         val builder = builder().apply {
@@ -116,102 +118,92 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         return executeRequest<BalanceResponse>(request).result
     }
 
-    fun getOrderList(
-        symbol: String,
-        orderStatus: String? = null,
-        direction: String? = null,
-        limit: String? = null,
-        cursor: String? = null
-    ): OrderListResponse {
-
-        val requestParams = createMapParams(TreeMap<String, String>().apply {
-            put("symbol", symbol)
-            orderStatus?.let { put("order_status", it) }
-            direction?.let { put("direction", it) }
-            limit?.let { put("limit", it) }
-            cursor?.let { put("cursor", it) }
-        })
-
-        val builder = builder().apply {
-            addPathSegment("order")
-            addPathSegment("list")
-            requestParams.forEach { (key, value) -> addQueryParameter(key, value) }
-        }.build()
-
-        val request: Request = Request.Builder().url(builder).build()
-        return executeRequest(request)
-    }
-
-    fun orderCreate(
+    fun newOrder(
         side: String,
+        category: String = "spot",
         symbol: String,
         orderType: String,
         qty: String,
-        timeInForce: String
-    ): CreateOrderResponse {
+        isLeverage: String? = null,
+        price: String? = null,
+        triggerDirection: String? = null,
+        orderFilter: String? = null,
+        triggerPrice: String? = null,
+        triggerBy: String? = null,
+        orderIv: String? = null,
+        timeInForce: String? = null
+    ): CreateOrderResponse.Result {
 
-        val requestParams = createMapParams(TreeMap<String, String>().apply {
+        val params = createMapParams(TreeMap<String, String>().apply {
             put("side", side)
             put("symbol", symbol)
-            put("order_type", orderType)
+            put("category", category)
+            put("orderType", orderType)
             put("qty", qty)
-            put("time_in_force", timeInForce)
+            isLeverage?.let { put("isLeverage", it) }
+            price?.let { put("price", it) }
+            triggerDirection?.let { put("triggerDirection", it) }
+            orderFilter?.let { put("orderFilter", it) }
+            triggerPrice?.let { put("triggerPrice", it) }
+            triggerBy?.let { put("triggerBy", it) }
+            orderIv?.let { put("orderIv", it) }
+            timeInForce?.let { put("timeInForce", it) }
         })
-
-        val requestBody = CreateOrderRequest(
-            side = side,
-            symbol = symbol,
-            order_type = orderType,
-            qty = qty,
-            time_in_force = timeInForce,
-            timestamp = requestParams["timestamp"]!!,
-            sign = requestParams["sign"]!!,
-            api_key = requestParams["api_key"]!!,
-        )
-
-        val body = body(requestBody)
 
         val builder = builder().apply {
             addPathSegment("order")
             addPathSegment("create")
         }.build()
 
-        return executeRequest(Request.Builder().url(builder).post(body).build())
+        return executeRequest<CreateOrderResponse>(Request.Builder().url(builder).post(body(params)).build()).result
     }
 
-    fun orderCancel(symbol: String, orderId: String? = null, orderLinkId: String? = null): CancelOrderResponse {
+    fun orderCancelAll(
+        category: String = "spot",
+        symbol: String? = null,
+        baseCoin: String? = null,
+        settleCoin: String? = null,
+        orderFilter: String? = null
+    ): CancelAllResponse.Result {
 
-        if (orderId.isNullOrEmpty() && orderLinkId.isNullOrEmpty())
-            throw java.lang.RuntimeException("'orderId' or 'orderLinkId' must not be null!")
-
-        val requestParams = createMapParams(TreeMap<String, String>().apply {
-            put("symbol", symbol)
-            orderId?.let { put("order_id", it) }
-            orderLinkId?.let { put("order_link_id", it) }
+        val params = createMapParams(TreeMap<String, String>().apply {
+            put("category", category)
+            symbol?.let { put("symbol", it) }
+            baseCoin?.let { put("baseCoin", it) }
+            settleCoin?.let { put("settleCoin", it) }
+            orderFilter?.let { put("orderFilter", it) }
         })
 
-        val requestBody = CancelOrderRequest(
-            symbol = symbol,
-            order_id = orderId,
-            order_link_id = orderLinkId,
-            timestamp = requestParams["timestamp"]!!,
-            sign = requestParams["sign"]!!,
-            api_key = requestParams["api_key"]!!,
-        )
+        val builder = builder().apply {
+            addPathSegment("order")
+            addPathSegment("cancel-all")
+        }.build()
 
-        val body = body(requestBody)
+        return executeRequest<CancelAllResponse>(Request.Builder().url(builder).post(body(params)).build()).result
+    }
+
+    fun orderCancel(
+        category: String = "spot",
+        symbol: String,
+        orderId: String? = null,
+        orderLinkId: String? = null,
+        orderFilter: String? = null
+    ): CancelResponse.Result {
+
+        val requestParams = createMapParams(TreeMap<String, String>().apply {
+            put("category", category)
+            put("symbol", symbol)
+            orderId?.let { put("orderId", it) }
+            orderLinkId?.let { put("orderLinkId", it) }
+            orderFilter?.let { put("orderFilter", it) }
+        })
 
         val builder = builder().apply {
             addPathSegment("order")
             addPathSegment("cancel")
         }.build()
 
-        return executeRequest(Request.Builder().url(builder).post(body).build())
-    }
-
-    fun getTime(): TimeResponse {
-        val request: Request = Request.Builder().url(builder().addPathSegment("time").build()).build()
-        return executeRequest<TimeResponse>(request)
+        return executeRequest<CancelResponse>(Request.Builder().url(builder).post(body(requestParams)).build()).result
     }
 
     private inline fun <reified T : Response> executeRequest(request: Request): T = try {
@@ -248,11 +240,12 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     }
 
     private fun headers(params: TreeMap<String, String> = TreeMap()) = params.apply {
-        val sign = Authorization.genGetSign(params, TIMESTAMP, apikey, RECV_WINDOW, secret)
+        val timestamp = timestamp()
+        val sign = Authorization.genGetSign(params, timestamp, apikey, RECV_WINDOW, secret)
         put("X-BAPI-API-KEY", apikey)
         put("X-BAPI-SIGN", sign)
         put("X-BAPI-SIGN-TYPE", "2")
-        put("X-BAPI-TIMESTAMP", TIMESTAMP)
+        put("X-BAPI-TIMESTAMP", timestamp)
         put("X-BAPI-RECV-WINDOW", RECV_WINDOW)
         put("Content-Type", "application/json")
     }

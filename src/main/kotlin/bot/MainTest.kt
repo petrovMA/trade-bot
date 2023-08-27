@@ -1,15 +1,9 @@
 package bot
 
-import bot.trade.exchanges.clients.*
-import bot.trade.exchanges.clients.stream.StreamBinanceFuturesImpl
-import bot.trade.libs.poll
 import bot.trade.libs.readConf
-import bot.trade.libs.*
 import io.bybit.api.rest.client.ByBitRestApiClient
 import mu.KotlinLogging
 import org.apache.log4j.PropertyConfigurator
-import org.knowm.xchange.derivative.FuturesContract
-import java.util.concurrent.LinkedBlockingDeque
 
 
 private val log = KotlinLogging.logger {}
@@ -17,7 +11,6 @@ private val log = KotlinLogging.logger {}
 fun main() {
     PropertyConfigurator.configure("log4j.properties")
 
-//    val conf = readConf("exchangeConfigs/BYBIT.conf")!!
     val conf = readConf("exchangeConfigs/BYBIT.conf")!!
 
     val api = conf.getString("api")
@@ -26,16 +19,42 @@ fun main() {
 // api rest
     ByBitRestApiClient(api, sec).apply {
         val balance = getBalance("CONTRACT")
-        println(balance)
+        println("balance: $balance")
+
+        val newOrder1 = newOrder(
+            symbol = "ETHUSDT",
+            category = "linear",
+            side = "Buy",
+            orderType = "Limit",
+            qty = "0.01",
+            price = "1500"
+        )
+        println("newOrder1: $newOrder1")
+
+        val newOrder2 = newOrder(
+            symbol = "ETHUSDT",
+            category = "linear",
+            side = "Sell",
+            orderType = "Limit",
+            qty = "0.01",
+            price = "2500"
+        )
+        println("newOrder2: $newOrder2")
+
+        val orderCancel = orderCancel(category = "linear", symbol = "ETHUSDT", orderId = newOrder1.orderId)
+        println("orderCancel: $orderCancel")
 
         val openOrders = getOpenOrders("linear", "ETHUSDT")
-        println(openOrders)
+        println("openOrders: $openOrders")
 
-        val resultOrderBook = getOrderBook("ETHUSDT", "linear")
-        println(resultOrderBook)
+        val orderCancelAll = orderCancelAll("linear", "ETHUSDT")
+        println("orderCancelAll: $orderCancelAll")
+
+        val orderBook = getOrderBook("ETHUSDT", "linear")
+        println("orderBook: $orderBook")
 
         val resultKline = getKline("ETHUSDT", "linear", ByBitRestApiClient.INTERVAL.FIVE_MINUTES)
-        println(resultKline)
+        println("resultKline: $resultKline")
 
         /*
             val time = getTime()
