@@ -6,7 +6,7 @@ plugins {
 }
 
 application {
-    mainClass.set("bot.telegram.notificator.Main")
+    mainClass.set("bot.Main")
 }
 
 group = "bot.exchange"

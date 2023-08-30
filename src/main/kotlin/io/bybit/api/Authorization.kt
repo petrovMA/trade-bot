@@ -1,6 +1,5 @@
 package io.bybit.api
 
-import io.bybit.api.rest.Encryption
 import org.knowm.xchange.utils.DigestUtils
 import java.time.ZonedDateTime
 import java.util.*
