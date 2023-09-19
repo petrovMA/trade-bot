@@ -4,6 +4,7 @@ import bot.trade.libs.*
 import bot.trade.libs.UnknownOrderSide
 import bot.trade.libs.UnknownOrderStatus
 import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
+import io.bybit.api.websocket.messages.response.Kline
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
@@ -264,6 +265,15 @@ data class Candlestick(
         low = kline.low,
         close = kline.close,
         volume = kline.volume
+    )
+    constructor(kline: Kline.Data) : this(
+        openTime = kline.start,
+        closeTime = kline.end,
+        open = kline.open.toBigDecimal(),
+        high = kline.high.toBigDecimal(),
+        low = kline.low.toBigDecimal(),
+        close = kline.close.toBigDecimal(),
+        volume = kline.volume.toBigDecimal()
     )
 }
 

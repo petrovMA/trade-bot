@@ -5,14 +5,7 @@ import io.bybit.api.Authorization
 import utils.mapper.Mapper.asObject
 import utils.mapper.Mapper.asString
 import io.bybit.api.websocket.messages.requests.WebSocketMsg
-import io.bybit.api.websocket.messages.response.instrument_info.InstrumentInfo
-import io.bybit.api.websocket.messages.response.insurance.Insurance
-import io.bybit.api.websocket.messages.response.kline.Kline
-import io.bybit.api.websocket.messages.response.liquidation.Liquidation
-import io.bybit.api.websocket.messages.response.order_book.Data
-import io.bybit.api.websocket.messages.response.order_book.OrderBook
-import io.bybit.api.websocket.messages.response.order_book.OrderBookSnapshot
-import io.bybit.api.websocket.messages.response.trade.Trade
+import io.bybit.api.websocket.messages.response.*
 import mu.KotlinLogging
 
 /**
@@ -29,12 +22,13 @@ class ByBitApiWebSocketListener {
     /**
      * patterns to determine type of message
      */
+    private val orderPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"order")
     private val orderBookPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"orderBook")
     private val orderBookSnapshotPattern = Regex("\\s*\"type\"\\s*:\\s*\"snapshot\"")
-    private val tradePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"trade\\.")
+    private val tradePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"publicTrade\\.")
     private val insurancePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"insurance")
     private val instrumentInfoPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"instrument_info")
-    private val klinePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"klineV2")
+    private val klinePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"kline\\.\\d+")
     private val liquidationPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"liquidation")
 
     /**
@@ -46,6 +40,7 @@ class ByBitApiWebSocketListener {
     private var instrumentInfoCallback: ((InstrumentInfo) -> Unit)? = null
     private var klineCallback: ((Kline) -> Unit)? = null
     private var liquidationCallback: ((Liquidation) -> Unit)? = null
+    private var orderCallback: ((Order) -> Unit)? = null
 
     /**
      * Initialize listener for authorized user
@@ -139,6 +134,8 @@ class ByBitApiWebSocketListener {
 //            pingPattern.matcher(message).find() -> {
 //                if (keepConnection) sendText("{ \"op\": \"pong\" }")
 //            }
+                tradePattern.containsMatchIn(message) -> tradeCallback?.invoke(asObject(message))
+                orderPattern.containsMatchIn(message) -> orderCallback?.invoke(asObject(message))
                 orderBookPattern.containsMatchIn(message) ->
                     if (orderBookSnapshotPattern.containsMatchIn(message)) {
                         asObject<OrderBookSnapshot>(message).run {
@@ -147,7 +144,7 @@ class ByBitApiWebSocketListener {
                                 timestamp_e6 = timestamp_e6,
                                 topic = topic,
                                 type = type,
-                                data = Data(
+                                data = OrderBook.Data(
                                     insert = data,
                                     update = emptyList(),
                                     delete = emptyList(),
@@ -155,9 +152,8 @@ class ByBitApiWebSocketListener {
                                 )
                             ).let { orderBookCallback?.invoke(it) }
                         }
-                    } else
-                        orderBookCallback?.invoke(asObject(message))
-                tradePattern.containsMatchIn(message) -> tradeCallback?.invoke(asObject(message))
+                    } else orderBookCallback?.invoke(asObject(message))
+
                 insurancePattern.containsMatchIn(message) -> insuranceCallback?.invoke(asObject(message))
                 instrumentInfoPattern.containsMatchIn(message) -> instrumentInfoCallback?.invoke(asObject(message))
                 klinePattern.containsMatchIn(message) -> klineCallback?.invoke(asObject(message))
@@ -190,6 +186,9 @@ class ByBitApiWebSocketListener {
 
     fun setLiquidationCallback(liquidationCallback: (Liquidation) -> Unit) =
         apply { this.liquidationCallback = liquidationCallback }
+
+    fun setOrderCallback(orderCallback: (Order) -> Unit) =
+        apply { this.orderCallback = orderCallback }
 
     companion object {
         /**

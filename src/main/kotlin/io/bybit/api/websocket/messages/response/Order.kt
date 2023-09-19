@@ -1,0 +1,52 @@
+package io.bybit.api.websocket.messages.response
+
+data class Order(
+    val id: String,
+    val topic: String,
+    val `data`: List<Data>
+) {
+    data class Data(
+        val symbol: String,
+        val orderId: String,
+        val side: String,
+        val orderType: String,
+        val cancelType: String,
+        val price: String,
+        val qty: String,
+        val orderIv: String,
+        val timeInForce: String,
+        val orderStatus: String,
+        val orderLinkId: String,
+        val lastPriceOnCreated: String,
+        val reduceOnly: Boolean,
+        val leavesQty: String,
+        val leavesValue: String,
+        val cumExecQty: String,
+        val cumExecValue: String,
+        val avgPrice: String,
+        val blockTradeId: String,
+        val positionIdx: Long,
+        val cumExecFee: String,
+        val createdTime: String,
+        val updatedTime: String,
+        val rejectReason: String,
+        val stopOrderType: String,
+        val tpslMode: String,
+        val triggerPrice: String,
+        val takeProfit: String,
+        val stopLoss: String,
+        val tpTriggerBy: String,
+        val slTriggerBy: String,
+        val tpLimitPrice: String,
+        val slLimitPrice: String,
+        val triggerDirection: Long,
+        val triggerBy: String,
+        val closeOnTrigger: Boolean,
+        val category: String,
+        val placeType: String,
+        val smpType: String,
+        val smpGroup: Long,
+        val smpOrderId: String,
+        val feeCurrency: String
+    )
+}

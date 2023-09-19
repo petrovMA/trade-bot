@@ -1,4 +1,4 @@
-package io.bybit.api.websocket.messages.response.order_book
+package io.bybit.api.websocket.messages.response
 
 
 data class OrderBookSnapshot(

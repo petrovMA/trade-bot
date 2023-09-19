@@ -1,9 +1,17 @@
 package bot
 
+import bot.trade.exchanges.clients.CommonExchangeData
+import bot.trade.exchanges.clients.TradePair
+import bot.trade.exchanges.clients.stream.StreamByBitFuturesImpl
+import bot.trade.libs.m
+import bot.trade.libs.poll
 import bot.trade.libs.readConf
 import io.bybit.api.rest.client.ByBitRestApiClient
+import io.bybit.api.websocket.ByBitApiWebSocketListener
+import io.bybit.api.websocket.messages.requests.WebSocketMsg
 import mu.KotlinLogging
 import org.apache.log4j.PropertyConfigurator
+import java.util.concurrent.LinkedBlockingDeque
 
 
 private val log = KotlinLogging.logger {}
@@ -15,7 +23,7 @@ fun main() {
 
     val api = conf.getString("api")
     val sec = conf.getString("sec")
-
+/*
 // api rest
     ByBitRestApiClient(api, sec).apply {
         val balance = getBalance("CONTRACT")
@@ -86,8 +94,8 @@ fun main() {
                 orderLinkId = "123456"
             )
             println(orderCancel)
-    */
     }
+    */
 
 //        newOrder(
 //            Order(
@@ -109,31 +117,29 @@ fun main() {
 //        println(info)
 //    }
 
-    /*
 
     _readMapAndClose(_jsonFactory.createParser(
         "{\"symbol\":\"ETHBUSD\",\"orderId\":7340604491,\"orderListId\":-1,\"clientOrderId\":\"1ih9wSuFwNnQYabAD6fvtj\",\"transactTime\":1690124145296,\"price\":\"2500.00000000\",\"origQty\":\"0.00600000\",\"executedQty\":\"0.00000000\",\"cummulativeQuoteQty\":\"0.00000000\",\"status\":\"NEW\",\"timeInForce\":\"GTC\",\"type\":\"LIMIT\",\"side\":\"SELL\",\"workingTime\":1690124145296,\"fills\":[],\"selfTradePreventionMode\":\"NONE\"}"
 ), valueType);
+    */
 
 
-
+/*
     // api webSocket
         ByBitApiWebSocketListener(
     //        api,
     //        sec,
-            "wss://stream.bytick.com/realtime",
+            "wss://stream.bybit.com/v5/public/linear",
             500000,
             true,
-            WebSocketMsg("subscribe", listOf("order")),
+//            WebSocketMsg("subscribe", listOf("order")),
             WebSocketMsg(
                 "subscribe",
                 listOf(
-                    "orderBook_200.100ms.BTCUSD",
-                    "trade",
-                    "insurance",
-                    "instrument_info.100ms.BTCUSD",
-                    "klineV2.1.BTCUSD",
-                    "liquidation"
+//                    "orderbook.200.ETHUSDT",
+                    "publicTrade.ETHUSDT",
+//                    "kline.5.ETHUSDT",
+//                    "liquidation.ETHUSDT"
                 )
             )
         )
@@ -142,6 +148,24 @@ fun main() {
             .setKlineCallback { println("Kline -> $it") }
             .setInsuranceCallback { println("Insurance -> $it") }
             .setInstrumentInfoCallback { println("InstrumentInfo -> $it") }
-            .setLiquidationCallback { println("Liquidation -> $it") }*/
+            .setLiquidationCallback { println("Liquidation -> $it") }
+*/
+
+
+    val queue = LinkedBlockingDeque<CommonExchangeData>()
+
+    StreamByBitFuturesImpl(
+        api = api,
+        sec = sec,
+        pair = TradePair("ETH_USDT"),
+        queue = queue
+    ).start()
+
+    var msg = queue.poll(5.m())
+
+    do {
+        println(msg)
+        msg = queue.poll(5.m())
+    } while (true)
 
 }
