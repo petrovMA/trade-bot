@@ -24,24 +24,32 @@ data class Balance(val asset: String, val total: BigDecimal, val free: BigDecima
 
 
 data class ExchangePosition(
-    val pair: TradePair,
+    val pair: String,
     val positionAmount: BigDecimal,
     val entryPrice: BigDecimal,
     val accumulatedRealized: BigDecimal,
     val unrealizedPnl: BigDecimal,
     val marginType: String,
     val isolatedWallet: BigDecimal,
-    val positionSide: String?
+    val positionSide: String?,
+    val breakEvenPrice: BigDecimal
 ) : CommonExchangeData {
     constructor(position: BinanceFuturesPosition) : this(
-        TradePair(position.futuresContract),
-        if (position.positionAmount == BigDecimal(0.0)) BigDecimal(0.0) else position.positionAmount.round(),
-        if (position.entryPrice == BigDecimal(0.0)) BigDecimal(0.0) else position.entryPrice.round(),
-        if (position.accumulatedRealized == BigDecimal(0.0)) BigDecimal(0.0) else position.accumulatedRealized.round(),
-        if (position.unrealizedPnl == BigDecimal(0.0)) BigDecimal(0.0) else position.unrealizedPnl.round(),
-        position.marginType,
-        if (position.isolatedWallet == BigDecimal(0.0)) BigDecimal(0.0) else position.isolatedWallet.round(),
-        position.positionSide
+        pair = TradePair(position.futuresContract).toString(),
+        positionAmount = if (position.positionAmount == BigDecimal(0.0)) BigDecimal(0.0)
+        else position.positionAmount.round(),
+        entryPrice = if (position.entryPrice == BigDecimal(0.0)) BigDecimal(0.0)
+        else position.entryPrice.round(),
+        accumulatedRealized = if (position.accumulatedRealized == BigDecimal(0.0)) BigDecimal(0.0)
+        else position.accumulatedRealized.round(),
+        unrealizedPnl = if (position.unrealizedPnl == BigDecimal(0.0)) BigDecimal(0.0)
+        else position.unrealizedPnl.round(),
+        marginType = position.marginType,
+        isolatedWallet = if (position.isolatedWallet == BigDecimal(0.0)) BigDecimal(0.0)
+        else position.isolatedWallet.round(),
+        positionSide = position.positionSide,
+        breakEvenPrice = if (position.positionAmount == BigDecimal(0.0)) BigDecimal(0.0)
+        else (position.entryPrice - position.accumulatedRealized / position.positionAmount).round()
     )
 }
 
@@ -101,8 +109,9 @@ data class TradePair(val first: String, val second: String) {
     override fun toString(): String = "${first}_$second"
     fun toCurrencyPair() = CurrencyPair(first, second)
 
-    override fun equals(other: Any?) =
-        other is TradePair && other.first.equals(first, true) && other.second.equals(second, true)
+    override fun equals(other: Any?) = other is TradePair
+            && other.first.equals(first, true)
+            && other.second.equals(second, true)
 
     override fun hashCode(): Int = 31 * first.hashCode() + second.hashCode()
 }
