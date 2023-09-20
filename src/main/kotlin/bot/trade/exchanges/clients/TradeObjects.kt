@@ -3,6 +3,7 @@ package bot.trade.exchanges.clients
 import bot.trade.libs.*
 import bot.trade.libs.UnknownOrderSide
 import bot.trade.libs.UnknownOrderStatus
+import com.google.gson.annotations.SerializedName
 import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
 import io.bybit.api.websocket.messages.response.Kline
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
@@ -266,6 +267,7 @@ data class Candlestick(
         close = kline.close,
         volume = kline.volume
     )
+
     constructor(kline: Kline.Data) : this(
         openTime = kline.start,
         closeTime = kline.end,
@@ -284,36 +286,63 @@ abstract class BotSettings(
     val exchange: String,
     val orderBalanceType: String,
     val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
-    val countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    val feePercent: BigDecimal // fee for calc profit
+    val countOfDigitsAfterDotForPrice: Int // number of characters after the dot for price
 )
 
 class BotSettingsTrader(
-    name: String,
-    pair: TradePair,
-    exchange: String,
+    @SerializedName("flow_name") val flowName: String,
+    @SerializedName("symbol") val symbol: String,
+    @SerializedName("exchange_type") val exchangeType: String,
     orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
-    countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
-    countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    feePercent: BigDecimal = BigDecimal(0.1), // fee for calc profit
-    val direction: DIRECTION,
-    val ordersType: TYPE,
-    val tradingRange: Pair<BigDecimal, BigDecimal>,
-    val orderSize: BigDecimal, // Order Quantity:: order size
-    val orderDistance: BigDecimal, // Order Distance:: distance between every order
-    val triggerDistance: BigDecimal, // Trigger Distance:: distance between order and stop-order
-    val enableStopOrderDistance: BigDecimal = BigDecimal(0), // enable stop order distance (stopOrderDistance = triggerDistance + enableStopOrderDistance)
-    val orderMaxQuantity: Int, // Max Order count:: max amount of orders
-    val setCloseOrders: Boolean = true // set close position orders when bot starts
+    @SerializedName("digits_after_comma_in_amount") val countOfDigitsForAmount: Int, // number of characters after the dot for amount
+    @SerializedName("digits_after_comma_in_price") val countOfDigitsForPrice: Int, // number of characters after the dot for price
+    @SerializedName("strategy_type") val direction: DIRECTION,
+    @SerializedName("order_type") val ordersType: TYPE,
+    @SerializedName("parameters") val parameters: Parameters
 ) : BotSettings(
-    name = name,
-    pair = pair,
-    exchange = exchange,
+    name = flowName,
+    pair = TradePair(symbol),
+    exchange = exchangeType.uppercase(),
     orderBalanceType = orderBalanceType,
-    countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
-    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice,
-    feePercent = feePercent
-)
+    countOfDigitsAfterDotForAmount = countOfDigitsForAmount,
+    countOfDigitsAfterDotForPrice = countOfDigitsForPrice
+) {
+    class Parameters(
+        @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
+        @SerializedName("in_order_quantity") val inOrderQuantity: InOrderQuantity, // Order Quantity:: order size
+        @SerializedName("in_order_distance") val inOrderDistance: InOrderDistance, // Order Distance:: distance between every order
+        @SerializedName("trigger_distance") val triggerDistance: TriggerDistance, // Trigger Distance:: distance between order and stop-order
+        @SerializedName("stop_order_distance") val stopOrderDistance: StopOrderDistance, // enable stop order distance (stopOrderDistance = triggerDistance + stopOrderDistance)
+        @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
+        @SerializedName("set_close_orders") val setCloseOrders: Boolean = true // set close position orders when bot starts
+    ) {
+        class TradingRange(
+            @SerializedName("lower_bound") val lowerBound: BigDecimal,
+            @SerializedName("upper_bound") val upperBound: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class InOrderQuantity(
+            @SerializedName("value") val value: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class InOrderDistance(
+            @SerializedName("value") val value: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class TriggerDistance(
+            @SerializedName("distance") val distance: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class StopOrderDistance(
+            @SerializedName("distance") val distance: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+    }
+}
 
 class BotSettingsBobblesIndicator(
     name: String,
@@ -322,7 +351,7 @@ class BotSettingsBobblesIndicator(
     orderBalanceType: String,
     countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
     countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    feePercent: BigDecimal, // fee for calc profit
+    val feePercent: BigDecimal = BigDecimal(0.1), // fee for calc profit
     val minOrderSize: BigDecimal, // min order size
     val buyAmountMultiplication: BigDecimal, // buy order size Multiplication
     val sellAmountMultiplication: BigDecimal, // sell order size Multiplication
@@ -333,6 +362,5 @@ class BotSettingsBobblesIndicator(
     exchange = exchange,
     orderBalanceType = orderBalanceType,
     countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
-    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice,
-    feePercent = feePercent
+    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
 )
