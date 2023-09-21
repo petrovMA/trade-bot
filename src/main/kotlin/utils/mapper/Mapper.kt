@@ -49,7 +49,7 @@ object Mapper {
         override fun deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext): BotSettings {
             val jsonObject = json.asJsonObject
 
-            return when (jsonObject.get("type").asString) {
+            return when (jsonObject.get("type")?.asString) {
                 "bobbles" -> context.deserialize(json, BotSettingsBobblesIndicator::class.java)
                 else -> context.deserialize(json, BotSettingsTrader::class.java)
             }

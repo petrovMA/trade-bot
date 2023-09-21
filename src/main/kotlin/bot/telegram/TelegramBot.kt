@@ -48,7 +48,8 @@ class TelegramBot(
 
     override fun onUpdateReceived(update: Update) {
         log.info("Income update message: $update")
-        communicator.onUpdate(update.message.text)
+        val text = update.channelPost.text
+        communicator.onUpdate(text)
     }
 
     override fun getBotUsername(): String = botUsername

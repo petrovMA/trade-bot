@@ -110,20 +110,37 @@ class Communicator(
                     null
                 }?.let { botSettings ->
 
-                    if (tradeBots[botSettings.name] == null) {
-                        tradeBots[botSettings.name] =
-                            AlgorithmBobblesIndicator(
-                                botSettings,
-                                exchangeBotsFiles = exchangeBotsFiles,
-                                orderService = orderService,
-                                sendMessage = sendMessage
-                            )
+                    when (botSettings) {
+                        is BotSettingsTrader -> {
+                            if (tradeBots[botSettings.name] == null) {
+                                tradeBots[botSettings.name] = AlgorithmTrader(
+                                    botSettings,
+                                    exchangeBotsFiles = exchangeBotsFiles,
+                                    sendMessage = sendMessage
+                                )
+                                log.info("new BotSettingsTrader: $botSettings")
 
-                        log.info("new AlgorithmBobblesIndicator: $botSettings")
+                            } else {
+                                msg = "TradePair with name '${botSettings.name}' already exist!"
+                                log.info("TradePair with name '${botSettings.name}' already exist!")
+                            }
+                        }
 
-                    } else {
-                        msg = "TradePair with name '${botSettings.name}' already exist!"
-                        log.info("TradePair with name '${botSettings.name}' already exist!")
+                        else -> {
+                            if (tradeBots[botSettings.name] == null) {
+                                tradeBots[botSettings.name] = AlgorithmBobblesIndicator(
+                                    botSettings,
+                                    exchangeBotsFiles = exchangeBotsFiles,
+                                    orderService = orderService,
+                                    sendMessage = sendMessage
+                                )
+                                log.info("new AlgorithmBobblesIndicator: $botSettings")
+
+                            } else {
+                                msg = "TradePair with name '${botSettings.name}' already exist!"
+                                log.info("TradePair with name '${botSettings.name}' already exist!")
+                            }
+                        }
                     }
                 }
             }
@@ -687,18 +704,39 @@ class Communicator(
                 return msg to BotSettingsTrader(
                     name = name,
                     pair = TradePair(pair),
-                    exchange = exchange,
+                    exchange = exchange.uppercase(),
                     direction = direction,
                     ordersType = ordersType,
-                    tradingRange = tradingRange,
-                    orderSize = orderSize,
-                    orderDistance = orderDistance,
                     orderBalanceType = orderBalanceType,
-                    triggerDistance = triggerDistance,
-                    enableStopOrderDistance = enableStopOrderDistance,
-                    orderMaxQuantity = orderMaxQuantity,
                     countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
-                    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
+                    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice,
+                    marketType = "",
+                    marketTypeComment = "",
+                    strategyTypeComment = "",
+                    parameters = BotSettingsTrader.Parameters(
+                        orderMaxQuantity = orderMaxQuantity,
+                        tradingRange = BotSettingsTrader.Parameters.TradingRange(
+                            lowerBound = tradingRange.first,
+                            upperBound = tradingRange.second,
+                            usePercent = false
+                        ),
+                        inOrderQuantity = BotSettingsTrader.Parameters.InOrderQuantity(
+                            value = orderSize,
+                            usePercent = false
+                        ),
+                        inOrderDistance = BotSettingsTrader.Parameters.InOrderDistance(
+                            distance = orderDistance,
+                            usePercent = false
+                        ),
+                        triggerDistance = BotSettingsTrader.Parameters.TriggerDistance(
+                            distance = triggerDistance,
+                            usePercent = false
+                        ),
+                        stopOrderDistance = BotSettingsTrader.Parameters.StopOrderDistance(
+                            distance = enableStopOrderDistance,
+                            usePercent = false
+                        )
+                    )
                 )
             }
         }

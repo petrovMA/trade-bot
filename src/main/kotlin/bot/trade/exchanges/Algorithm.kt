@@ -16,7 +16,7 @@ import kotlin.math.absoluteValue
 
 
 abstract class Algorithm(
-    open val botSettings: BotSettings,
+    val botSettings: BotSettings,
     exchangeBotsFiles: String,
     val queue: LinkedBlockingDeque<CommonExchangeData>,
     val exchangeEnum: ExchangeEnum,

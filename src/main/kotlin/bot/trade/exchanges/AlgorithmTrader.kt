@@ -37,15 +37,17 @@ class AlgorithmTrader(
     isEmulate = isEmulate,
     sendMessage = sendMessage
 ) {
-    override val botSettings: BotSettingsTrader = super.botSettings as BotSettingsTrader
-    private val minRange = this.botSettings.parameters.tradingRange.lowerBound
-    private val maxRange = this.botSettings.parameters.tradingRange.upperBound
-    private val orderDistance = this.botSettings.parameters.inOrderDistance.value
-    private val orderSize = this.botSettings.parameters.inOrderQuantity.value
-    private val triggerDistance = this.botSettings.parameters.triggerDistance.distance
-    private val orderMaxQuantity = this.botSettings.parameters.orderMaxQuantity
-    private val stopOrderDistance = this.botSettings.parameters.stopOrderDistance.distance
-    private val setCloseOrders = this.botSettings.parameters.setCloseOrders
+    private val settings: BotSettingsTrader = super.botSettings as BotSettingsTrader
+    private val minRange = settings.parameters.tradingRange.lowerBound
+    private val maxRange = settings.parameters.tradingRange.upperBound
+    private val orderDistance = settings.parameters.inOrderDistance.distance
+    private val orderQuantity = settings.parameters.inOrderQuantity.value
+    private val triggerDistance = settings.parameters.triggerDistance.distance
+    private val orderMaxQuantity = settings.parameters.orderMaxQuantity
+    private val stopOrderDistance = settings.parameters.stopOrderDistance.distance
+    private val setCloseOrders = settings.parameters.setCloseOrders
+    private val ordersType = settings.ordersType
+    private val direction = settings.direction
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 
@@ -81,19 +83,20 @@ class AlgorithmTrader(
 
                                 val priceIn = (currentPrice - (currentPrice % orderDistance)).toPrice()
 
-                                when (botSettings.ordersType) {
+                                when (ordersType) {
                                     TYPE.MARKET -> {
                                         orders[priceIn]?.let { log?.trace("{} Order already exist: {}", botSettings.name, it) }
                                             ?: run {
                                                 if (orders.size < orderMaxQuantity) {
                                                     orders[priceIn] = sentOrder(
-                                                        amount = orderSize,
-                                                        orderSide = if (botSettings.direction == DIRECTION.LONG) SIDE.BUY
+                                                        amount = if (firstBalanceForOrderAmount) orderQuantity
+                                                        else orderQuantity.div8(priceIn.toBigDecimal()),
+                                                        orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
                                                         else SIDE.SELL,
                                                         price = priceIn.toBigDecimal(),
                                                         orderType = TYPE.MARKET
                                                     ).also {
-                                                        if (botSettings.direction == DIRECTION.LONG)
+                                                        if (direction == DIRECTION.LONG)
                                                             it.lastBorderPrice = BigDecimal.ZERO
                                                         else
                                                             it.lastBorderPrice = BigDecimal(99999999999999L)
@@ -103,7 +106,7 @@ class AlgorithmTrader(
                                     }
 
                                     TYPE.LIMIT -> {
-                                        when (botSettings.direction) {
+                                        when (direction) {
                                             DIRECTION.LONG -> {
                                                 var keyPrice = priceIn.toBigDecimal()
                                                 while (keyPrice > minRange) {
@@ -113,7 +116,8 @@ class AlgorithmTrader(
                                                                 if (orders.size < orderMaxQuantity) {
                                                                     orders[it] = sentOrder(
                                                                         price = keyPrice,
-                                                                        amount = orderSize,
+                                                                        amount = if (firstBalanceForOrderAmount) orderQuantity
+                                                                        else orderQuantity.div8(keyPrice),
                                                                         orderSide = SIDE.BUY,
                                                                         orderType = TYPE.LIMIT
                                                                     )
@@ -124,8 +128,7 @@ class AlgorithmTrader(
                                                     keyPrice -= orderDistance
                                                 }
 
-                                                val prev =
-                                                    (prevPrice - (prevPrice % orderDistance)).toPrice()
+                                                val prev = (prevPrice - (prevPrice % orderDistance)).toPrice()
 
                                                 if (priceIn.toBigDecimal() != prev.toBigDecimal()) {
                                                     orders[prev]?.let { order ->
@@ -150,12 +153,12 @@ class AlgorithmTrader(
                                         }
                                     }
 
-                                    else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${botSettings.ordersType}'!")
+                                    else -> throw UnsupportedOrderTypeException("Error: Unknown order type '$ordersType'!")
                                 }
                             } else
                                 log?.warn("${botSettings.name} Price ${format(currentPrice)}, not in range: ${minRange to maxRange}")
 
-                            when (botSettings.direction) {
+                            when (direction) {
                                 DIRECTION.LONG -> {
                                     val ordersForUpdate = orders.filter { it.value.type == TYPE.MARKET }
 
@@ -335,9 +338,9 @@ class AlgorithmTrader(
                     val priceIn = price.toPrice()
                     openOrders.find { it.price == priceIn.toBigDecimal() }?.let { openOrder ->
                         orders[priceIn] ?: run {
-                            if (botSettings.direction == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
-                                val orderSize = if (firstBalanceForOrderAmount) orderSize
-                                else orderSize.div8(price)
+                            if (direction == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
+                                val orderSize = if (firstBalanceForOrderAmount) orderQuantity
+                                else orderQuantity.div8(price)
 
                                 val qty = orderSize.percent(10.toBigDecimal())
 
@@ -345,9 +348,9 @@ class AlgorithmTrader(
                                     orders[price.toPrice()] = openOrder
                                     log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
                                 }
-                            } else if (botSettings.direction == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
-                                val orderSize = if (firstBalanceForOrderAmount) orderSize
-                                else orderSize.div8(price)
+                            } else if (direction == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
+                                val orderSize = if (firstBalanceForOrderAmount) orderQuantity
+                                else orderQuantity.div8(price)
 
                                 val qty = orderSize.percent(10.toBigDecimal())
 
@@ -384,10 +387,10 @@ class AlgorithmTrader(
                                     orderId = "",
                                     pair = botSettings.pair,
                                     price = priceIn.toBigDecimal(),
-                                    origQty = if (firstBalanceForOrderAmount) orderSize
-                                    else orderSize.div8(price),
+                                    origQty = if (firstBalanceForOrderAmount) orderQuantity
+                                    else orderQuantity.div8(price),
                                     executedQty = BigDecimal(0),
-                                    side = if (botSettings.direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
+                                    side = if (direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
                                     type = TYPE.MARKET,
                                     status = STATUS.FILLED,
                                     lastBorderPrice = BigDecimal.ZERO

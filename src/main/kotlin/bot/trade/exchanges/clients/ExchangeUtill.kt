@@ -10,6 +10,7 @@ private val log = KotlinLogging.logger {}
 
 fun newClient(exchangeEnum: ExchangeEnum, api: String? = null, sec: String? = null): Client =
     when (exchangeEnum) {
+        ExchangeEnum.BYBIT -> ClientByBit(api, sec).also { log.info(" !!! Connect: $it !!! ") }
         ExchangeEnum.BINANCE -> ClientBinance(api, sec).also { log.info(" !!! Connect: $it !!! ") }
         ExchangeEnum.BITMAX -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }
         ExchangeEnum.HUOBI -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }

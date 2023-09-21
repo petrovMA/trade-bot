@@ -241,6 +241,7 @@ data class Offer(val price: BigDecimal, val qty: BigDecimal) : CommonExchangeDat
 data class OrderBook(val bids: List<Offer>, val asks: List<Offer>) : CommonExchangeData
 
 enum class ExchangeEnum {
+    BYBIT,
     BINANCE,
     BINANCE_FUTURES,
     BITMAX,
@@ -281,31 +282,34 @@ data class Candlestick(
 
 abstract class BotSettings(
     val type: String = "",
-    val name: String,
-    val pair: TradePair,
-    val exchange: String,
+    open val name: String,
+    open val pair: TradePair,
+    open val exchange: String,
     val orderBalanceType: String,
     val countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
     val countOfDigitsAfterDotForPrice: Int // number of characters after the dot for price
 )
 
 class BotSettingsTrader(
-    @SerializedName("flow_name") val flowName: String,
-    @SerializedName("symbol") val symbol: String,
-    @SerializedName("exchange_type") val exchangeType: String,
+    @SerializedName("flow_name") override val name: String,
+    @SerializedName("symbol") override val pair: TradePair,
+    @SerializedName("exchange_type") override val exchange: String,
     orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
-    @SerializedName("digits_after_comma_in_amount") val countOfDigitsForAmount: Int, // number of characters after the dot for amount
-    @SerializedName("digits_after_comma_in_price") val countOfDigitsForPrice: Int, // number of characters after the dot for price
+    countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
     @SerializedName("strategy_type") val direction: DIRECTION,
     @SerializedName("order_type") val ordersType: TYPE,
-    @SerializedName("parameters") val parameters: Parameters
+    @SerializedName("parameters") val parameters: Parameters,
+    @SerializedName("market_type") val marketType: String,
+    @SerializedName("market_type_comment") val marketTypeComment: String,
+    @SerializedName("strategy_type_comment") val strategyTypeComment: String
 ) : BotSettings(
-    name = flowName,
-    pair = TradePair(symbol),
-    exchange = exchangeType.uppercase(),
+    name = name,
+    pair = pair,
+    exchange = exchange.uppercase(),
     orderBalanceType = orderBalanceType,
-    countOfDigitsAfterDotForAmount = countOfDigitsForAmount,
-    countOfDigitsAfterDotForPrice = countOfDigitsForPrice
+    countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
+    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
 ) {
     class Parameters(
         @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
@@ -328,7 +332,7 @@ class BotSettingsTrader(
         )
 
         class InOrderDistance(
-            @SerializedName("value") val value: BigDecimal,
+            @SerializedName("distance") val distance: BigDecimal,
             @SerializedName("use_percent") val usePercent: Boolean = false
         )
 

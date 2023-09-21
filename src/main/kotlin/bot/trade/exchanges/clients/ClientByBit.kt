@@ -1,6 +1,7 @@
 package bot.trade.exchanges.clients
 
 import bot.trade.exchanges.clients.stream.StreamBinanceImpl
+import bot.trade.exchanges.clients.stream.StreamByBitFuturesImpl
 import bot.trade.libs.UnknownOrderSide
 import mu.KotlinLogging
 import okhttp3.OkHttpClient
@@ -245,8 +246,8 @@ class ClientByBit(
 
 
     override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
-        StreamBinanceImpl(
-            pair = pair.toCurrencyPair(),
+        StreamByBitFuturesImpl(
+            pair = pair,
             queue = queue,
             sec = sec,
             api = api
