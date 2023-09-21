@@ -89,8 +89,7 @@ class AlgorithmTrader(
                                             ?: run {
                                                 if (orders.size < orderMaxQuantity) {
                                                     orders[priceIn] = sentOrder(
-                                                        amount = if (firstBalanceForOrderAmount) orderQuantity
-                                                        else orderQuantity.div8(priceIn.toBigDecimal()),
+                                                        amount = orderQuantity,
                                                         orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
                                                         else SIDE.SELL,
                                                         price = priceIn.toBigDecimal(),
@@ -116,8 +115,7 @@ class AlgorithmTrader(
                                                                 if (orders.size < orderMaxQuantity) {
                                                                     orders[it] = sentOrder(
                                                                         price = keyPrice,
-                                                                        amount = if (firstBalanceForOrderAmount) orderQuantity
-                                                                        else orderQuantity.div8(keyPrice),
+                                                                        amount = orderQuantity,
                                                                         orderSide = SIDE.BUY,
                                                                         orderType = TYPE.LIMIT
                                                                     )

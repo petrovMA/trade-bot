@@ -1,141 +1,126 @@
 package bot.trade.exchanges.clients
 
-import bot.trade.exchanges.clients.stream.StreamBinanceImpl
 import bot.trade.exchanges.clients.stream.StreamByBitFuturesImpl
 import bot.trade.libs.UnknownOrderSide
+import bot.trade.libs.UnsupportedOrderTypeException
+import io.bybit.api.rest.client.ByBitRestApiClient
 import mu.KotlinLogging
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.marketdata.KlineInterval
 import org.knowm.xchange.binance.dto.trade.OrderSide
+import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 
-class ClientByBit(
-    private val api: String? = null,
-    private val sec: String? = null,
-//    private val instance: Exchange = ExchangeFactory.INSTANCE.createExchange(BinanceExchange::class.java, api, sec)
-) : Client {
+class ClientByBit(private val api: String? = null, private val sec: String? = null) : Client {
 
-//    private val tradeService: BinanceTradeService = instance.tradeService as BinanceTradeService
-//    private val marketDataService: BinanceMarketDataService = instance.marketDataService as BinanceMarketDataService
-//    private val accountService: BinanceAccountService = instance.accountService as BinanceAccountService
-//    private val accountInfo: AccountInfo? = if (sec == null) null else accountService.accountInfo
-//    private val wallet: Wallet? = if (sec == null) null else accountInfo!!.wallet
-//    private val timestampFactory: BinanceTimestampFactory
-
-    val client = OkHttpClient().newBuilder().build()
+    val client = if (api != null && sec != null) ByBitRestApiClient(api, sec)
+    else throw IllegalArgumentException("api and sec must be not null")
 
     private val log = KotlinLogging.logger {}
-
-    // todo STUB 'timestampFactory' begin
-    private val serverInterval: Long = 15000
 
     override fun getAllPairs(): List<TradePair> =
         TODO("getAllPairs NOT IMPLEMENTED")
 //        instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
 
 
-    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> {
-        getCandles()
-        TODO("getCandlestickBars NOT IMPLEMENTED")
-    }
-//        marketDataService.klines(
-//            pair.toCurrencyPair(),
-//            asKlineInterval(interval),
-//            countCandles,
-//            null,
-//            null
-//        ).map { asCandlestick(it) }
+    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
+        client.getKline(pair.first + pair.second, "linear", ByBitRestApiClient.INTERVAL.FIVE_MINUTES)
+            .list
+            .map { asCandlestick(it, interval) }
 
 
     override fun getOpenOrders(pair: TradePair): List<Order> =
-        TODO("getOpenOrders NOT IMPLEMENTED")
-
-//        tradeService
-//        .getOpenOrders(pair.toCurrencyPair())
-//        .openOrders
-//        .map {
-//            Order(
-//                price = it.limitPrice,
-//                pair = pair,
-//                orderId = it.id,
-//                origQty = it.originalAmount,
-//                executedQty = it.cumulativeAmount,
-//                side = SIDE.valueOf(it.type),
-//                type = TYPE.LIMIT,
-//                status = when (it.status) {
-//                    org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
-//                    org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
-//                    org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
-//
-//                    org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
-//
-//                    org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
-//                    org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-//                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
-//                }
-//            )
-//        }
+        client.getOpenOrders(
+            category = "linear", // linear -> for perpetual contracts
+            symbol = pair.first + pair.second
+        )
+            .list
+            .filter {
+                pair == try {
+                    TradePair(it.symbol.substring(0, 3), it.symbol.substring(3))
+                } catch (t: Throwable) {
+                    log.warn("Can't convert to pair ${it.symbol} error: ${t.message}")
+                    null
+                }
+            }
+            .map {
+                Order(
+                    price = it.price.toBigDecimal(),
+                    pair = TradePair(it.symbol.substring(0, 3), it.symbol.substring(3)),
+                    orderId = it.orderId,
+                    origQty = it.qty.toBigDecimal(),
+                    executedQty = it.cumExecQty.toBigDecimal(),
+                    side = SIDE.valueOf(it.side.uppercase()),
+                    type = TYPE.LIMIT,
+                    status = when (it.orderStatus) {
+                        "Created" -> STATUS.NEW
+                        "New" -> STATUS.NEW
+                        "Rejected" -> STATUS.REJECTED
+                        "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
+                        "PartiallyFilledCanceled" -> STATUS.CANCELED
+                        "Filled" -> STATUS.FILLED
+                        "Cancelled" -> STATUS.CANCELED
+                        "Untriggered" -> STATUS.UNSUPPORTED
+                        "Triggered" -> STATUS.UNSUPPORTED
+                        "Deactivated" -> STATUS.UNSUPPORTED
+                        "Active" -> STATUS.UNSUPPORTED
+                        else -> STATUS.UNSUPPORTED
+                    }
+                )
+            }
 
 
     override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> =
-        TODO("getAllOpenOrders NOT IMPLEMENTED")
+        client.getOpenOrders(category = "linear") // linear -> for perpetual contracts
+            .list
+            .filter {
+                val pair = try {
+                    TradePair(it.symbol.substring(0, 3), it.symbol.substring(3))
+                } catch (t: Throwable) {
+                    log.warn("Can't convert to pair ${it.symbol} error: ${t.message}")
+                    null
+                }
+                pairs.contains(pair)
+            }
+            .map {
+                Order(
+                    price = it.price.toBigDecimal(),
+                    pair = TradePair(it.symbol.substring(0, 3), it.symbol.substring(3)),
+                    orderId = it.orderId,
+                    origQty = it.qty.toBigDecimal(),
+                    executedQty = it.cumExecQty.toBigDecimal(),
+                    side = SIDE.valueOf(it.side),
+                    type = TYPE.LIMIT,
+                    status = when (it.orderStatus) {
+                        "Created" -> STATUS.NEW
+                        "New" -> STATUS.NEW
+                        "Rejected" -> STATUS.REJECTED
+                        "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
+                        "PartiallyFilledCanceled" -> STATUS.CANCELED
+                        "Filled" -> STATUS.FILLED
+                        "Cancelled" -> STATUS.CANCELED
+                        "Untriggered" -> STATUS.UNSUPPORTED
+                        "Triggered" -> STATUS.UNSUPPORTED
+                        "Deactivated" -> STATUS.UNSUPPORTED
+                        "Active" -> STATUS.UNSUPPORTED
+                        else -> STATUS.UNSUPPORTED
+                    }
+                )
+            }
+            .groupBy { it.pair }
 
-//        tradeService
-//        .openOrders
-//        .openOrders
-//        .map {
-//            Order(
-//                price = it.limitPrice,
-//                pair = (it.instrument as CurrencyPair).run { TradePair(base.currencyCode, counter.currencyCode) },
-//                orderId = it.id,
-//                origQty = it.originalAmount,
-//                executedQty = it.cumulativeAmount,
-//                side = SIDE.valueOf(it.type),
-//                type = TYPE.LIMIT,
-//                status = when (it.status) {
-//                    org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
-//                    org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
-//                    org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
-//
-//                    org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
-//
-//                    org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
-//                    org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-//                    else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
-//                }
-//            )
-//        }
-//        .groupBy { TradePair(it.pair.toString()) }
 
+    override fun getBalances(): Map<String, List<Balance>> = mapOf(client.getBalance("UNIFIED").let {
+        it.accountType to it.balance.map { balance ->
+            Balance(
+                asset = balance.coin,
+                total = balance.walletBalance.toBigDecimal(),
+                free = balance.transferBalance.toBigDecimal(),
+                locked = balance.walletBalance.toBigDecimal() - balance.transferBalance.toBigDecimal()
+            )
+        }
+    })
 
-    override fun getBalances(): Map<String, List<Balance>>? =
-        TODO("getBalances NOT IMPLEMENTED")
-
-//    wallet?.balances?.map {
-//        Balance(
-//            asset = it.key.currencyCode,
-//            total = it.value.total,
-//            free = it.value.available,
-//            locked = it.value.frozen
-//        )
-//    } ?: throw UnsupportedOperationException(
-//        "This initialization has no API and SECRET keys, " +
-//                "because of that fun 'getBalances' not supported."
-//    )
 
     override fun getOrderBook(pair: TradePair, limit: Int): OrderBook =
         TODO("getOrderBook NOT IMPLEMENTED")
@@ -150,53 +135,46 @@ class ClientByBit(
 //        }
 
     override fun getAssetBalance(asset: String): Map<String, Balance?> =
-        TODO("getAssetBalance NOT IMPLEMENTED")
-
-//        wallet?.getBalance(Currency(asset))?.let {
-//        Balance(
-//            asset = asset,
-//            total = it.total,
-//            free = it.available,
-//            locked = it.frozen
-//        )
-//    } ?: throw UnsupportedOperationException(
-//        "This initialization has no API and SECRET keys, " +
-//                "because of that fun 'getAssetBalance' not supported."
-//    )
+        mapOf(client.getBalance(accountType = "UNIFIED", coin = asset).let {
+            it.accountType to it.balance.find { b -> b.coin == asset }?.run {
+                Balance(
+                    asset = coin,
+                    total = walletBalance.toBigDecimal(),
+                    free = transferBalance.toBigDecimal(),
+                    locked = walletBalance.toBigDecimal() - transferBalance.toBigDecimal()
+                )
+            }
+        })
 
 
-    override fun getOrder(pair: TradePair, orderId: String): Order {
-        TODO("getOrder NOT IMPLEMENTED")
-
-//        println((exchange.timestampFactory as BinanceTimestampFactory).deltaServerTime())
-//        return tradeService.getOrder(DefaultQueryOrderParamCurrencyPair(pair.toCurrencyPair(), orderId)).map {
-//            it as LimitOrder
-//            Order(
-//                price = it.limitPrice,
-//                pair = (it.instrument as CurrencyPair).run { TradePair(base.currencyCode, counter.currencyCode) },
-//                orderId = it.id,
-//                origQty = it.originalAmount,
-//                executedQty = it.cumulativeAmount,
-//                side = SIDE.valueOf(it.type),
-//                type = TYPE.LIMIT,
-//                status = when (it.status) {
-//                    org.knowm.xchange.dto.Order.OrderStatus.NEW -> STATUS.NEW
-//                    org.knowm.xchange.dto.Order.OrderStatus.PENDING_NEW -> STATUS.NEW
-//                    org.knowm.xchange.dto.Order.OrderStatus.OPEN -> STATUS.NEW
-//
-//                    org.knowm.xchange.dto.Order.OrderStatus.CANCELED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.REJECTED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.EXPIRED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.CLOSED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.STOPPED -> STATUS.CANCELED
-//                    org.knowm.xchange.dto.Order.OrderStatus.REPLACED -> STATUS.CANCELED
-//
-//                        org.knowm.xchange.dto.Order.OrderStatus.FILLED -> STATUS.FILLED
-//                        org.knowm.xchange.dto.Order.OrderStatus.PARTIALLY_FILLED -> STATUS.PARTIALLY_FILLED
-//                        else -> throw UnknownOrderStatus("Error: Unknown status '${it.status}'!")
-//                    }
-//                )
-//            }.first()
+    override fun getOrder(pair: TradePair, orderId: String): Order = client.getOpenOrders(
+        symbol = pair.first + pair.second,
+        category = "linear", // linear -> for perpetual contracts
+        orderId = orderId
+    ).list.first().run {
+        Order(
+            price = price.toBigDecimal(),
+            pair = pair,
+            orderId = orderId,
+            origQty = qty.toBigDecimal(),
+            executedQty = cumExecQty.toBigDecimal(),
+            side = SIDE.valueOf(side),
+            type = TYPE.LIMIT,
+            status = when (orderStatus) {
+                "Created" -> STATUS.NEW
+                "New" -> STATUS.NEW
+                "Rejected" -> STATUS.REJECTED
+                "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
+                "PartiallyFilledCanceled" -> STATUS.CANCELED
+                "Filled" -> STATUS.FILLED
+                "Cancelled" -> STATUS.CANCELED
+                "Untriggered" -> STATUS.UNSUPPORTED
+                "Triggered" -> STATUS.UNSUPPORTED
+                "Deactivated" -> STATUS.UNSUPPORTED
+                "Active" -> STATUS.UNSUPPORTED
+                else -> STATUS.UNSUPPORTED
+            }
+        )
     }
 
     override fun newOrder(
@@ -205,30 +183,40 @@ class ClientByBit(
         formatCount: String,
         formatPrice: String
     ): Order {
-        TODO("newOrder NOT IMPLEMENTED")
-
-//        val typeX = order.side.toType()
-//        val currPair = CurrencyPair(order.pair.first, order.pair.second)
-//        val orderId = tradeService.placeLimitOrder(
-//            LimitOrder(
-//                typeX,
-//                String.format(formatCount, order.origQty).toBigDecimal(),
-//                currPair,
-//                null,
-//                Date(),
-//                String.format(formatPrice, order.price).toBigDecimal()
-//            )
-//        )
-//
-//        return Order(orderId, order.pair, order.price, order.origQty, BigDecimal(0), order.side, order.type, STATUS.NEW)
+        val resp = client.newOrder(
+            symbol = order.pair.first + order.pair.second,
+            category = "linear", // linear -> for perpetual contracts
+            side = when (order.side) {
+                SIDE.BUY -> "Buy"
+                SIDE.SELL -> "Sell"
+                else -> throw UnknownOrderSide("Error, side: $this")
+            },
+            orderType = when (order.type) {
+                TYPE.LIMIT -> "Limit"
+                TYPE.MARKET -> "Market"
+                else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${order.type}'!")
+            },
+            qty = String.format(formatCount, order.origQty),
+            price = String.format(formatPrice, order.price)
+        )
+        return Order(
+            resp.orderId,
+            order.pair,
+            order.price,
+            order.origQty,
+            BigDecimal(0),
+            order.side,
+            order.type,
+            STATUS.NEW
+        )
     }
 
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean =
         TODO("cancelOrder NOT IMPLEMENTED")
 
-        /*try {
-        tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
+    /*try {
+    tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
 
 
 //        val ids = orderId.split('|')
@@ -238,11 +226,11 @@ class ClientByBit(
 //        else
 //            tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)
 
-        true
-    } catch (e: Exception) {
-        log.warn("Cancel order Error: ", e)
-        false
-    }*/
+    true
+} catch (e: Exception) {
+    log.warn("Cancel order Error: ", e)
+    false
+}*/
 
 
     override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
@@ -273,14 +261,14 @@ class ClientByBit(
         INTERVAL.MONTHLY -> KlineInterval.M1
     }
 
-    private fun asCandlestick(kline: BinanceKline): Candlestick = Candlestick(
-        openTime = kline.openTime,
-        closeTime = kline.closeTime,
-        open = kline.open,
-        high = kline.high,
-        low = kline.low,
-        close = kline.close,
-        volume = kline.volume
+    private fun asCandlestick(candlestick: List<String>, interval: INTERVAL): Candlestick = Candlestick(
+        openTime = candlestick[0].toLong(),
+        closeTime = candlestick[0].toLong() + interval.toMillsTime(),
+        open = candlestick[1].toBigDecimal(),
+        high = candlestick[2].toBigDecimal(),
+        low = candlestick[3].toBigDecimal(),
+        close = candlestick[4].toBigDecimal(),
+        volume = candlestick[5].toBigDecimal()
     )
 
     override fun toString(): String = "BYBIT"
@@ -295,15 +283,5 @@ class ClientByBit(
         SIDE.BUY -> OrderSide.BUY
         SIDE.SELL -> OrderSide.SELL
         else -> throw UnknownOrderSide("Unsupported Order side!")
-    }
-
-
-    fun getCandles() {
-        val request: Request = Request.Builder()
-            .url("https://api.bybit.com/v2/public/mark-price-kline?interval=1&from=1544156750&symbol=ETHUSD")
-            .method("GET", null)
-            .build()
-        val response: Response = client.newCall(request).execute()
-        println(response)
     }
 }
