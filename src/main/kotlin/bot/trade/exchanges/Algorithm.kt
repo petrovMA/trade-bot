@@ -63,8 +63,8 @@ abstract class Algorithm(
 
     fun interruptThis(msg: String? = null) {
         stream.interrupt()
-        var msgErr = "#Interrupt_${botSettings.pair} Thread, socket.status = ${stream.state}"
-        var logErr = "Thread for ${botSettings.pair} Interrupt, socket.status = ${stream.state}"
+        var msgErr = "#Interrupt #${botSettings.name} Thread, socket.status = ${stream.state}"
+        var logErr = "Thread for ${botSettings.name} Interrupt, socket.status = ${stream.state}"
         msg?.let { msgErr = "$msgErr\nMessage: $it"; logErr = "$logErr\nMessage: $it"; }
         send(msgErr)
         log?.warn(logErr)
@@ -120,7 +120,7 @@ abstract class Algorithm(
                 }
 
                 retryCount--
-                send("#Cannot_send_order_${botSettings.name}: $order\nError:\n${printTrace(e, 50)}")
+                send("#Cannot_send_order #${botSettings.name}: $order\nError:\n${printTrace(e, 50)}")
                 log?.error("${botSettings.name} Can't send: $order", e)
 
                 e.printStackTrace()
@@ -153,7 +153,7 @@ abstract class Algorithm(
                     e
                 )
                 send(
-                    "${botSettings.name} #getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n" +
+                    "#${botSettings.name} #getOrder_${pair}_trying ${(retryCount - retryGetOrderCount).absoluteValue}\n" +
                             printTrace(e, 0)
                 )
                 sleep(retryGetOrderInterval.toMillis())

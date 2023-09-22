@@ -74,7 +74,7 @@ class AlgorithmTrader(
                         is Trade -> {
                             prevPrice = currentPrice
                             currentPrice = msg.price
-                            log?.debug("{} TradeEvent:\n{}", botSettings.name, msg)
+                            log?.debug("{} TradeEvent: {}", botSettings.name, msg)
 
                             from = if (from > msg.time) msg.time else from
                             to = if (to < msg.time) msg.time else to
@@ -85,7 +85,13 @@ class AlgorithmTrader(
 
                                 when (ordersType) {
                                     TYPE.MARKET -> {
-                                        orders[priceIn]?.let { log?.trace("{} Order already exist: {}", botSettings.name, it) }
+                                        orders[priceIn]?.let {
+                                            log?.trace(
+                                                "{} Order already exist: {}",
+                                                botSettings.name,
+                                                it
+                                            )
+                                        }
                                             ?: run {
                                                 if (orders.size < orderMaxQuantity) {
                                                     orders[priceIn] = sentOrder(
@@ -110,7 +116,13 @@ class AlgorithmTrader(
                                                 var keyPrice = priceIn.toBigDecimal()
                                                 while (keyPrice > minRange) {
                                                     keyPrice.toPrice().let {
-                                                        orders[it]?.let { order -> log?.trace("{} Order already exist: {}", botSettings.name, order) }
+                                                        orders[it]?.let { order ->
+                                                            log?.trace(
+                                                                "{} Order already exist: {}",
+                                                                botSettings.name,
+                                                                order
+                                                            )
+                                                        }
                                                             ?: run {
                                                                 if (orders.size < orderMaxQuantity) {
                                                                     orders[it] = sentOrder(
@@ -120,7 +132,12 @@ class AlgorithmTrader(
                                                                         orderType = TYPE.LIMIT
                                                                     )
                                                                 } else
-                                                                    log?.trace("{} Orders count limit reached: price = {}; orderMaxQuantity = {}", botSettings.name, keyPrice, orderMaxQuantity)
+                                                                    log?.trace(
+                                                                        "{} Orders count limit reached: price = {}; orderMaxQuantity = {}",
+                                                                        botSettings.name,
+                                                                        keyPrice,
+                                                                        orderMaxQuantity
+                                                                    )
                                                             }
                                                     }
                                                     keyPrice -= orderDistance
@@ -146,7 +163,7 @@ class AlgorithmTrader(
                                             }
 
                                             DIRECTION.SHORT -> {
-                                                TODO()
+                                                TODO("SHORT strategy not implemented for TYPE.LIMIT")
                                             }
                                         }
                                     }
@@ -188,10 +205,10 @@ class AlgorithmTrader(
                                             v.lastBorderPrice = currentPrice
 
                                             if (
-                                                v.stopPrice?.run { this > currentPrice - triggerDistance } == true
+                                                v.stopPrice?.run { this > currentPrice + triggerDistance } == true
                                                 || v.stopPrice == null && k.toBigDecimal() > (currentPrice + triggerDistance + stopOrderDistance)
                                             ) {
-                                                v.stopPrice = currentPrice - triggerDistance
+                                                v.stopPrice = currentPrice + triggerDistance
                                             }
 
                                             orders[k] = v
@@ -239,6 +256,7 @@ class AlgorithmTrader(
                         }
 
                         is Order -> {
+                            log?.info("{} Order update: {}", botSettings.name, msg)
                             if (msg.pair == botSettings.pair) {
                                 if (msg.status == STATUS.FILLED) {
                                     if (msg.type == TYPE.LIMIT) {
@@ -251,9 +269,9 @@ class AlgorithmTrader(
                                                 it.lastBorderPrice = BigDecimal.ZERO
                                             }
 
-                                            send("Executed LIMIT order:\n```json\n$order\n```", true)
+                                            send("#${botSettings.name} Executed LIMIT order:\n```json\n$order\n```", true)
                                         }
-                                    } else send("Executed MARKET order:\n```json\n$msg\n```", true)
+                                    } else send("#${botSettings.name} Executed MARKET order:\n```json\n$msg\n```", true)
                                 }
                             }
                         }
@@ -265,8 +283,9 @@ class AlgorithmTrader(
                                         .filter { it.isNotBlank() }
 
                                     send(
-                                        client.getOpenOrders(TradePair(symbols[0], symbols[1]))
-                                            .joinToString("\n\n")
+                                        "#${botSettings.name} " +
+                                                client.getOpenOrders(TradePair(symbols[0], symbols[1]))
+                                                    .joinToString("\n\n")
                                     )
                                 }
 
@@ -281,16 +300,19 @@ class AlgorithmTrader(
                                         }
 
                                     client.getAllOpenOrders(pairs)
-                                        .forEach { send("${it.key}\n${it.value.joinToString("\n\n")}") }
+                                        .forEach { send("#${botSettings.name} ${it.key}\n${it.value.joinToString("\n\n")}") }
                                 }
 
                                 BotEvent.Type.SHOW_BALANCES -> {
                                     send(
-                                        "#AllBalances " +
+                                        "#${botSettings.name} #AllBalances " +
                                                 client.getBalances()
                                                     ?.toList()
                                                     ?.joinToString(prefix = "\n", separator = "\n") {
-                                                        it.first + "\n" + it.second.joinToString(prefix = "\n", separator = "\n")
+                                                        it.first + "\n" + it.second.joinToString(
+                                                            prefix = "\n",
+                                                            separator = "\n"
+                                                        )
                                                     }
                                     )
                                 }
@@ -300,7 +322,7 @@ class AlgorithmTrader(
                                     return
                                 }
 
-                                else -> send("${botSettings.name} Unsupported command: ${msg.type}")
+                                else -> send("#${botSettings.name} Unsupported command: ${msg.type}")
                             }
                         }
 
@@ -379,7 +401,13 @@ class AlgorithmTrader(
                     while (price <= maxRange) {
                         val priceIn = price.toPrice()
 
-                        orders[priceIn]?.let { order -> log?.trace("{} Order already exist: {}", botSettings.name, order) }
+                        orders[priceIn]?.let { order ->
+                            log?.trace(
+                                "{} Order already exist: {}",
+                                botSettings.name,
+                                order
+                            )
+                        }
                             ?: run {
                                 orders[priceIn] = Order(
                                     orderId = "",

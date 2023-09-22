@@ -16,6 +16,7 @@ import java.util.concurrent.BlockingQueue
 
 class TelegramBot(
     private val chatId: String,
+    private val adminId: String,
     exchangeBotsFiles: String,
     orderService: OrderService,
     private val botUsername: String,
@@ -48,8 +49,23 @@ class TelegramBot(
 
     override fun onUpdateReceived(update: Update) {
         log.info("Income update message: $update")
-        val text = update.channelPost.text
-        communicator.onUpdate(text)
+        val text = try {
+            if (chatId == adminId)
+                update.message.text
+            else {
+                if (update.message.from.id.toString() == adminId && update.message.text.startsWith("@$botUsername"))
+                    update.message.text.replace(Regex("@$botUsername\\s+"), "")
+                else
+                    null
+            }
+        } catch (e: NullPointerException) {
+            update.channelPost.text
+        } catch (e: NullPointerException) {
+            log.error("Can't get text from update: $update", e)
+            throw e
+        }
+
+        text?.let { communicator.onUpdate(it) }
     }
 
     override fun getBotUsername(): String = botUsername

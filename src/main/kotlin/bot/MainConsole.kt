@@ -26,16 +26,11 @@ fun main() {
     taskExecutor.start()
     try {
         val bot = Communicator(
-            intervalCandlestick = properties?.getDuration("bot_properties.exchange.interval_candlestick_update"),
-            intervalStatistic = properties?.getDuration("bot_properties.exchange.interval_statistic"),
-            timeDifference = properties?.getDuration("bot_properties.exchange.time_difference"),
-            candlestickDataCommandStr = properties?.getString("bot_properties.exchange.candlestick_data_command"),
-            candlestickDataPath = mapOf(
-                ExchangeEnum.BINANCE to properties?.getString("bot_properties.exchange.binance_emulate_data_path")!!,
-//                        ExchangeEnum.BITMAX to properties.getString("bot_properties.exchange.bitmax_emulate_data_path")!!,
-//                        ExchangeEnum.HUOBI to properties.getString("bot_properties.exchange.huobi_emulate_data_path")!!,
-//                        ExchangeEnum.GATE to properties.getString("bot_properties.exchange.gate_emulate_data_path")!!
-            ),
+            intervalCandlestick = null,
+            intervalStatistic = null,
+            timeDifference = null,
+            candlestickDataCommandStr = null,
+            candlestickDataPath = mapOf(),
             taskQueue = taskExecutor.getQueue(),
             exchangeFiles = exchangeFile,
             exchangeBotsFiles = exchangeBotsFiles,

@@ -33,19 +33,17 @@ class MainController(orderService: OrderService) {
         bot = try {
             TelegramBot(
                 chatId = propConf.getString("bot_properties.bot.chat_id"),
+                adminId = propConf.getString("bot_properties.bot.admin_id"),
                 exchangeBotsFiles = exchangeBotsFiles,
                 orderService = orderService,
                 botUsername = propConf.getString("bot_properties.bot.bot_name"),
                 botToken = propConf.getString("bot_properties.bot.bot_token"),
                 defaultCommands = mapOf(),
-                intervalCandlestick = propConf.getDuration("bot_properties.exchange.interval_candlestick_update"),
-                intervalStatistic = propConf.getDuration("bot_properties.exchange.interval_statistic"),
-                timeDifference = propConf.getDuration("bot_properties.exchange.time_difference"),
-                candlestickDataCommandStr = propConf.getString("bot_properties.exchange.candlestick_data_command"),
-                candlestickDataPath = mapOf(
-                    ExchangeEnum.BINANCE to propConf.getString("bot_properties.exchange.binance_emulate_data_path")!!,
-                    ExchangeEnum.GATE to propConf.getString("bot_properties.exchange.gate_emulate_data_path")!!
-                ),
+                intervalCandlestick = null,
+                intervalStatistic = null,
+                timeDifference = null,
+                candlestickDataCommandStr = null,
+                candlestickDataPath = mapOf(),
                 taskQueue = taskExecutor.getQueue(),
                 exchangeFiles = exchangeFile
             ).also { TelegramBotsApi(DefaultBotSession::class.java).registerBot(it) }
