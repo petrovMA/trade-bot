@@ -60,3 +60,7 @@ dependencies {
     implementation("org.slf4j:slf4j-log4j12:2.0.5")
     implementation("org.apache.logging.log4j:log4j-to-slf4j:2.20.0")
 }
+
+tasks.test {
+    useJUnitPlatform()
+}

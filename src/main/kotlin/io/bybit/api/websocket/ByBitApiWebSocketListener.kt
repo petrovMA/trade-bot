@@ -7,6 +7,9 @@ import utils.mapper.Mapper.asString
 import io.bybit.api.websocket.messages.requests.WebSocketMsg
 import io.bybit.api.websocket.messages.response.*
 import mu.KotlinLogging
+import java.time.Duration
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Represents a Listener of webSocket channels
@@ -30,6 +33,7 @@ class ByBitApiWebSocketListener {
     private val instrumentInfoPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"instrument_info")
     private val klinePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"kline\\.\\d+")
     private val liquidationPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"liquidation")
+    private val pongPattern = Regex(".+\"ret_msg\"\\s*:\\s*\"pong\".+\"op\"\\s*:\\s*\"ping\".+")
 
     /**
      * callBacks or every message type
@@ -42,6 +46,9 @@ class ByBitApiWebSocketListener {
     private var liquidationCallback: ((Liquidation) -> Unit)? = null
     private var orderCallback: ((Order) -> Unit)? = null
 
+    private var schedulerReconnect = Executors.newScheduledThreadPool(1)
+    private val url: String
+
     /**
      * Initialize listener for authorized user
      */
@@ -51,35 +58,34 @@ class ByBitApiWebSocketListener {
         url: String,
         timeout: Int = TIMEOUT,
         keepConnection: Boolean = true,
+        pingTimeInterval: Duration? = null,
         vararg subscribeMessages: WebSocketMsg
     ) {
         this.keepConnection = keepConnection
 
-        val date = (System.currentTimeMillis() + 5000).toString()
-        val authMsg = WebSocketMsg("auth", listOf(api, date, Authorization.signForWebSocket("GET/realtime$date", sec)))
-        try {
-            webSocket = WebSocketFactory()
-                .setConnectionTimeout(timeout)
-                .createSocket(url)
-                .addListener(object : WebSocketAdapter() {
-                    override fun onTextMessage(websocket: WebSocket, message: String) {
-                        onMessage(message)
-                    }
+        this.url = url
 
-                    override fun onDisconnected(
-                        websocket: WebSocket, serverCloseFrame: WebSocketFrame,
-                        clientCloseFrame: WebSocketFrame, closedByServer: Boolean
-                    ) {
-                        println("Socket Disconnected!")
-                    }
-                })
-                .addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
-            webSocket!!.connect()
-            send(authMsg)
-            subscribeMessages.forEach { send(it) }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        webSocket = connect(
+            api = api,
+            sec = sec,
+            url = url,
+            timeout = timeout,
+            pingTimeInterval = pingTimeInterval,
+            subscribeMessages = subscribeMessages
+        )
+
+        schedulerReconnect.scheduleAtFixedRate({
+            log.info("Reconnecting...")
+            webSocket?.disconnect()
+            webSocket = connect(
+                api = api,
+                sec = sec,
+                url = url,
+                timeout = timeout,
+                pingTimeInterval = pingTimeInterval,
+                subscribeMessages = subscribeMessages
+            )
+        }, 9, 9, TimeUnit.MINUTES)
     }
 
     /**
@@ -89,9 +95,12 @@ class ByBitApiWebSocketListener {
         url: String,
         timeout: Int = TIMEOUT,
         keepConnection: Boolean = true,
+        pingTimeInterval: Duration? = null,
         vararg subscribeMessages: WebSocketMsg
     ) {
         this.keepConnection = keepConnection
+        this.url = url
+
         try {
             webSocket = WebSocketFactory()
                 .setConnectionTimeout(timeout)
@@ -113,6 +122,62 @@ class ByBitApiWebSocketListener {
             subscribeMessages.forEach { send(it) }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun disconnect() {
+        webSocket?.disconnect()
+        schedulerReconnect.shutdown()
+    }
+
+    private fun connect(
+        timeout: Int = TIMEOUT,
+        api: String?,
+        sec: String?,
+        url: String,
+        pingTimeInterval: Duration? = null,
+        vararg subscribeMessages: WebSocketMsg
+    ): WebSocket {
+        val authMsg = if (api != null && sec != null) {
+            val date = (System.currentTimeMillis() + 5000).toString()
+            WebSocketMsg("auth", listOf(api, date, Authorization.signForWebSocket("GET/realtime$date", sec)))
+        } else null
+
+        try {
+            val webSocket = WebSocketFactory()
+                .setConnectionTimeout(timeout)
+                .createSocket(url)
+                .addListener(object : WebSocketAdapter() {
+
+                    override fun onPongFrame(websocket: WebSocket?, frame: WebSocketFrame?) {
+                        log.debug("Pong message received!")
+                    }
+
+                    override fun onTextMessage(websocket: WebSocket, message: String) {
+                        onMessage(message)
+                    }
+
+                    override fun onDisconnected(
+                        websocket: WebSocket, serverCloseFrame: WebSocketFrame,
+                        clientCloseFrame: WebSocketFrame, closedByServer: Boolean
+                    ) {
+                        log.info("Socket Disconnected!")
+                    }
+                })
+                .addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
+
+            pingTimeInterval?.let { webSocket.pingInterval = it.toMillis() }
+            webSocket.connect()
+            authMsg?.let {
+                val text = asString(it)
+                log.trace("Send message >>> $text")
+                webSocket.sendText(text)
+            }
+            subscribeMessages.forEach { webSocket.sendText(asString(it)) }
+            return webSocket
+        } catch (e: Exception) {
+            log.error("Can't connect to $url", e)
+            throw e
         }
     }
 
@@ -131,9 +196,7 @@ class ByBitApiWebSocketListener {
         log.trace("Receive message <<< $message")
         try {
             when {
-//            pingPattern.matcher(message).find() -> {
-//                if (keepConnection) sendText("{ \"op\": \"pong\" }")
-//            }
+                message.matches(pongPattern) -> log.debug("Pong message received!")
                 tradePattern.containsMatchIn(message) -> tradeCallback?.invoke(asObject(message))
                 orderPattern.containsMatchIn(message) -> orderCallback?.invoke(asObject(message))
                 orderBookPattern.containsMatchIn(message) ->

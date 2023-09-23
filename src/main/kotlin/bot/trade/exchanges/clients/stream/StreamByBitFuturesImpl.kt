@@ -1,6 +1,7 @@
 package bot.trade.exchanges.clients.stream
 
 import bot.trade.exchanges.clients.*
+import bot.trade.libs.s
 import io.bybit.api.websocket.ByBitApiWebSocketListener
 import io.bybit.api.websocket.messages.requests.WebSocketMsg
 import mu.KotlinLogging
@@ -26,6 +27,7 @@ class StreamByBitFuturesImpl(
                 url = publicUrl,
                 timeout = timeout,
                 keepConnection = true,
+                pingTimeInterval = 30.s(),
                 WebSocketMsg("subscribe", listOf("publicTrade.${pair.first}${pair.second}"))
             )
 
@@ -44,40 +46,14 @@ class StreamByBitFuturesImpl(
                 val privateStream = ByBitApiWebSocketListener(
                     api = api,
                     sec = sec,
-                    url = "wss://stream.bybit.com/v5/private",
+                    url = "wss://stream.bybit.com/v5/private?max_alive_time=1m",
                     timeout = timeout,
                     keepConnection = true,
+                    pingTimeInterval = 30.s(),
                     WebSocketMsg("subscribe", listOf("order"))
                 )
 
-                privateStream.setOrderCallback {
-                    queue.addAll(it.data.map { order ->
-                        Order(
-                            orderId = order.orderId,
-                            pair = order.symbol.run { TradePair(take(3), drop(3)) },
-                            price = order.price.toBigDecimal(),
-                            origQty = order.qty.toBigDecimal(),
-                            executedQty = order.cumExecQty.toBigDecimal(),
-                            side = SIDE.valueOf(order.side.uppercase()),
-                            type = TYPE.valueOf(order.orderType.uppercase()),
-                            status = when (order.orderStatus) {
-                                "Created" -> STATUS.NEW
-                                "New" -> STATUS.NEW
-                                "Rejected" -> STATUS.REJECTED
-                                "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
-                                "PartiallyFilledCanceled" -> STATUS.CANCELED
-                                "Filled" -> STATUS.FILLED
-                                "Cancelled" -> STATUS.CANCELED
-                                "Untriggered" -> STATUS.UNSUPPORTED
-                                "Triggered" -> STATUS.UNSUPPORTED
-                                "Deactivated" -> STATUS.UNSUPPORTED
-                                "Active" -> STATUS.UNSUPPORTED
-                                else -> STATUS.UNSUPPORTED
-                            },
-                            fee = order.cumExecFee.toBigDecimal()
-                        )
-                    })
-                }
+                privateStream.setOrderCallback { queue.addAll(it.data.map { order -> Order(order) }) }
 
 //                privateStream
 //                    .streamingTradeService

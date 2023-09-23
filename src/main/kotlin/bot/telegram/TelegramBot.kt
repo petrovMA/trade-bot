@@ -53,14 +53,20 @@ class TelegramBot(
             if (chatId == adminId)
                 update.message.text
             else {
-                if (update.message.from.id.toString() == adminId && update.message.text.startsWith("@$botUsername"))
-                    update.message.text.replace(Regex("@$botUsername\\s+"), "")
+                if (update.message.from.id.toString() == adminId && Regex("@?$botUsername.+").matches(update.message.text))
+                    update.message.text.replace(Regex("@?$botUsername\\s+"), "")
                 else
                     null
             }
-        } catch (e: NullPointerException) {
+        } catch (e: java.lang.NullPointerException) {
+            if (update.inlineQuery.from.id.toString() == adminId)
+                null
+                //update.inlineQuery.query
+            else
+                null
+        } catch (e: java.lang.NullPointerException) {
             update.channelPost.text
-        } catch (e: NullPointerException) {
+        } catch (e: java.lang.NullPointerException) {
             log.error("Can't get text from update: $update", e)
             throw e
         }

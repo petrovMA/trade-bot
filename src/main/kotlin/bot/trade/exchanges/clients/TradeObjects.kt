@@ -95,6 +95,34 @@ data class Order(
         val lastBorderPrice: BigDecimal? = null,
         val fee: BigDecimal? = null
     )
+
+    constructor(data: io.bybit.api.websocket.messages.response.Order.Data) : this(
+        orderId = data.orderId,
+        pair = data.symbol.run { TradePair(take(3), drop(3)) },
+        price = if (data.avgPrice.matches(Regex("\\d+\\.?\\d*")))
+            data.avgPrice.toBigDecimal()
+        else
+            data.price.toBigDecimal(),
+        origQty = data.qty.toBigDecimal(),
+        executedQty = data.cumExecQty.toBigDecimal(),
+        side = SIDE.valueOf(data.side.uppercase()),
+        type = TYPE.valueOf(data.orderType.uppercase()),
+        status = when (data.orderStatus) {
+            "Created" -> STATUS.NEW
+            "New" -> STATUS.NEW
+            "Rejected" -> STATUS.REJECTED
+            "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
+            "PartiallyFilledCanceled" -> STATUS.CANCELED
+            "Filled" -> STATUS.FILLED
+            "Cancelled" -> STATUS.CANCELED
+            "Untriggered" -> STATUS.UNSUPPORTED
+            "Triggered" -> STATUS.UNSUPPORTED
+            "Deactivated" -> STATUS.UNSUPPORTED
+            "Active" -> STATUS.UNSUPPORTED
+            else -> STATUS.UNSUPPORTED
+        },
+        fee = data.cumExecFee.toBigDecimal()
+    )
 }
 
 data class TradePair(val first: String, val second: String) {

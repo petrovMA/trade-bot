@@ -268,12 +268,11 @@ class AlgorithmTrader(
                                                 it.type = TYPE.MARKET
                                                 it.lastBorderPrice = BigDecimal.ZERO
                                             }
-
-                                            send("#${botSettings.name} Executed LIMIT order:\n```json\n$order\n```", true)
                                         }
-                                    } else send("#${botSettings.name} Executed MARKET order:\n```json\n$msg\n```", true)
+                                    }
                                 }
                             }
+                            send("#${botSettings.name} Order update:\n```json\n$msg\n```", true)
                         }
 
                         is BotEvent -> {
