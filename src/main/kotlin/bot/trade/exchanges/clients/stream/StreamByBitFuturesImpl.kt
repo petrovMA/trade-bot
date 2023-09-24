@@ -1,6 +1,7 @@
 package bot.trade.exchanges.clients.stream
 
 import bot.trade.exchanges.clients.*
+import bot.trade.libs.m
 import bot.trade.libs.s
 import io.bybit.api.websocket.ByBitApiWebSocketListener
 import io.bybit.api.websocket.messages.requests.WebSocketMsg
@@ -27,7 +28,8 @@ class StreamByBitFuturesImpl(
                 url = publicUrl,
                 timeout = timeout,
                 keepConnection = true,
-                pingTimeInterval = 30.s(),
+                pingTimeInterval = 50.s(),
+                reconnectIfNoMessagesDuring = 2.m(),
                 WebSocketMsg("subscribe", listOf("publicTrade.${pair.first}${pair.second}"))
             )
 

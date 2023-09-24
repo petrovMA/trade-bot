@@ -48,6 +48,7 @@ class ByBitApiWebSocketListener {
 
     private var schedulerReconnect = Executors.newScheduledThreadPool(1)
     private val url: String
+    private var lastMessageTime: Long = 0L
 
     /**
      * Initialize listener for authorized user
@@ -96,33 +97,32 @@ class ByBitApiWebSocketListener {
         timeout: Int = TIMEOUT,
         keepConnection: Boolean = true,
         pingTimeInterval: Duration? = null,
+        reconnectIfNoMessagesDuring: Duration,
         vararg subscribeMessages: WebSocketMsg
     ) {
         this.keepConnection = keepConnection
         this.url = url
 
-        try {
-            webSocket = WebSocketFactory()
-                .setConnectionTimeout(timeout)
-                .createSocket(url)
-                .addListener(object : WebSocketAdapter() {
-                    override fun onTextMessage(websocket: WebSocket, message: String) {
-                        onMessage(message)
-                    }
+        webSocket = connect(
+            url = url,
+            timeout = timeout,
+            pingTimeInterval = pingTimeInterval,
+            subscribeMessages = subscribeMessages
+        )
 
-                    override fun onDisconnected(
-                        websocket: WebSocket, serverCloseFrame: WebSocketFrame,
-                        clientCloseFrame: WebSocketFrame, closedByServer: Boolean
-                    ) {
-                        println("Socket Disconnected!")
-                    }
-                })
-                .addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
-            webSocket!!.connect()
-            subscribeMessages.forEach { send(it) }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        schedulerReconnect.scheduleAtFixedRate({
+            log.debug("Check connection")
+            if (System.currentTimeMillis() - lastMessageTime > reconnectIfNoMessagesDuring.toMillis()) {
+                log.info("Reconnecting...")
+                webSocket?.disconnect()
+                webSocket = connect(
+                    url = url,
+                    timeout = timeout,
+                    pingTimeInterval = pingTimeInterval,
+                    subscribeMessages = subscribeMessages
+                )
+            }
+        }, 5, 5, TimeUnit.SECONDS)
     }
 
     fun disconnect() {
@@ -132,8 +132,8 @@ class ByBitApiWebSocketListener {
 
     private fun connect(
         timeout: Int = TIMEOUT,
-        api: String?,
-        sec: String?,
+        api: String? = null,
+        sec: String? = null,
         url: String,
         pingTimeInterval: Duration? = null,
         vararg subscribeMessages: WebSocketMsg
@@ -151,6 +151,7 @@ class ByBitApiWebSocketListener {
 
                     override fun onPongFrame(websocket: WebSocket?, frame: WebSocketFrame?) {
                         log.debug("Pong message received!")
+                        lastMessageTime = System.currentTimeMillis()
                     }
 
                     override fun onTextMessage(websocket: WebSocket, message: String) {
@@ -167,6 +168,7 @@ class ByBitApiWebSocketListener {
                 .addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
 
             pingTimeInterval?.let { webSocket.pingInterval = it.toMillis() }
+            log.info("Connecting to $url")
             webSocket.connect()
             authMsg?.let {
                 val text = asString(it)
@@ -194,6 +196,7 @@ class ByBitApiWebSocketListener {
 
     private fun onMessage(message: String) {
         log.trace("Receive message <<< $message")
+        lastMessageTime = System.currentTimeMillis()
         try {
             when {
                 message.matches(pongPattern) -> log.debug("Pong message received!")
