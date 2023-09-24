@@ -271,8 +271,8 @@ class AlgorithmTrader(
                                         }
                                     }
                                 }
+                                send("#${botSettings.name} Order update:\n```json\n$msg\n```", true)
                             }
-                            send("#${botSettings.name} Order update:\n```json\n$msg\n```", true)
                         }
 
                         is BotEvent -> {
