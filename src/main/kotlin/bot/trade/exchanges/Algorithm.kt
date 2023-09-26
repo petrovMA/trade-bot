@@ -103,8 +103,10 @@ abstract class Algorithm(
 
         do {
             try {
+                val before = System.currentTimeMillis()
                 order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
-                log?.debug("{} Order sent: {}", botSettings.name, order)
+                val after = System.currentTimeMillis()
+                log?.info("{}, request time = {}ms, Order sent: {}", botSettings.name, before - after, order)
                 return order
             } catch (be: ExchangeException) {
                 throw be
