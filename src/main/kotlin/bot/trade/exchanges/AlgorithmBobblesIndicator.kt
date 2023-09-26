@@ -260,6 +260,18 @@ class AlgorithmBobblesIndicator(
                                         log?.error("Error while saving order to db: ${t.message}")
                                     }
 
+                                    positions =
+                                        readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+
+                                    positions = if (notification.type.equals("buy", true))
+                                        updatePositionsBuy(notification.amount, notification.price ?: price)
+                                    else
+                                        updatePositionsSell(notification.amount, notification.price ?: price)
+
+                                    reWriteObject(positions, File("$path/positions.json"))
+
+                                    log?.info("Positions After update:\n$positions")
+
                                     if (notification.amount > settings.minOrderSize
                                         && notification.price == null
                                         && notification.placeOrder
@@ -279,8 +291,10 @@ class AlgorithmBobblesIndicator(
                                                         send("HttpStatusException:\n```\n${e.message}```", true)
                                                         log?.warn(e.stackTraceToString())
                                                     }
-                                                }
-                                                else send("Buy orders disabled, because of buyAmountMultiplication = ${settings.buyAmountMultiplication}")
+                                                } else send(
+                                                    "Buy orders disabled, because of buyAmountMultiplication = ${settings.buyAmountMultiplication}" +
+                                                            "\n\nPosition:\n```json\n${json(positions)}```"
+                                                )
                                             }
 
                                             SIDE.SELL -> {
@@ -305,24 +319,15 @@ class AlgorithmBobblesIndicator(
                                                         "Short position and sum of short orders are too big: " +
                                                                 "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
                                                     )
-                                                }
-                                                else send("Sell orders disabled, because of sellAmountMultiplication = ${settings.sellAmountMultiplication}")
+                                                } else send(
+                                                    "Sell orders disabled, because of sellAmountMultiplication = ${settings.sellAmountMultiplication}" +
+                                                            "\n\nPosition:\n```json\n${json(positions)}```"
+                                                )
                                             }
+
                                             else -> send("Unsupported OrderSide: $side")
                                         }
                                     }
-
-                                    positions =
-                                        readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
-
-                                    positions = if (notification.type.equals("buy", true))
-                                        updatePositionsBuy(notification.amount, notification.price ?: price)
-                                    else
-                                        updatePositionsSell(notification.amount, notification.price ?: price)
-
-                                    reWriteObject(positions, File("$path/positions.json"))
-
-                                    log?.info("Positions After update:\n$positions")
                                 }
 
                                 BotEvent.Type.SET_SETTINGS -> {
@@ -392,10 +397,10 @@ class AlgorithmBobblesIndicator(
         positions: VirtualPositions = this.positions
     ): VirtualPositions {
         return if (positions.sellPrice < price && positions.sellAmount > amount) {
+            val newOrderAmount = positions.sellAmount - amount
             positions.apply {
-                sellPrice =
-                    (positions.sellPrice + (price - positions.sellPrice) * (amount / positions.sellAmount)).round()
-                sellAmount = (positions.sellAmount - amount).round()
+                sellPrice = (sellPrice + (price - sellPrice) * (amount / newOrderAmount)).round()
+                sellAmount = newOrderAmount.round()
             }
         } else {
             val newOrderAmount = positions.buyAmount + amount
@@ -420,10 +425,10 @@ class AlgorithmBobblesIndicator(
         positions: VirtualPositions = this.positions
     ): VirtualPositions {
         return if (positions.buyPrice > price && positions.buyAmount > amount) {
+            val newOrderAmount = positions.buyAmount - amount
             positions.apply {
-                buyPrice =
-                    (positions.buyPrice + (price - positions.buyPrice) * (amount / positions.buyAmount)).round()
-                buyAmount = (positions.buyAmount - amount).round()
+                buyPrice = (buyPrice + (price - buyPrice) * (amount / newOrderAmount)).round()
+                buyAmount = newOrderAmount.round()
             }
         } else {
             val newOrderAmount = positions.sellAmount + amount
