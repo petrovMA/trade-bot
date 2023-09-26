@@ -384,12 +384,13 @@ class AlgorithmTrader(
                 }
 
                 orders.forEach { (k, v) ->
-                    openOrders
-                        .find { (v.orderId == it.orderId || v.type == TYPE.MARKET) && v.price?.run { this in minRange..maxRange } ?: false }
-                        ?: run {
-                            ordersListForRemove.add(k to v)
-                            log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
-                        }
+                    if (v.type != TYPE.MARKET && v.price?.run { this in minRange..maxRange } == true)
+                        openOrders
+                            .find { v.orderId == it.orderId }
+                            ?: run {
+                                ordersListForRemove.add(k to v)
+                                log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
+                            }
                 }
 
                 ordersListForRemove.forEach { orders.remove(it.first) }
