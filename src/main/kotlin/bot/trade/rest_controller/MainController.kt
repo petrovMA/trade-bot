@@ -8,12 +8,10 @@ import bot.telegram.TelegramBot
 import mu.KLogger
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
+import utils.resourceFile
 import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 
@@ -53,6 +51,7 @@ class MainController(orderService: OrderService) {
             throw e
         }
     }
+
     data class Response(val status: String, val data: Any)
     data class BotsInfoResponse(val settings: BotSettings, val position: Any)
 
@@ -76,5 +75,70 @@ class MainController(orderService: OrderService) {
         log.info("Response for /positions = $infoResponse")
 
         return ResponseEntity.ok(infoResponse)
+    }
+
+    @GetMapping("/orders")
+    fun ordersGet(@RequestParam botName: String): ResponseEntity<String> {
+
+        val tableHeader = """
+        <thead class="thead-dark">
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">In Price</th>
+            <th scope="col">Stop Price</th>
+            <th scope="col">Border Price</th>
+            <th scope="col">Size</th>
+        </tr>
+        </thead>
+        """.trimIndent()
+
+        val infoResponse = bot.communicator.getOrders(botName)
+        log.info("Response for /orders = $infoResponse")
+
+        if (infoResponse == null) {
+
+            val botsList = bot.communicator
+                .getBotsList()
+                .joinToString {
+                    """
+                        <div class="text-center mt-4">
+                            <a href="/orders?botName=$it" class="btn btn-primary">$it</a>
+                        </div>
+                    """.trimIndent()
+                }
+
+            return ResponseEntity.ok()
+                .header("Content-Type", "text/html")
+                .body(
+                    resourceFile<MainController>("404.html")
+                        .readText()
+                        .replace("${'$'}content", botsList)
+                )
+        }
+
+        var rowNum = 1
+
+        val tableContent = infoResponse
+            .map { it.value }
+            .sortedBy { it.price }
+            .joinToString(prefix = "<tbody>", postfix = "</tbody>") {
+                """
+                    <tr>
+            <th scope="row">${rowNum++}</th>
+            <td>${it.price}</td>
+            <td>${it.stopPrice}</td>
+            <td>${it.lastBorderPrice}</td>
+            <td>${it.origQty}</td>
+        </tr>
+                """.trimIndent()
+            }
+
+        return ResponseEntity.ok()
+            .header("Content-Type", "text/html")
+            .body(
+                resourceFile<MainController>("orders.html")
+                    .readText()
+                    .replace("${'$'}content", tableHeader + tableContent)
+            )
     }
 }

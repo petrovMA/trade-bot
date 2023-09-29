@@ -744,6 +744,8 @@ class Communicator(
     }
 
     fun getInfo() = tradeBots.values.map { it.botSettings to (it as AlgorithmBobblesIndicator).positions }
+    fun getOrders(botName: String) = tradeBots[botName]?.orders()
+    fun getBotsList() = tradeBots.map { it.key }
 
     private fun getBotStartParam(params: List<String>, paramName: String, prevMsg: String): Pair<String, String> {
         var msg = prevMsg
