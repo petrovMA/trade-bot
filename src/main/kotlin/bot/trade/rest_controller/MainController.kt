@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
-import utils.resourceFile
 import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 
@@ -110,7 +109,7 @@ class MainController(orderService: OrderService) {
             return ResponseEntity.ok()
                 .header("Content-Type", "text/html")
                 .body(
-                    resourceFile<MainController>("404.html")
+                    File("pages/404.html")
                         .readText()
                         .replace("${'$'}content", botsList)
                 )
@@ -136,7 +135,7 @@ class MainController(orderService: OrderService) {
         return ResponseEntity.ok()
             .header("Content-Type", "text/html")
             .body(
-                resourceFile<MainController>("orders.html")
+                File("pages/orders.html")
                     .readText()
                     .replace("${'$'}content", tableHeader + tableContent)
             )
