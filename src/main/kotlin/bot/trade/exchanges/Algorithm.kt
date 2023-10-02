@@ -106,7 +106,7 @@ abstract class Algorithm(
                 val before = System.currentTimeMillis()
                 order = client.newOrder(order, isStaticUpdate, formatAmount, formatPrice)
                 val after = System.currentTimeMillis()
-                log?.info("{}, request time = {}ms, Order sent: {}", botSettings.name, before - after, order)
+                log?.info("{}, request time = {}ms, Order sent: {}", botSettings.name, after - before, order)
                 return order
             } catch (be: ExchangeException) {
                 throw be
