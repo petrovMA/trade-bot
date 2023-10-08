@@ -120,7 +120,7 @@ class MainController(orderService: OrderService) {
         val tableContent = infoResponse
             .map { it.value }
             .sortedBy { it.price }
-            .joinToString(prefix = "<tbody>", postfix = "</tbody>") {
+            .joinToString(prefix = "<tbody>", postfix = "</tbody>", separator = "") {
                 """
                     <tr>
             <th scope="row">${rowNum++}</th>
