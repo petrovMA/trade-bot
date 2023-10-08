@@ -109,7 +109,7 @@ class MainController(orderService: OrderService) {
             return ResponseEntity.ok()
                 .header("Content-Type", "text/html")
                 .body(
-                    File("pages/404.html")
+                    File("pages/main.html")
                         .readText()
                         .replace("${'$'}content", botsList)
                 )
@@ -118,8 +118,18 @@ class MainController(orderService: OrderService) {
         var rowNum = 1
 
         val tableContent = infoResponse
+            .second
             .map { it.value }
             .sortedBy { it.price }
+            .run {
+                when (val settings = infoResponse.first) {
+                    is BotSettingsTrader -> when (settings.direction) {
+                        DIRECTION.SHORT -> reversed()
+                        else -> this
+                    }
+                    else -> this
+                }
+            }
             .joinToString(prefix = "<tbody>", postfix = "</tbody>", separator = "") {
                 """
                     <tr>

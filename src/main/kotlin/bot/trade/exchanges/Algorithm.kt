@@ -183,5 +183,5 @@ abstract class Algorithm(
 
     override fun toString(): String = "status = $state, settings = $botSettings"
 
-    fun orders() = orders
+    fun orders() = botSettings to orders
 }
