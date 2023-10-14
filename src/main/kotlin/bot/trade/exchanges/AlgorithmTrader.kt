@@ -45,6 +45,8 @@ class AlgorithmTrader(
     private val triggerDistance = settings.parameters.triggerDistance.distance
     private val orderMaxQuantity = settings.parameters.orderMaxQuantity
     private val stopOrderDistance = settings.parameters.stopOrderDistance.distance
+    private val triggerInOrderDistance = settings.parameters.triggerInOrderDistance.distance // todo:: Implement it!!!
+    private val trailingInOrderDistance = settings.parameters.trailingInOrderDistance?.distance
     private val setCloseOrders = settings.parameters.setCloseOrders
     private val ordersType = settings.ordersType
     private val direction = settings.direction
@@ -91,9 +93,9 @@ class AlgorithmTrader(
                                                 botSettings.name,
                                                 it
                                             )
-                                        }
-                                            ?: run {
-                                                if (orders.size < orderMaxQuantity) {
+                                        } ?: run {
+                                            if (orders.size < orderMaxQuantity) {
+                                                if (trailingInOrderDistance == null) {
                                                     orders[priceIn] = sentOrder(
                                                         amount = orderQuantity,
                                                         orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
@@ -101,13 +103,34 @@ class AlgorithmTrader(
                                                         price = priceIn.toBigDecimal(),
                                                         orderType = TYPE.MARKET
                                                     ).also {
-                                                        if (direction == DIRECTION.LONG)
-                                                            it.lastBorderPrice = BigDecimal.ZERO
-                                                        else
+                                                        if (direction == DIRECTION.LONG) {
+                                                            it.lastBorderPrice = BigDecimal(-99999999999999L)
+                                                            it.side = SIDE.SELL
+                                                        } else {
                                                             it.lastBorderPrice = BigDecimal(99999999999999L)
+                                                            it.side = SIDE.BUY
+                                                        }
                                                     }
+                                                } else {
+                                                    orders[priceIn] = Order(
+                                                        orderId = "",
+                                                        pair = botSettings.pair,
+                                                        price = priceIn.toBigDecimal(),
+                                                        origQty = orderQuantity,
+                                                        executedQty = BigDecimal(0),
+                                                        side = if (direction == DIRECTION.LONG) SIDE.BUY
+                                                        else SIDE.SELL,
+                                                        type = TYPE.MARKET,
+                                                        status = STATUS.NEW,
+                                                        lastBorderPrice = if (direction == DIRECTION.LONG)
+                                                            priceIn.toBigDecimal() + trailingInOrderDistance
+                                                        else
+                                                            priceIn.toBigDecimal() - trailingInOrderDistance,
+                                                        stopPrice = null
+                                                    )
                                                 }
                                             }
+                                        }
                                     }
 
                                     TYPE.LIMIT -> {
@@ -175,47 +198,93 @@ class AlgorithmTrader(
 
                             when (direction) {
                                 DIRECTION.LONG -> {
-                                    val ordersForUpdate = orders.filter { it.value.type == TYPE.MARKET }
+                                    val ordersForUpdate = orders.filter { (_, v) -> v.type == TYPE.MARKET }
 
                                     ordersForUpdate.forEach { (k, v) ->
-                                        if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
-                                            v.lastBorderPrice = currentPrice
+                                        if (v.side == SIDE.SELL) {
+                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
+                                                v.lastBorderPrice = currentPrice
 
-                                            if (
-                                                v.stopPrice?.run { this < currentPrice - triggerDistance } == true
-                                                || v.stopPrice == null && k.toBigDecimal() < (currentPrice - triggerDistance - stopOrderDistance)
-                                            ) {
-                                                v.stopPrice = currentPrice - triggerDistance
+                                                if (
+                                                    v.stopPrice?.run { this < currentPrice - triggerDistance } == true
+                                                    || v.stopPrice == null && k.toBigDecimal() < (currentPrice - triggerDistance - stopOrderDistance)
+                                                ) {
+                                                    v.stopPrice = currentPrice - triggerDistance
+                                                }
+
+                                                orders[k] = v
                                             }
+                                            if (v.stopPrice?.run { this >= currentPrice } == true) {
+                                                log?.debug("{} Order close: {}", botSettings.name, v)
+                                                ordersListForExecute.add(k to v.apply {
+                                                    side = SIDE.SELL
+                                                }) // todo:: check for remove part 'v.apply { side = SIDE.SELL }'
+                                            }
+                                        } else if (trailingInOrderDistance != null) {
+                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
+                                                v.lastBorderPrice = currentPrice
 
-                                            orders[k] = v
-                                        }
-                                        if (v.stopPrice?.run { this >= currentPrice } == true) {
-                                            log?.debug("{} Order close: {}", botSettings.name, v)
-                                            ordersListForRemove.add(k to v.apply { side = SIDE.SELL })
+                                                if (
+                                                    v.stopPrice?.run { this > currentPrice + trailingInOrderDistance } == true
+                                                    || v.stopPrice == null && k.toBigDecimal() > (currentPrice + trailingInOrderDistance)
+                                                ) {
+                                                    v.stopPrice = currentPrice + triggerDistance
+                                                }
+
+                                                orders[k] = v
+                                            }
+                                        } else {
+                                            log?.warn(
+                                                "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
+                                                botSettings.name,
+                                                v
+                                            )
                                         }
                                     }
                                 }
 
                                 DIRECTION.SHORT -> {
-                                    val ordersForUpdate = orders.filter { it.value.type == TYPE.MARKET }
+                                    val ordersForUpdate = orders.filter { (_, v) -> v.type == TYPE.MARKET }
 
                                     ordersForUpdate.forEach { (k, v) ->
-                                        if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
-                                            v.lastBorderPrice = currentPrice
+                                        if (v.side == SIDE.BUY) {
+                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
+                                                v.lastBorderPrice = currentPrice
 
-                                            if (
-                                                v.stopPrice?.run { this > currentPrice + triggerDistance } == true
-                                                || v.stopPrice == null && k.toBigDecimal() > (currentPrice + triggerDistance + stopOrderDistance)
-                                            ) {
-                                                v.stopPrice = currentPrice + triggerDistance
+                                                if (
+                                                    v.stopPrice?.run { this > currentPrice + triggerDistance } == true
+                                                    || v.stopPrice == null && k.toBigDecimal() > (currentPrice + triggerDistance + stopOrderDistance)
+                                                ) {
+                                                    v.stopPrice = currentPrice + triggerDistance
+                                                }
+
+                                                orders[k] = v
                                             }
+                                            if (v.stopPrice?.run { this <= currentPrice } == true) {
+                                                log?.debug("{} Order close: {}", botSettings.name, v)
+                                                ordersListForExecute.add(k to v.apply {
+                                                    side = SIDE.BUY
+                                                }) // todo:: check for remove part 'v.apply { side = SIDE.BUY }'
+                                            }
+                                        } else if (trailingInOrderDistance != null) {
+                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
+                                                v.lastBorderPrice = currentPrice
 
-                                            orders[k] = v
-                                        }
-                                        if (v.stopPrice?.run { this <= currentPrice } == true) {
-                                            log?.debug("{} Order close: {}", botSettings.name, v)
-                                            ordersListForRemove.add(k to v.apply { side = SIDE.BUY })
+                                                if (
+                                                    v.stopPrice?.run { this < currentPrice - trailingInOrderDistance } == true
+                                                    || v.stopPrice == null && k.toBigDecimal() < (currentPrice - trailingInOrderDistance)
+                                                ) {
+                                                    v.stopPrice = currentPrice - triggerDistance
+                                                }
+
+                                                orders[k] = v
+                                            }
+                                        } else {
+                                            log?.warn(
+                                                "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
+                                                botSettings.name,
+                                                v
+                                            )
                                         }
                                     }
                                 }
@@ -224,8 +293,54 @@ class AlgorithmTrader(
                             var sellSumAmount = BigDecimal.ZERO
                             var buySumAmount = BigDecimal.ZERO
 
-                            ordersListForRemove.forEach {
-                                orders.remove(it.first)
+                            ordersListForExecute.forEach {
+                                if (trailingInOrderDistance != null) {
+                                    when (direction) {
+                                        DIRECTION.LONG -> {
+                                            when (it.second.side) {
+                                                SIDE.BUY -> {
+                                                    orders[it.first] = Order(
+                                                        orderId = "",
+                                                        pair = botSettings.pair,
+                                                        price = it.first.toBigDecimal(),
+                                                        origQty = orderQuantity,
+                                                        executedQty = BigDecimal(0),
+                                                        side = SIDE.BUY,
+                                                        type = TYPE.MARKET,
+                                                        status = STATUS.NEW,
+                                                        lastBorderPrice = BigDecimal(99999999999999L),
+                                                        stopPrice = null
+                                                    )
+                                                }
+                                                SIDE.SELL -> orders.remove(it.first)
+                                                else -> log?.error("${botSettings.name} Unknown side: ${it.second.side}")
+                                            }
+                                        }
+
+                                        DIRECTION.SHORT -> {
+                                            when (it.second.side) {
+                                                SIDE.SELL -> {
+                                                    orders[it.first] = Order(
+                                                        orderId = "",
+                                                        pair = botSettings.pair,
+                                                        price = it.first.toBigDecimal(),
+                                                        origQty = orderQuantity,
+                                                        executedQty = BigDecimal(0),
+                                                        side = SIDE.SELL,
+                                                        type = TYPE.MARKET,
+                                                        status = STATUS.NEW,
+                                                        lastBorderPrice = BigDecimal(-99999999999999L),
+                                                        stopPrice = null
+                                                    )
+                                                }
+                                                SIDE.BUY -> orders.remove(it.first)
+                                                else -> log?.error("${botSettings.name} Unknown side: ${it.second.side}")
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    orders.remove(it.first)
+                                }
 
                                 when (it.second.side) {
                                     SIDE.BUY -> buySumAmount += it.second.origQty
@@ -252,7 +367,7 @@ class AlgorithmTrader(
                                     isCloseOrder = true
                                 )
 
-                            ordersListForRemove.clear()
+                            ordersListForExecute.clear()
                         }
 
                         is Order -> {
@@ -388,13 +503,13 @@ class AlgorithmTrader(
                         openOrders
                             .find { v.orderId == it.orderId }
                             ?: run {
-                                ordersListForRemove.add(k to v)
+                                ordersListForExecute.add(k to v)
                                 log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
                             }
                 }
 
-                ordersListForRemove.forEach { orders.remove(it.first) }
-                ordersListForRemove.clear()
+                ordersListForExecute.forEach { orders.remove(it.first) }
+                ordersListForExecute.clear()
 
                 if (setCloseOrders) {
                     price = minRange

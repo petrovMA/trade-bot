@@ -343,6 +343,8 @@ class BotSettingsTrader(
         @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
         @SerializedName("in_order_quantity") val inOrderQuantity: InOrderQuantity, // Order Quantity:: order size
         @SerializedName("in_order_distance") val inOrderDistance: InOrderDistance, // Order Distance:: distance between every order
+        @SerializedName("trailing_in_order_distance") val trailingInOrderDistance: TrailingInOrderDistance?, // Trailing in Distance:: distance between in_order and when_order_be_executed
+        @SerializedName("trigger_in_order_distance") val triggerInOrderDistance: TriggerInOrderDistance, // Trigger in Distance //todo:: Implement It!!!
         @SerializedName("trigger_distance") val triggerDistance: TriggerDistance, // Trigger Distance:: distance between order and stop-order
         @SerializedName("stop_order_distance") val stopOrderDistance: StopOrderDistance, // enable stop order distance (stopOrderDistance = triggerDistance + stopOrderDistance)
         @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
@@ -360,6 +362,16 @@ class BotSettingsTrader(
         )
 
         class InOrderDistance(
+            @SerializedName("distance") val distance: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class TrailingInOrderDistance(
+            @SerializedName("distance") val distance: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class TriggerInOrderDistance(
             @SerializedName("distance") val distance: BigDecimal,
             @SerializedName("use_percent") val usePercent: Boolean = false
         )
