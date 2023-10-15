@@ -735,6 +735,14 @@ class Communicator(
                         stopOrderDistance = BotSettingsTrader.Parameters.StopOrderDistance(
                             distance = enableStopOrderDistance,
                             usePercent = false
+                        ),
+                        triggerInOrderDistance = BotSettingsTrader.Parameters.TriggerInOrderDistance(
+                            distance = BigDecimal(0.0),
+                            usePercent = false
+                        ),
+                        trailingInOrderDistance = BotSettingsTrader.Parameters.TrailingInOrderDistance(
+                            distance = BigDecimal(0.0),
+                            usePercent = false
                         )
                     )
                 )
