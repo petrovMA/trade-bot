@@ -76,25 +76,18 @@ abstract class Algorithm(
         amount: BigDecimal,
         orderSide: SIDE,
         orderType: TYPE,
-        isStaticUpdate: Boolean = false,
-        isCloseOrder: Boolean = false
+        isStaticUpdate: Boolean = false
     ): Order {
 
         var retryCount = retrySentOrderCount
 
-        val orderAmount = if (isCloseOrder) amount
-        else {
-            if (firstBalanceForOrderAmount) amount
-            else amount.div8(price)
-        }
-
-        log?.info("${botSettings.name} Sent $orderType order with params: price = $price; amount = $orderAmount; side = $orderSide")
+        log?.info("${botSettings.name} Sent $orderType order with params: price = $price; amount = $amount; side = $orderSide")
 
         var order = Order(
             orderId = "",
             pair = botSettings.pair,
             price = price,
-            origQty = orderAmount,
+            origQty = amount,
             executedQty = BigDecimal(0),
             side = orderSide,
             type = orderType,
@@ -178,6 +171,10 @@ abstract class Algorithm(
 
         reWriteObject(botSettings, settingsFile)
     }
+
+    fun calcAmount(amount: BigDecimal, price: BigDecimal) =
+        if (firstBalanceForOrderAmount) amount
+        else amount.div8(price)
 
     fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 

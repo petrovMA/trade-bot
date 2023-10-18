@@ -97,10 +97,10 @@ class AlgorithmTrader(
                                             if (orders.size < orderMaxQuantity) {
                                                 if (trailingInOrderDistance == null) {
                                                     orders[priceIn] = sentOrder(
-                                                        amount = orderQuantity,
+                                                        amount = calcAmount(orderQuantity, BigDecimal(priceIn)),
                                                         orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
                                                         else SIDE.SELL,
-                                                        price = priceIn.toBigDecimal(),
+                                                        price = BigDecimal(priceIn),
                                                         orderType = TYPE.MARKET
                                                     ).also {
                                                         if (direction == DIRECTION.LONG) {
@@ -115,8 +115,8 @@ class AlgorithmTrader(
                                                     orders[priceIn] = Order(
                                                         orderId = "",
                                                         pair = botSettings.pair,
-                                                        price = priceIn.toBigDecimal(),
-                                                        origQty = orderQuantity,
+                                                        price = BigDecimal(priceIn),
+                                                        origQty = calcAmount(orderQuantity, BigDecimal(priceIn)),
                                                         executedQty = BigDecimal(0),
                                                         side = if (direction == DIRECTION.LONG) SIDE.BUY
                                                         else SIDE.SELL,
@@ -228,10 +228,16 @@ class AlgorithmTrader(
                                                     v.stopPrice?.run { this > currentPrice + trailingInOrderDistance } == true
                                                     || v.stopPrice == null && k.toBigDecimal() > (currentPrice + trailingInOrderDistance)
                                                 ) {
-                                                    v.stopPrice = currentPrice + triggerDistance
+                                                    v.stopPrice = currentPrice + trailingInOrderDistance
                                                 }
 
                                                 orders[k] = v
+                                            }
+                                            if (v.stopPrice?.run { this <= currentPrice } == true) {
+                                                log?.debug("{} Order close: {}", botSettings.name, v)
+                                                ordersListForExecute.add(k to v.apply {
+                                                    side = SIDE.BUY
+                                                }) // todo:: check for remove part 'v.apply { side = SIDE.BUY }'
                                             }
                                         } else {
                                             log?.warn(
@@ -274,10 +280,16 @@ class AlgorithmTrader(
                                                     v.stopPrice?.run { this < currentPrice - trailingInOrderDistance } == true
                                                     || v.stopPrice == null && k.toBigDecimal() < (currentPrice - trailingInOrderDistance)
                                                 ) {
-                                                    v.stopPrice = currentPrice - triggerDistance
+                                                    v.stopPrice = currentPrice - trailingInOrderDistance
                                                 }
 
                                                 orders[k] = v
+                                            }
+                                            if (v.stopPrice?.run { this >= currentPrice } == true) {
+                                                log?.debug("{} Order close: {}", botSettings.name, v)
+                                                ordersListForExecute.add(k to v.apply {
+                                                    side = SIDE.SELL
+                                                }) // todo:: check for remove part 'v.apply { side = SIDE.SELL }'
                                             }
                                         } else {
                                             log?.warn(
@@ -302,13 +314,13 @@ class AlgorithmTrader(
                                                     orders[it.first] = Order(
                                                         orderId = "",
                                                         pair = botSettings.pair,
-                                                        price = it.first.toBigDecimal(),
-                                                        origQty = orderQuantity,
+                                                        price = BigDecimal(it.first),
+                                                        origQty = calcAmount(orderQuantity, BigDecimal(it.first)),
                                                         executedQty = BigDecimal(0),
-                                                        side = SIDE.BUY,
+                                                        side = SIDE.SELL,
                                                         type = TYPE.MARKET,
                                                         status = STATUS.NEW,
-                                                        lastBorderPrice = BigDecimal(99999999999999L),
+                                                        lastBorderPrice = BigDecimal(-99999999999999L),
                                                         stopPrice = null
                                                     )
                                                 }
@@ -323,13 +335,13 @@ class AlgorithmTrader(
                                                     orders[it.first] = Order(
                                                         orderId = "",
                                                         pair = botSettings.pair,
-                                                        price = it.first.toBigDecimal(),
-                                                        origQty = orderQuantity,
+                                                        price = BigDecimal(it.first),
+                                                        origQty = calcAmount(orderQuantity, BigDecimal(it.first)),
                                                         executedQty = BigDecimal(0),
-                                                        side = SIDE.SELL,
+                                                        side = SIDE.BUY,
                                                         type = TYPE.MARKET,
                                                         status = STATUS.NEW,
-                                                        lastBorderPrice = BigDecimal(-99999999999999L),
+                                                        lastBorderPrice = BigDecimal(99999999999999L),
                                                         stopPrice = null
                                                     )
                                                 }
@@ -354,8 +366,7 @@ class AlgorithmTrader(
                                     amount = buySumAmount,
                                     orderSide = SIDE.BUY,
                                     price = currentPrice,
-                                    orderType = TYPE.MARKET,
-                                    isCloseOrder = true
+                                    orderType = TYPE.MARKET
                                 )
 
                             if (sellSumAmount > BigDecimal.ZERO)
@@ -363,8 +374,7 @@ class AlgorithmTrader(
                                     amount = sellSumAmount,
                                     orderSide = SIDE.SELL,
                                     price = currentPrice,
-                                    orderType = TYPE.MARKET,
-                                    isCloseOrder = true
+                                    orderType = TYPE.MARKET
                                 )
 
                             ordersListForExecute.clear()
@@ -472,22 +482,15 @@ class AlgorithmTrader(
                     val priceIn = price.toPrice()
                     openOrders.find { it.price == priceIn.toBigDecimal() }?.let { openOrder ->
                         orders[priceIn] ?: run {
+
+                            val qty = calcAmount(orderQuantity, price).percent(10.toBigDecimal())
+
                             if (direction == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
-                                val orderSize = if (firstBalanceForOrderAmount) orderQuantity
-                                else orderQuantity.div8(price)
-
-                                val qty = orderSize.percent(10.toBigDecimal())
-
                                 if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
                                     orders[price.toPrice()] = openOrder
                                     log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
                                 }
                             } else if (direction == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
-                                val orderSize = if (firstBalanceForOrderAmount) orderQuantity
-                                else orderQuantity.div8(price)
-
-                                val qty = orderSize.percent(10.toBigDecimal())
-
                                 if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
                                     orders[price.toPrice()] = openOrder
                                     log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
@@ -528,8 +531,7 @@ class AlgorithmTrader(
                                     orderId = "",
                                     pair = botSettings.pair,
                                     price = priceIn.toBigDecimal(),
-                                    origQty = if (firstBalanceForOrderAmount) orderQuantity
-                                    else orderQuantity.div8(price),
+                                    origQty = calcAmount(orderQuantity, price),
                                     executedQty = BigDecimal(0),
                                     side = if (direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
                                     type = TYPE.MARKET,

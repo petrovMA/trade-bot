@@ -131,7 +131,8 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         triggerPrice: String? = null,
         triggerBy: String? = null,
         orderIv: String? = null,
-        timeInForce: String? = null
+        timeInForce: String? = null,
+        positionIdx: Int? = null
     ): CreateOrderResponse.Result {
 
         val params = createMapParams(TreeMap<String, String>().apply {
@@ -148,6 +149,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             triggerBy?.let { put("triggerBy", it) }
             orderIv?.let { put("orderIv", it) }
             timeInForce?.let { put("timeInForce", it) }
+            positionIdx?.let { put("positionIdx", it.toString()) }
         })
 
         val builder = builder().apply {

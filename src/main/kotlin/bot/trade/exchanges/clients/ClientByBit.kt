@@ -196,8 +196,12 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
                 TYPE.MARKET -> "Market"
                 else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${order.type}'!")
             },
-            qty = String.format(formatCount, order.origQty),
-            price = String.format(formatPrice, order.price)
+            qty = String.format(formatCount, order.origQty).replace(",", "."),
+            price = String.format(formatPrice, order.price).replace(",", "."),
+
+            // todo:: Add auto fix this using: "/v5/position/switch-mode"
+            // todo:: for fix: ByBitRestException: position idx not match position mode
+            positionIdx = 0
         )
         return Order(
             resp.orderId,
