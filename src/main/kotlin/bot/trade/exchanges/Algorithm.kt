@@ -29,7 +29,6 @@ abstract class Algorithm(
     val sendMessage: (String, Boolean) -> Unit
 ) : Thread() {
     val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
-    val ordersListForExecute: MutableList<Pair<String, Order>> = mutableListOf()
 
     protected val path: String = "$exchangeBotsFiles/${botSettings.name}".also { File(it).mkdirs() }
     private val settingsPath = "$path/settings.json".also { saveBotSettings(botSettings, it) }

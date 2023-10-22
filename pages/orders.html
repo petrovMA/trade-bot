@@ -11,18 +11,66 @@
 
 <body>
 
-<div class="container mt-5">
-    <h2 class="text-center mb-4">List of Trading Orders</h2>
+<style>
+    .container {
+        padding-top: 1px;
+        padding-bottom: 1px;
+    }
+
+    .sell {
+        background-color: #ff71718a;
+    }
+
+    .buy {
+        background-color: #71ff788e;
+    }
+</style>
+
+<div class="row">
+    <div class="col text-center">
+        $buttons
+    </div>
+</div>
+
+<div class="container">
+
     <table class="table table-bordered table-hover">
         $content
     </table>
 </div>
 
-<!-- Include Bootstrap JS and Popper.js -->
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-
+<div class="row">
+    <div class="col-md-6">
+        <h3>Parameters</h3>
+        <ul id="parameters">
+            <li id="flow_name">Name: BTCUSDT_LONG</li>
+            <li id="symbol">Symbol: BTC/USDT</li>
+            <li id="exchange_type">Exchange Type: Bybit</li>
+            <li id="strategy_type">Strategy Type: LONG</li>
+            <li id="order_type">Order Type: MARKET</li>
+            <li id="trading_range">Trading Range: 28400 - 28600</li>
+            <li id="in_order_quantity">In Order Quantity: 30</li>
+            <li id="in_order_distance">In Order Distance: 10</li>
+            <li id="trailing_in_order_distance">Trailing In Order Distance: 15</li>
+            <li id="trigger_in_order_distance">Trigger In Order Distance: 0.0</li>
+            <li id="trigger_distance">Trigger Distance: 10</li>
+            <li id="stop_order_distance">Stop Order Distance: 15</li>
+            <li id="max_trigger_count">Max Trigger Count: 100</li>
+            <li id="set_close_orders">Set Close Orders: false</li>
+            <li id="market_type">Market Type: USDT Perpetual</li>
+            <li id="market_type_comment">Market Type Comment: USDT Perpetual, Inverse Perpetual, Spot</li>
+            <li id="strategy_type_comment">Strategy Type Comment: Long, Short, Spot</li>
+            <li id="orderBalanceType">Order Balance Type: second</li>
+            <li id="countOfDigitsAfterDotForAmount">Count Of Digits After Dot For Amount: 3</li>
+            <li id="countOfDigitsAfterDotForPrice">Count Of Digits After Dot For Price: 1</li>
+        </ul>
+    </div>
+    <div class="col-md-6">
+        <!-- Include Bootstrap JS and Popper.js -->
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    </div>
+</div>
 </body>
-
 </html>

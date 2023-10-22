@@ -76,6 +76,23 @@ class MainController(orderService: OrderService) {
         return ResponseEntity.ok(infoResponse)
     }
 
+    @GetMapping("/error")
+    fun error(): ResponseEntity<Any> {
+        val botsList = bot.communicator
+            .getBotsList()
+            .joinToString(separator = "") {
+                """<a href="/orders?botName=$it" class="btn btn-primary">$it</a>""".trimIndent()
+            }
+
+        return ResponseEntity.ok()
+            .header("Content-Type", "text/html")
+            .body(
+                File("pages/main.html")
+                    .readText()
+                    .replace("${'$'}buttons", botsList)
+            )
+    }
+
     @GetMapping("/orders")
     fun ordersGet(@RequestParam botName: String): ResponseEntity<String> {
 
@@ -94,26 +111,21 @@ class MainController(orderService: OrderService) {
         val infoResponse = bot.communicator.getOrders(botName)
         log.info("Response for /orders = $infoResponse")
 
-        if (infoResponse == null) {
+        val botsList = bot.communicator
+            .getBotsList()
+            .joinToString(separator = "") {
+                """<a href="/orders?botName=$it" class="btn btn-primary">$it</a>""".trimIndent()
+            }
 
-            val botsList = bot.communicator
-                .getBotsList()
-                .joinToString {
-                    """
-                        <div class="text-center mt-4">
-                            <a href="/orders?botName=$it" class="btn btn-primary">$it</a>
-                        </div>
-                    """.trimIndent()
-                }
-
+        if (infoResponse == null)
             return ResponseEntity.ok()
                 .header("Content-Type", "text/html")
                 .body(
                     File("pages/main.html")
                         .readText()
-                        .replace("${'$'}content", botsList)
+                        .replace("${'$'}buttons", botsList)
                 )
-        }
+
 
         var rowNum = 1
 
@@ -132,7 +144,7 @@ class MainController(orderService: OrderService) {
             }
             .joinToString(prefix = "<tbody>", postfix = "</tbody>", separator = "") {
                 """
-                    <tr>
+                    <tr class="${if (it.side == SIDE.BUY) "buy" else "sell"}">
             <th scope="row">${rowNum++}</th>
             <td>${it.price}</td>
             <td>${it.stopPrice}</td>
@@ -148,6 +160,7 @@ class MainController(orderService: OrderService) {
                 File("pages/orders.html")
                     .readText()
                     .replace("${'$'}content", tableHeader + tableContent)
+                    .replace("${'$'}buttons", botsList)
             )
     }
 }

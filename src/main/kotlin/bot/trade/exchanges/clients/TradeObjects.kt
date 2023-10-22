@@ -330,7 +330,8 @@ class BotSettingsTrader(
     @SerializedName("parameters") val parameters: Parameters,
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
-    @SerializedName("strategy_type_comment") val strategyTypeComment: String
+    @SerializedName("strategy_type_comment") val strategyTypeComment: String,
+    @SerializedName("min_order_amount") val minOrderAmount: BigDecimal? = null
 ) : BotSettings(
     name = name,
     pair = pair,
@@ -381,7 +382,7 @@ class BotSettingsTrader(
             @SerializedName("use_percent") val usePercent: Boolean = false
         )
 
-        class StopOrderDistance(
+        class StopOrderDistance( // todo:: Obsolete
             @SerializedName("distance") val distance: BigDecimal,
             @SerializedName("use_percent") val usePercent: Boolean = false
         )

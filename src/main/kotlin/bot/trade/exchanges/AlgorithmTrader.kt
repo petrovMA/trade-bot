@@ -50,8 +50,10 @@ class AlgorithmTrader(
     private val setCloseOrders = settings.parameters.setCloseOrders
     private val ordersType = settings.ordersType
     private val direction = settings.direction
+    private val minOrderAmount = settings.minOrderAmount ?: BigDecimal.ZERO
 
     private val log = if (isLog) KotlinLogging.logger {} else null
+    private val ordersListForExecute: MutableMap<String, Order> = mutableMapOf()
 
     var from: Long = Long.MAX_VALUE
     var to: Long = Long.MIN_VALUE
@@ -216,9 +218,7 @@ class AlgorithmTrader(
                                             }
                                             if (v.stopPrice?.run { this >= currentPrice } == true) {
                                                 log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute.add(k to v.apply {
-                                                    side = SIDE.SELL
-                                                }) // todo:: check for remove part 'v.apply { side = SIDE.SELL }'
+                                                ordersListForExecute[k] = v
                                             }
                                         } else if (trailingInOrderDistance != null) {
                                             if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
@@ -235,9 +235,7 @@ class AlgorithmTrader(
                                             }
                                             if (v.stopPrice?.run { this <= currentPrice } == true) {
                                                 log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute.add(k to v.apply {
-                                                    side = SIDE.BUY
-                                                }) // todo:: check for remove part 'v.apply { side = SIDE.BUY }'
+                                                ordersListForExecute[k] = v
                                             }
                                         } else {
                                             log?.warn(
@@ -268,9 +266,7 @@ class AlgorithmTrader(
                                             }
                                             if (v.stopPrice?.run { this <= currentPrice } == true) {
                                                 log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute.add(k to v.apply {
-                                                    side = SIDE.BUY
-                                                }) // todo:: check for remove part 'v.apply { side = SIDE.BUY }'
+                                                ordersListForExecute[k] = v
                                             }
                                         } else if (trailingInOrderDistance != null) {
                                             if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
@@ -287,9 +283,7 @@ class AlgorithmTrader(
                                             }
                                             if (v.stopPrice?.run { this >= currentPrice } == true) {
                                                 log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute.add(k to v.apply {
-                                                    side = SIDE.SELL
-                                                }) // todo:: check for remove part 'v.apply { side = SIDE.SELL }'
+                                                ordersListForExecute[k] = v
                                             }
                                         } else {
                                             log?.warn(
@@ -305,79 +299,33 @@ class AlgorithmTrader(
                             var sellSumAmount = BigDecimal.ZERO
                             var buySumAmount = BigDecimal.ZERO
 
-                            ordersListForExecute.forEach {
-                                if (trailingInOrderDistance != null) {
-                                    when (direction) {
-                                        DIRECTION.LONG -> {
-                                            when (it.second.side) {
-                                                SIDE.BUY -> {
-                                                    orders[it.first] = Order(
-                                                        orderId = "",
-                                                        pair = botSettings.pair,
-                                                        price = BigDecimal(it.first),
-                                                        origQty = calcAmount(orderQuantity, BigDecimal(it.first)),
-                                                        executedQty = BigDecimal(0),
-                                                        side = SIDE.SELL,
-                                                        type = TYPE.MARKET,
-                                                        status = STATUS.NEW,
-                                                        lastBorderPrice = BigDecimal(-99999999999999L),
-                                                        stopPrice = null
-                                                    )
-                                                }
-                                                SIDE.SELL -> orders.remove(it.first)
-                                                else -> log?.error("${botSettings.name} Unknown side: ${it.second.side}")
-                                            }
-                                        }
-
-                                        DIRECTION.SHORT -> {
-                                            when (it.second.side) {
-                                                SIDE.SELL -> {
-                                                    orders[it.first] = Order(
-                                                        orderId = "",
-                                                        pair = botSettings.pair,
-                                                        price = BigDecimal(it.first),
-                                                        origQty = calcAmount(orderQuantity, BigDecimal(it.first)),
-                                                        executedQty = BigDecimal(0),
-                                                        side = SIDE.BUY,
-                                                        type = TYPE.MARKET,
-                                                        status = STATUS.NEW,
-                                                        lastBorderPrice = BigDecimal(99999999999999L),
-                                                        stopPrice = null
-                                                    )
-                                                }
-                                                SIDE.BUY -> orders.remove(it.first)
-                                                else -> log?.error("${botSettings.name} Unknown side: ${it.second.side}")
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    orders.remove(it.first)
-                                }
-
-                                when (it.second.side) {
-                                    SIDE.BUY -> buySumAmount += it.second.origQty
-                                    SIDE.SELL -> sellSumAmount += it.second.origQty
+                            ordersListForExecute.forEach { (_, v) ->
+                                when (v.side) {
+                                    SIDE.BUY -> buySumAmount += v.origQty
+                                    SIDE.SELL -> sellSumAmount += v.origQty
                                     else -> {}
                                 }
                             }
 
-                            if (buySumAmount > BigDecimal.ZERO)
+                            if (buySumAmount > minOrderAmount) {
                                 sentOrder(
                                     amount = buySumAmount,
                                     orderSide = SIDE.BUY,
                                     price = currentPrice,
                                     orderType = TYPE.MARKET
                                 )
+                                checkOrders()
+                            }
 
-                            if (sellSumAmount > BigDecimal.ZERO)
+                            if (sellSumAmount > minOrderAmount) {
                                 sentOrder(
                                     amount = sellSumAmount,
                                     orderSide = SIDE.SELL,
                                     price = currentPrice,
                                     orderType = TYPE.MARKET
                                 )
-
-                            ordersListForExecute.clear()
+                                checkOrders()
+                            }
                         }
 
                         is Order -> {
@@ -471,6 +419,60 @@ class AlgorithmTrader(
         }
     }
 
+    private fun checkOrders() {
+        ordersListForExecute.forEach {
+            if (trailingInOrderDistance != null) {
+                when (direction) {
+                    DIRECTION.LONG -> {
+                        when (it.value.side) {
+                            SIDE.BUY -> {
+                                orders[it.key] = Order(
+                                    orderId = "",
+                                    pair = botSettings.pair,
+                                    price = BigDecimal(it.key),
+                                    origQty = calcAmount(orderQuantity, BigDecimal(it.key)),
+                                    executedQty = BigDecimal(0),
+                                    side = SIDE.SELL,
+                                    type = TYPE.MARKET,
+                                    status = STATUS.NEW,
+                                    lastBorderPrice = BigDecimal(-99999999999999L),
+                                    stopPrice = null
+                                )
+                            }
+
+                            SIDE.SELL -> orders.remove(it.key)
+                            else -> log?.error("${botSettings.name} Unknown side: ${it.value.side}")
+                        }
+                    }
+
+                    DIRECTION.SHORT -> {
+                        when (it.value.side) {
+                            SIDE.SELL -> {
+                                orders[it.key] = Order(
+                                    orderId = "",
+                                    pair = botSettings.pair,
+                                    price = BigDecimal(it.key),
+                                    origQty = calcAmount(orderQuantity, BigDecimal(it.key)),
+                                    executedQty = BigDecimal(0),
+                                    side = SIDE.BUY,
+                                    type = TYPE.MARKET,
+                                    status = STATUS.NEW,
+                                    lastBorderPrice = BigDecimal(99999999999999L),
+                                    stopPrice = null
+                                )
+                            }
+
+                            SIDE.BUY -> orders.remove(it.key)
+                            else -> log?.error("${botSettings.name} Unknown side: ${it.value.side}")
+                        }
+                    }
+                }
+            } else orders.remove(it.key)
+        }
+
+        ordersListForExecute.clear()
+    }
+
     override fun synchronizeOrders() {
         when (orders) {
             is ObservableHashMap -> {
@@ -506,12 +508,12 @@ class AlgorithmTrader(
                         openOrders
                             .find { v.orderId == it.orderId }
                             ?: run {
-                                ordersListForExecute.add(k to v)
+                                ordersListForExecute[k] = v
                                 log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
                             }
                 }
 
-                ordersListForExecute.forEach { orders.remove(it.first) }
+                ordersListForExecute.forEach { (k, _) -> orders.remove(k) }
                 ordersListForExecute.clear()
 
                 if (setCloseOrders) {
