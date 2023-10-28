@@ -50,7 +50,7 @@ class AlgorithmTrader(
     private val setCloseOrders = settings.parameters.setCloseOrders
     private val ordersType = settings.ordersType
     private val direction = settings.direction
-    private val minOrderAmount = settings.minOrderAmount ?: BigDecimal.ZERO
+    private val minOrderAmount = settings.parameters.minOrderAmount ?: BigDecimal.ZERO
 
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val ordersListForExecute: MutableMap<String, Order> = mutableMapOf()
@@ -62,7 +62,7 @@ class AlgorithmTrader(
         saveBotSettings(botSettings)
         stopThread = false
         try {
-            if (File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
+            if (isEmulate.not() && File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
 
             synchronizeOrders()
 
@@ -307,24 +307,24 @@ class AlgorithmTrader(
                                 }
                             }
 
-                            if (buySumAmount > minOrderAmount) {
+                            if (buySumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                                checkOrders()
                                 sentOrder(
                                     amount = buySumAmount,
                                     orderSide = SIDE.BUY,
                                     price = currentPrice,
                                     orderType = TYPE.MARKET
                                 )
-                                checkOrders()
                             }
 
-                            if (sellSumAmount > minOrderAmount) {
+                            if (sellSumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                                checkOrders()
                                 sentOrder(
                                     amount = sellSumAmount,
                                     orderSide = SIDE.SELL,
                                     price = currentPrice,
                                     orderType = TYPE.MARKET
                                 )
-                                checkOrders()
                             }
                         }
 
@@ -470,6 +470,13 @@ class AlgorithmTrader(
             } else orders.remove(it.key)
         }
 
+        log?.info(
+            "{} Price = '{}' Orders for execute:\n{}",
+            botSettings.name,
+            currentPrice.toPrice(),
+            json(ordersListForExecute)
+        )
+
         ordersListForExecute.clear()
     }
 
@@ -527,21 +534,19 @@ class AlgorithmTrader(
                                 botSettings.name,
                                 order
                             )
+                        } ?: run {
+                            orders[priceIn] = Order(
+                                orderId = "",
+                                pair = botSettings.pair,
+                                price = priceIn.toBigDecimal(),
+                                origQty = calcAmount(orderQuantity, price),
+                                executedQty = BigDecimal(0),
+                                side = if (direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
+                                type = TYPE.MARKET,
+                                status = STATUS.FILLED,
+                                lastBorderPrice = BigDecimal.ZERO
+                            )
                         }
-                            ?: run {
-                                orders[priceIn] = Order(
-                                    orderId = "",
-                                    pair = botSettings.pair,
-                                    price = priceIn.toBigDecimal(),
-                                    origQty = calcAmount(orderQuantity, price),
-                                    executedQty = BigDecimal(0),
-                                    side = if (direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
-                                    type = TYPE.MARKET,
-                                    status = STATUS.FILLED,
-                                    lastBorderPrice = BigDecimal.ZERO
-                                )
-                            }
-
 
                         price += orderDistance
                     }

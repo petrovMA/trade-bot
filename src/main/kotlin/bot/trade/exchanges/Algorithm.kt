@@ -162,13 +162,15 @@ abstract class Algorithm(
     fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
 
     fun saveBotSettings(botSettings: BotSettings, settingsPath: String = this.settingsPath) {
-        val settingsDir = File(path)
+        if(isEmulate.not()) {
+            val settingsDir = File(path)
 
-        if (settingsDir.isDirectory.not()) Files.createDirectories(Paths.get(path))
+            if (settingsDir.isDirectory.not()) Files.createDirectories(Paths.get(path))
 
-        val settingsFile = File(settingsPath)
+            val settingsFile = File(settingsPath)
 
-        reWriteObject(botSettings, settingsFile)
+            reWriteObject(botSettings, settingsFile)
+        }
     }
 
     fun calcAmount(amount: BigDecimal, price: BigDecimal) =

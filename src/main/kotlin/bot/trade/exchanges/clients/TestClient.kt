@@ -1,6 +1,6 @@
 package bot.trade.exchanges.clients
 
-import bot.trade.exchanges.emulate.StreamThreadStub
+import bot.trade.exchanges.clients.stream.StreamThreadStub
 import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.exchanges.emulate.libs.NotSupportedCandlestickIntervalException
 import bot.trade.exchanges.emulate.libs.UnsupportedStateException

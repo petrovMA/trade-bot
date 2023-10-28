@@ -275,7 +275,8 @@ enum class ExchangeEnum {
     BITMAX,
     HUOBI,
     GATE,
-    STUB_TEST
+    STUB_TEST,
+    TEST
 }
 
 data class Candlestick(
@@ -330,8 +331,7 @@ class BotSettingsTrader(
     @SerializedName("parameters") val parameters: Parameters,
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
-    @SerializedName("strategy_type_comment") val strategyTypeComment: String,
-    @SerializedName("min_order_amount") val minOrderAmount: BigDecimal? = null
+    @SerializedName("strategy_type_comment") val strategyTypeComment: String
 ) : BotSettings(
     name = name,
     pair = pair,
@@ -349,7 +349,8 @@ class BotSettingsTrader(
         @SerializedName("trigger_distance") val triggerDistance: TriggerDistance, // Trigger Distance:: distance between order and stop-order
         @SerializedName("stop_order_distance") val stopOrderDistance: StopOrderDistance, // enable stop order distance (stopOrderDistance = triggerDistance + stopOrderDistance)
         @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
-        @SerializedName("set_close_orders") val setCloseOrders: Boolean = true // set close position orders when bot starts
+        @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts,\
+        @SerializedName("min_order_amount") val minOrderAmount: BigDecimal? = null
     ) {
         class TradingRange(
             @SerializedName("lower_bound") val lowerBound: BigDecimal,

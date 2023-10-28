@@ -1,0 +1,50 @@
+{
+  "flow_name": "BTCUSDT_LONG",
+  "symbol": {
+    "first": "BTC",
+    "second": "USDT"
+  },
+  "exchange_type": "Bybit",
+  "strategy_type": "LONG",
+  "order_type": "MARKET",
+  "parameters": {
+    "trading_range": {
+      "lower_bound": 32000,
+      "upper_bound": 36000,
+      "use_percent": false
+    },
+    "in_order_quantity": {
+      "value": 3,
+      "use_percent": false
+    },
+    "in_order_distance": {
+      "distance": 10.0,
+      "use_percent": false
+    },
+    "trailing_in_order_distance": {
+      "distance": 50.0,
+      "use_percent": false
+    },
+    "trigger_in_order_distance": {
+      "distance": 0.0,
+      "use_percent": false
+    },
+    "trigger_distance": {
+      "distance": 50.0,
+      "use_percent": false
+    },
+    "stop_order_distance": {
+      "distance": 50.0,
+      "use_percent": false
+    },
+    "max_trigger_count": 100,
+    "set_close_orders": false,
+    "min_order_amount": 35
+  },
+  "market_type": "USDT Perpetual",
+  "market_type_comment": "USDT Perpetual, Inverse Perpetual, Spot",
+  "strategy_type_comment": "Long, Short, Spot",
+  "orderBalanceType": "second",
+  "countOfDigitsAfterDotForAmount": 3,
+  "countOfDigitsAfterDotForPrice": 1
+}
