@@ -60,6 +60,51 @@ abstract class Algorithm(
 
     var stream: Stream = client.stream(botSettings.pair, interval, queue)
 
+    /**
+     * custom actions before start thread
+     */
+    abstract fun setup()
+
+    override fun run() {
+        setup()
+        saveBotSettings(botSettings)
+        stopThread = false
+        try {
+            if (isEmulate.not() && File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
+
+            synchronizeOrders()
+
+            stream.run { start() }
+
+            var msg = if (isEmulate) client.nextEvent() /* only for test */
+            else queue.poll(waitTime)
+
+            do {
+                if (stopThread) return
+                try {
+
+                    handle(msg)
+
+                    msg = if (isEmulate) client.nextEvent() /* only for test */
+                    else queue.poll(waitTime)
+
+                } catch (e: InterruptedException) {
+                    log?.error("${botSettings.name} ${e.message}", e)
+                    send("#Error_${botSettings.name}: \n${printTrace(e)}")
+                    if (stopThread) return
+                }
+            } while (true)
+
+        } catch (e: Exception) {
+            log?.error("${botSettings.name} MAIN ERROR:\n", e)
+            send("#Error_${botSettings.name}: \n${printTrace(e)}")
+        } finally {
+            interruptThis()
+        }
+    }
+
+    abstract fun handle(msg: CommonExchangeData?)
+
     fun interruptThis(msg: String? = null) {
         stream.interrupt()
         var msgErr = "#Interrupt #${botSettings.name} Thread, socket.status = ${stream.state}"
@@ -85,8 +130,8 @@ abstract class Algorithm(
         var order = Order(
             orderId = "",
             pair = botSettings.pair,
-            price = price,
-            origQty = amount,
+            price = String.format(formatPrice, price).replace(",", ".").toBigDecimal(),
+            origQty = String.format(formatAmount, amount).replace(",", ".").toBigDecimal(),
             executedQty = BigDecimal(0),
             side = orderSide,
             type = orderType,
@@ -173,9 +218,9 @@ abstract class Algorithm(
         }
     }
 
-    fun calcAmount(amount: BigDecimal, price: BigDecimal) =
-        if (firstBalanceForOrderAmount) amount
-        else amount.div8(price)
+    abstract fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal
+
+    fun price(price: BigDecimal) = price.round(botSettings.countOfDigitsAfterDotForPrice)
 
     fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 

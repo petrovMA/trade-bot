@@ -185,8 +185,8 @@ class ClientBinanceFutures(
     override fun newOrder(
         order: Order,
         isStaticUpdate: Boolean,
-        formatCount: String,
-        formatPrice: String
+        qty: String,
+        price: String
     ): Order {
         val typeX = order.side.toType()
         val instrument = FuturesContract(order.pair.toCurrencyPair(), "PERPETUAL")
@@ -194,18 +194,18 @@ class ClientBinanceFutures(
             TYPE.LIMIT -> tradeService.placeLimitOrder(
                 LimitOrder(
                     typeX,
-                    String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
+                    qty.toBigDecimal(),
                     instrument,
                     null,
                     Date(),
-                    String.format(formatPrice, order.price).replace(',', '.').toBigDecimal()
+                    price.toBigDecimal()
                 )
             )
 
             TYPE.MARKET -> tradeService.placeMarketOrder(
                 MarketOrder(
                     typeX,
-                    String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
+                    qty.toBigDecimal(),
                     instrument
                 )
             )

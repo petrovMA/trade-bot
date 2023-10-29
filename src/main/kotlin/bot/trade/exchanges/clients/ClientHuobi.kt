@@ -184,8 +184,8 @@ class ClientHuobi(
     override fun newOrder(
         order: Order,
         isStaticUpdate: Boolean,
-        formatCount: String,
-        formatPrice: String
+        qty: String,
+        price: String
     ): Order {
         TODO("09.04.2021 IMPLEMENT IT")
 //        val typeX = order.side.toType()

@@ -105,8 +105,8 @@ class TestClient(
     override fun newOrder(
         order: Order,
         isStaticUpdate: Boolean,
-        formatCount: String,
-        formatPrice: String
+        qty: String,
+        price: String
     ): Order {
         when (order.type) {
             TYPE.MARKET -> {

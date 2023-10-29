@@ -187,25 +187,25 @@ open class ClientBinance(
         }.first()
     }
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order {
+    override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
         val typeX = order.side.toType()
         val currPair = CurrencyPair(order.pair.first, order.pair.second)
         val orderId = when (order.type) {
             TYPE.LIMIT -> tradeService.placeLimitOrder(
                 LimitOrder(
                     typeX,
-                    String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
+                    qty.toBigDecimal(),
                     currPair,
                     null,
                     Date(),
-                    String.format(formatPrice, order.price).replace(',', '.').toBigDecimal()
+                    price.toBigDecimal()
                 )
             )
 
             TYPE.MARKET -> tradeService.placeMarketOrder(
                 MarketOrder(
                     typeX,
-                    String.format(formatCount, order.origQty).replace(',', '.').toBigDecimal(),
+                    qty.toBigDecimal(),
                     currPair
                 )
             )

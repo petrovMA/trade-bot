@@ -350,7 +350,7 @@ class BotSettingsTrader(
         @SerializedName("stop_order_distance") val stopOrderDistance: StopOrderDistance, // enable stop order distance (stopOrderDistance = triggerDistance + stopOrderDistance)
         @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
         @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts,\
-        @SerializedName("min_order_amount") val minOrderAmount: BigDecimal? = null
+        @SerializedName("min_order_amount") val minOrderAmount: MinOrderAmount? = null
     ) {
         class TradingRange(
             @SerializedName("lower_bound") val lowerBound: BigDecimal,
@@ -381,6 +381,11 @@ class BotSettingsTrader(
         class TriggerDistance(
             @SerializedName("distance") val distance: BigDecimal,
             @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class MinOrderAmount(
+            @SerializedName("distance") val amount: BigDecimal,
+            @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
         )
 
         class StopOrderDistance( // todo:: Obsolete

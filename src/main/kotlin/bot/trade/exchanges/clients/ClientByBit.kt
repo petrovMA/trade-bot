@@ -180,8 +180,8 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
     override fun newOrder(
         order: Order,
         isStaticUpdate: Boolean,
-        formatCount: String,
-        formatPrice: String
+        qty: String,
+        price: String
     ): Order {
         val resp = client.newOrder(
             symbol = order.pair.first + order.pair.second,
@@ -196,8 +196,8 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
                 TYPE.MARKET -> "Market"
                 else -> throw UnsupportedOrderTypeException("Error: Unknown order type '${order.type}'!")
             },
-            qty = String.format(formatCount, order.origQty).replace(",", "."),
-            price = String.format(formatPrice, order.price).replace(",", "."),
+            qty = qty,
+            price = price,
 
             // todo:: Add auto fix this using: "/v5/position/switch-mode"
             // todo:: for fix: ByBitRestException: position idx not match position mode

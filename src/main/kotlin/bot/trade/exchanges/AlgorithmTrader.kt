@@ -4,10 +4,7 @@ import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
 import com.typesafe.config.Config
 import mu.KotlinLogging
-import java.io.File
 import java.math.BigDecimal
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 
@@ -50,7 +47,7 @@ class AlgorithmTrader(
     private val setCloseOrders = settings.parameters.setCloseOrders
     private val ordersType = settings.ordersType
     private val direction = settings.direction
-    private val minOrderAmount = settings.parameters.minOrderAmount ?: BigDecimal.ZERO
+    private val minOrderAmount = settings.parameters.minOrderAmount?.amount ?: BigDecimal.ZERO
 
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val ordersListForExecute: MutableMap<String, Order> = mutableMapOf()
@@ -58,364 +55,332 @@ class AlgorithmTrader(
     var from: Long = Long.MAX_VALUE
     var to: Long = Long.MIN_VALUE
 
-    override fun run() {
-        saveBotSettings(botSettings)
-        stopThread = false
-        try {
-            if (isEmulate.not() && File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
+    override fun setup() = Unit
 
-            synchronizeOrders()
+    override fun handle(msg: CommonExchangeData?) {
+        when (msg) {
+            is Trade -> {
+                prevPrice = currentPrice
+                currentPrice = msg.price
+                log?.debug("{} TradeEvent: {}", botSettings.name, msg)
 
-            stream.run { start() }
+                from = if (from > msg.time) msg.time else from
+                to = if (to < msg.time) msg.time else to
 
-            var msg = if (isEmulate) client.nextEvent() /* only for test */
-            else queue.poll(waitTime)
+                if (currentPrice > minRange && currentPrice < maxRange) {
 
-            do {
-                if (stopThread) return
-                try {
-                    when (msg) {
-                        is Trade -> {
-                            prevPrice = currentPrice
-                            currentPrice = msg.price
-                            log?.debug("{} TradeEvent: {}", botSettings.name, msg)
+                    val priceIn = (currentPrice - (currentPrice % orderDistance)).toPrice()
 
-                            from = if (from > msg.time) msg.time else from
-                            to = if (to < msg.time) msg.time else to
-
-                            if (currentPrice > minRange && currentPrice < maxRange) {
-
-                                val priceIn = (currentPrice - (currentPrice % orderDistance)).toPrice()
-
-                                when (ordersType) {
-                                    TYPE.MARKET -> {
-                                        orders[priceIn]?.let {
-                                            log?.trace(
-                                                "{} Order already exist: {}",
-                                                botSettings.name,
-                                                it
-                                            )
-                                        } ?: run {
-                                            if (orders.size < orderMaxQuantity) {
-                                                if (trailingInOrderDistance == null) {
-                                                    orders[priceIn] = sentOrder(
-                                                        amount = calcAmount(orderQuantity, BigDecimal(priceIn)),
-                                                        orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
-                                                        else SIDE.SELL,
-                                                        price = BigDecimal(priceIn),
-                                                        orderType = TYPE.MARKET
-                                                    ).also {
-                                                        if (direction == DIRECTION.LONG) {
-                                                            it.lastBorderPrice = BigDecimal(-99999999999999L)
-                                                            it.side = SIDE.SELL
-                                                        } else {
-                                                            it.lastBorderPrice = BigDecimal(99999999999999L)
-                                                            it.side = SIDE.BUY
-                                                        }
-                                                    }
-                                                } else {
-                                                    orders[priceIn] = Order(
-                                                        orderId = "",
-                                                        pair = botSettings.pair,
-                                                        price = BigDecimal(priceIn),
-                                                        origQty = calcAmount(orderQuantity, BigDecimal(priceIn)),
-                                                        executedQty = BigDecimal(0),
-                                                        side = if (direction == DIRECTION.LONG) SIDE.BUY
-                                                        else SIDE.SELL,
-                                                        type = TYPE.MARKET,
-                                                        status = STATUS.NEW,
-                                                        lastBorderPrice = if (direction == DIRECTION.LONG)
-                                                            priceIn.toBigDecimal() + trailingInOrderDistance
-                                                        else
-                                                            priceIn.toBigDecimal() - trailingInOrderDistance,
-                                                        stopPrice = null
-                                                    )
-                                                }
+                    when (ordersType) {
+                        TYPE.MARKET -> {
+                            orders[priceIn]?.let {
+                                log?.trace(
+                                    "{} Order already exist: {}",
+                                    botSettings.name,
+                                    it
+                                )
+                            } ?: run {
+                                if (orders.size < orderMaxQuantity) {
+                                    if (trailingInOrderDistance == null) {
+                                        orders[priceIn] = sentOrder(
+                                            amount = calcAmount(orderQuantity, BigDecimal(priceIn)),
+                                            orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
+                                            else SIDE.SELL,
+                                            price = BigDecimal(priceIn),
+                                            orderType = TYPE.MARKET
+                                        ).also {
+                                            if (direction == DIRECTION.LONG) {
+                                                it.lastBorderPrice = BigDecimal(-99999999999999L)
+                                                it.side = SIDE.SELL
+                                            } else {
+                                                it.lastBorderPrice = BigDecimal(99999999999999L)
+                                                it.side = SIDE.BUY
                                             }
                                         }
-                                    }
-
-                                    TYPE.LIMIT -> {
-                                        when (direction) {
-                                            DIRECTION.LONG -> {
-                                                var keyPrice = priceIn.toBigDecimal()
-                                                while (keyPrice > minRange) {
-                                                    keyPrice.toPrice().let {
-                                                        orders[it]?.let { order ->
-                                                            log?.trace(
-                                                                "{} Order already exist: {}",
-                                                                botSettings.name,
-                                                                order
-                                                            )
-                                                        }
-                                                            ?: run {
-                                                                if (orders.size < orderMaxQuantity) {
-                                                                    orders[it] = sentOrder(
-                                                                        price = keyPrice,
-                                                                        amount = orderQuantity,
-                                                                        orderSide = SIDE.BUY,
-                                                                        orderType = TYPE.LIMIT
-                                                                    )
-                                                                } else
-                                                                    log?.trace(
-                                                                        "{} Orders count limit reached: price = {}; orderMaxQuantity = {}",
-                                                                        botSettings.name,
-                                                                        keyPrice,
-                                                                        orderMaxQuantity
-                                                                    )
-                                                            }
-                                                    }
-                                                    keyPrice -= orderDistance
-                                                }
-
-                                                val prev = (prevPrice - (prevPrice % orderDistance)).toPrice()
-
-                                                if (priceIn.toBigDecimal() != prev.toBigDecimal()) {
-                                                    orders[prev]?.let { order ->
-                                                        if (order.price?.let { it > currentPrice } == true && order.status != STATUS.FILLED && order.status != STATUS.REJECTED && order.type != TYPE.MARKET) {
-                                                            val o = getOrder(botSettings.pair, order.orderId)
-                                                                ?: order.apply { status = STATUS.FILLED }
-
-                                                            if (o.status == STATUS.FILLED || o.status == STATUS.REJECTED) {
-                                                                orders[prev] = o.also {
-                                                                    it.type = TYPE.MARKET
-                                                                    it.lastBorderPrice = BigDecimal.ZERO
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            DIRECTION.SHORT -> {
-                                                TODO("SHORT strategy not implemented for TYPE.LIMIT")
-                                            }
-                                        }
-                                    }
-
-                                    else -> throw UnsupportedOrderTypeException("Error: Unknown order type '$ordersType'!")
+                                    }/* else {
+                                        orders[priceIn] = Order(
+                                            orderId = "",
+                                            pair = botSettings.pair,
+                                            price = BigDecimal(priceIn),
+                                            origQty = calcAmount(orderQuantity, BigDecimal(priceIn)),
+                                            executedQty = BigDecimal(0),
+                                            side = if (direction == DIRECTION.LONG) SIDE.BUY
+                                            else SIDE.SELL,
+                                            type = TYPE.MARKET,
+                                            status = STATUS.NEW,
+                                            lastBorderPrice = if (direction == DIRECTION.LONG)
+                                                priceIn.toBigDecimal() + trailingInOrderDistance
+                                            else
+                                                priceIn.toBigDecimal() - trailingInOrderDistance,
+                                            stopPrice = null
+                                        )
+                                    }*/
                                 }
-                            } else
-                                log?.warn("${botSettings.name} Price ${format(currentPrice)}, not in range: ${minRange to maxRange}")
+                            }
+                        }
 
+                        TYPE.LIMIT -> {
                             when (direction) {
                                 DIRECTION.LONG -> {
-                                    val ordersForUpdate = orders.filter { (_, v) -> v.type == TYPE.MARKET }
+                                    var keyPrice = priceIn.toBigDecimal()
+                                    while (keyPrice > minRange) {
+                                        keyPrice.toPrice().let {
+                                            orders[it]?.let { order ->
+                                                log?.trace(
+                                                    "{} Order already exist: {}",
+                                                    botSettings.name,
+                                                    order
+                                                )
+                                            } ?: run {
+                                                if (orders.size < orderMaxQuantity) {
+                                                    orders[it] = sentOrder(
+                                                        price = keyPrice,
+                                                        amount = orderQuantity,
+                                                        orderSide = SIDE.BUY,
+                                                        orderType = TYPE.LIMIT
+                                                    )
+                                                } else log?.trace(
+                                                    "{} Orders count limit reached: price = {}; orderMaxQuantity = {}",
+                                                    botSettings.name,
+                                                    keyPrice,
+                                                    orderMaxQuantity
+                                                )
+                                            }
+                                        }
+                                        keyPrice -= orderDistance
+                                    }
 
-                                    ordersForUpdate.forEach { (k, v) ->
-                                        if (v.side == SIDE.SELL) {
-                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
-                                                v.lastBorderPrice = currentPrice
+                                    val prev = (prevPrice - (prevPrice % orderDistance)).toPrice()
 
-                                                if (
-                                                    v.stopPrice?.run { this < currentPrice - triggerDistance } == true
-                                                    || v.stopPrice == null && k.toBigDecimal() < (currentPrice - triggerDistance - stopOrderDistance)
-                                                ) {
-                                                    v.stopPrice = currentPrice - triggerDistance
+                                    if (priceIn.toBigDecimal() != prev.toBigDecimal()) {
+                                        orders[prev]?.let { order ->
+                                            if (order.price?.let { it > currentPrice } == true && order.status != STATUS.FILLED && order.status != STATUS.REJECTED && order.type != TYPE.MARKET) {
+                                                val o = getOrder(botSettings.pair, order.orderId)
+                                                    ?: order.apply { status = STATUS.FILLED }
+
+                                                if (o.status == STATUS.FILLED || o.status == STATUS.REJECTED) {
+                                                    orders[prev] = o.also {
+                                                        it.type = TYPE.MARKET
+                                                        it.lastBorderPrice = BigDecimal.ZERO
+                                                    }
                                                 }
-
-                                                orders[k] = v
                                             }
-                                            if (v.stopPrice?.run { this >= currentPrice } == true) {
-                                                log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute[k] = v
-                                            }
-                                        } else if (trailingInOrderDistance != null) {
-                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
-                                                v.lastBorderPrice = currentPrice
-
-                                                if (
-                                                    v.stopPrice?.run { this > currentPrice + trailingInOrderDistance } == true
-                                                    || v.stopPrice == null && k.toBigDecimal() > (currentPrice + trailingInOrderDistance)
-                                                ) {
-                                                    v.stopPrice = currentPrice + trailingInOrderDistance
-                                                }
-
-                                                orders[k] = v
-                                            }
-                                            if (v.stopPrice?.run { this <= currentPrice } == true) {
-                                                log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute[k] = v
-                                            }
-                                        } else {
-                                            log?.warn(
-                                                "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
-                                                botSettings.name,
-                                                v
-                                            )
                                         }
                                     }
                                 }
 
                                 DIRECTION.SHORT -> {
-                                    val ordersForUpdate = orders.filter { (_, v) -> v.type == TYPE.MARKET }
+                                    TODO("SHORT strategy not implemented for TYPE.LIMIT")
+                                }
+                            }
+                        }
 
-                                    ordersForUpdate.forEach { (k, v) ->
-                                        if (v.side == SIDE.BUY) {
-                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
-                                                v.lastBorderPrice = currentPrice
+                        else -> throw UnsupportedOrderTypeException("Error: Unknown order type '$ordersType'!")
+                    }
+                } else
+                    log?.warn("${botSettings.name} Price ${format(currentPrice)}, not in range: ${minRange to maxRange}")
 
-                                                if (
-                                                    v.stopPrice?.run { this > currentPrice + triggerDistance } == true
-                                                    || v.stopPrice == null && k.toBigDecimal() > (currentPrice + triggerDistance + stopOrderDistance)
-                                                ) {
-                                                    v.stopPrice = currentPrice + triggerDistance
-                                                }
+                when (direction) {
+                    DIRECTION.LONG -> {
+                        val ordersForUpdate = orders.filter { (_, v) -> v.type == TYPE.MARKET }
 
-                                                orders[k] = v
-                                            }
-                                            if (v.stopPrice?.run { this <= currentPrice } == true) {
-                                                log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute[k] = v
-                                            }
-                                        } else if (trailingInOrderDistance != null) {
-                                            if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
-                                                v.lastBorderPrice = currentPrice
+                        ordersForUpdate.forEach { (k, v) ->
+                            if (v.side == SIDE.SELL) {
+                                if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
+                                    v.lastBorderPrice = currentPrice
 
-                                                if (
-                                                    v.stopPrice?.run { this < currentPrice - trailingInOrderDistance } == true
-                                                    || v.stopPrice == null && k.toBigDecimal() < (currentPrice - trailingInOrderDistance)
-                                                ) {
-                                                    v.stopPrice = currentPrice - trailingInOrderDistance
-                                                }
-
-                                                orders[k] = v
-                                            }
-                                            if (v.stopPrice?.run { this >= currentPrice } == true) {
-                                                log?.debug("{} Order close: {}", botSettings.name, v)
-                                                ordersListForExecute[k] = v
-                                            }
-                                        } else {
-                                            log?.warn(
-                                                "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
-                                                botSettings.name,
-                                                v
-                                            )
-                                        }
+                                    if (
+                                        v.stopPrice?.run { this < currentPrice - triggerDistance } == true
+                                        || v.stopPrice == null && k.toBigDecimal() < (currentPrice - triggerDistance - stopOrderDistance)
+                                    ) {
+                                        v.stopPrice = currentPrice - triggerDistance
                                     }
+
+                                    orders[k] = v
                                 }
-                            }
-
-                            var sellSumAmount = BigDecimal.ZERO
-                            var buySumAmount = BigDecimal.ZERO
-
-                            ordersListForExecute.forEach { (_, v) ->
-                                when (v.side) {
-                                    SIDE.BUY -> buySumAmount += v.origQty
-                                    SIDE.SELL -> sellSumAmount += v.origQty
-                                    else -> {}
+                                if (v.stopPrice?.run { this >= currentPrice } == true) {
+                                    log?.debug("{} Order close: {}", botSettings.name, v)
+                                    ordersListForExecute[k] = v
                                 }
-                            }
+                            } else if (trailingInOrderDistance != null) {
+                                if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
+                                    v.lastBorderPrice = currentPrice
 
-                            if (buySumAmount > calcAmount(minOrderAmount, currentPrice)) {
-                                checkOrders()
-                                sentOrder(
-                                    amount = buySumAmount,
-                                    orderSide = SIDE.BUY,
-                                    price = currentPrice,
-                                    orderType = TYPE.MARKET
-                                )
-                            }
+                                    if (
+                                        v.stopPrice?.run { this > currentPrice + trailingInOrderDistance } == true
+                                        || v.stopPrice == null && k.toBigDecimal() > (currentPrice + trailingInOrderDistance)
+                                    ) {
+                                        v.stopPrice = currentPrice + trailingInOrderDistance
+                                    }
 
-                            if (sellSumAmount > calcAmount(minOrderAmount, currentPrice)) {
-                                checkOrders()
-                                sentOrder(
-                                    amount = sellSumAmount,
-                                    orderSide = SIDE.SELL,
-                                    price = currentPrice,
-                                    orderType = TYPE.MARKET
+                                    orders[k] = v
+                                }
+                                if (v.stopPrice?.run { this <= currentPrice } == true) {
+                                    log?.debug("{} Order close: {}", botSettings.name, v)
+                                    ordersListForExecute[k] = v
+                                }
+                            } else {
+                                log?.warn(
+                                    "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
+                                    botSettings.name,
+                                    v
                                 )
                             }
                         }
-
-                        is Order -> {
-                            log?.info("{} Order update: {}", botSettings.name, msg)
-                            if (msg.pair == botSettings.pair) {
-                                if (msg.status == STATUS.FILLED) {
-                                    if (msg.type == TYPE.LIMIT) {
-                                        val order = msg
-                                        val ordersForUpdate = orders.filter { (_, v) -> v.orderId == order.orderId }
-
-                                        ordersForUpdate.forEach { (k, _) ->
-                                            orders[k] = order.also {
-                                                it.type = TYPE.MARKET
-                                                it.lastBorderPrice = BigDecimal.ZERO
-                                            }
-                                        }
-                                    }
-                                }
-                                send("#${botSettings.name} Order update:\n```json\n$msg\n```", true)
-                            }
-                        }
-
-                        is BotEvent -> {
-                            when (msg.type) {
-                                BotEvent.Type.GET_PAIR_OPEN_ORDERS -> {
-                                    val symbols = msg.text.split("[^a-zA-Z]+".toRegex())
-                                        .filter { it.isNotBlank() }
-
-                                    send(
-                                        "#${botSettings.name} " +
-                                                client.getOpenOrders(TradePair(symbols[0], symbols[1]))
-                                                    .joinToString("\n\n")
-                                    )
-                                }
-
-                                BotEvent.Type.GET_ALL_OPEN_ORDERS -> {
-                                    val pairs = msg.text
-                                        .split("\\s+".toRegex())
-                                        .filter { it.isNotBlank() }
-                                        .map { pair ->
-                                            val symbols = pair.split("[^a-zA-Z]+".toRegex())
-                                                .filter { it.isNotBlank() }
-                                            TradePair(symbols[0], symbols[1])
-                                        }
-
-                                    client.getAllOpenOrders(pairs)
-                                        .forEach { send("#${botSettings.name} ${it.key}\n${it.value.joinToString("\n\n")}") }
-                                }
-
-                                BotEvent.Type.SHOW_BALANCES -> {
-                                    send(
-                                        "#${botSettings.name} #AllBalances " +
-                                                client.getBalances()
-                                                    ?.toList()
-                                                    ?.joinToString(prefix = "\n", separator = "\n") {
-                                                        it.first + "\n" + it.second.joinToString(
-                                                            prefix = "\n",
-                                                            separator = "\n"
-                                                        )
-                                                    }
-                                    )
-                                }
-
-                                BotEvent.Type.INTERRUPT -> {
-                                    stream.interrupt()
-                                    return
-                                }
-
-                                else -> send("#${botSettings.name} Unsupported command: ${msg.type}")
-                            }
-                        }
-
-                        else -> log?.warn("${botSettings.name} Unsupported message: $msg")
                     }
 
-                    msg = if (isEmulate) client.nextEvent() /* only for test */
-                    else queue.poll(waitTime)
+                    DIRECTION.SHORT -> {
+                        val ordersForUpdate = orders.filter { (_, v) -> v.type == TYPE.MARKET }
 
-                } catch (e: InterruptedException) {
-                    log?.error("${botSettings.name} ${e.message}", e)
-                    send("#Error_${botSettings.name}: \n${printTrace(e)}")
-                    if (stopThread) return
+                        ordersForUpdate.forEach { (k, v) ->
+                            if (v.side == SIDE.BUY) {
+                                if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
+                                    v.lastBorderPrice = currentPrice
+
+                                    if (
+                                        v.stopPrice?.run { this > currentPrice + triggerDistance } == true
+                                        || v.stopPrice == null && k.toBigDecimal() > (currentPrice + triggerDistance + stopOrderDistance)
+                                    ) {
+                                        v.stopPrice = currentPrice + triggerDistance
+                                    }
+
+                                    orders[k] = v
+                                }
+                                if (v.stopPrice?.run { this <= currentPrice } == true) {
+                                    log?.debug("{} Order close: {}", botSettings.name, v)
+                                    ordersListForExecute[k] = v
+                                }
+                            } else if (trailingInOrderDistance != null) {
+                                if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
+                                    v.lastBorderPrice = currentPrice
+
+                                    if (
+                                        v.stopPrice?.run { this < currentPrice - trailingInOrderDistance } == true
+                                        || v.stopPrice == null && k.toBigDecimal() < (currentPrice - trailingInOrderDistance)
+                                    ) {
+                                        v.stopPrice = currentPrice - trailingInOrderDistance
+                                    }
+
+                                    orders[k] = v
+                                }
+                                if (v.stopPrice?.run { this >= currentPrice } == true) {
+                                    log?.debug("{} Order close: {}", botSettings.name, v)
+                                    ordersListForExecute[k] = v
+                                }
+                            } else {
+                                log?.warn(
+                                    "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
+                                    botSettings.name,
+                                    v
+                                )
+                            }
+                        }
+                    }
                 }
-            } while (true)
 
-        } catch (e: Exception) {
-            log?.error("${botSettings.name} MAIN ERROR:\n", e)
-            send("#Error_${botSettings.name}: \n${printTrace(e)}")
-        } finally {
-            interruptThis()
+                var sellSumAmount = BigDecimal.ZERO
+                var buySumAmount = BigDecimal.ZERO
+
+                ordersListForExecute.forEach { (_, v) ->
+                    when (v.side) {
+                        SIDE.BUY -> buySumAmount += v.origQty
+                        SIDE.SELL -> sellSumAmount += v.origQty
+                        else -> {}
+                    }
+                }
+
+                if (buySumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                    checkOrders()
+                    sentOrder(
+                        amount = buySumAmount,
+                        orderSide = SIDE.BUY,
+                        price = currentPrice,
+                        orderType = TYPE.MARKET
+                    )
+                }
+
+                if (sellSumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                    checkOrders()
+                    sentOrder(
+                        amount = sellSumAmount,
+                        orderSide = SIDE.SELL,
+                        price = currentPrice,
+                        orderType = TYPE.MARKET
+                    )
+                }
+            }
+
+            is Order -> {
+                log?.info("{} Order update: {}", botSettings.name, msg)
+                if (msg.pair == botSettings.pair) {
+                    if (msg.status == STATUS.FILLED) {
+                        if (msg.type == TYPE.LIMIT) {
+                            val order = msg
+                            val ordersForUpdate = orders.filter { (_, v) -> v.orderId == order.orderId }
+
+                            ordersForUpdate.forEach { (k, _) ->
+                                orders[k] = order.also {
+                                    it.type = TYPE.MARKET
+                                    it.lastBorderPrice = BigDecimal.ZERO
+                                }
+                            }
+                        }
+                    }
+                    send("#${botSettings.name} Order update:\n```json\n$msg\n```", true)
+                }
+            }
+
+            is BotEvent -> {
+                when (msg.type) {
+                    BotEvent.Type.GET_PAIR_OPEN_ORDERS -> {
+                        val symbols = msg.text.split("[^a-zA-Z]+".toRegex())
+                            .filter { it.isNotBlank() }
+
+                        send(
+                            "#${botSettings.name} " +
+                                    client.getOpenOrders(TradePair(symbols[0], symbols[1]))
+                                        .joinToString("\n\n")
+                        )
+                    }
+
+                    BotEvent.Type.GET_ALL_OPEN_ORDERS -> {
+                        val pairs = msg.text
+                            .split("\\s+".toRegex())
+                            .filter { it.isNotBlank() }
+                            .map { pair ->
+                                val symbols = pair.split("[^a-zA-Z]+".toRegex())
+                                    .filter { it.isNotBlank() }
+                                TradePair(symbols[0], symbols[1])
+                            }
+
+                        client.getAllOpenOrders(pairs)
+                            .forEach { send("#${botSettings.name} ${it.key}\n${it.value.joinToString("\n\n")}") }
+                    }
+
+                    BotEvent.Type.SHOW_BALANCES -> {
+                        send(
+                            "#${botSettings.name} #AllBalances " +
+                                    client.getBalances()
+                                        ?.toList()
+                                        ?.joinToString(prefix = "\n", separator = "\n") {
+                                            it.first + "\n" + it.second.joinToString(
+                                                prefix = "\n",
+                                                separator = "\n"
+                                            )
+                                        }
+                        )
+                    }
+
+                    BotEvent.Type.INTERRUPT -> {
+                        stream.interrupt()
+                        return
+                    }
+
+                    else -> send("#${botSettings.name} Unsupported command: ${msg.type}")
+                }
+            }
+
+            else -> log?.warn("${botSettings.name} Unsupported message: $msg")
         }
     }
 
@@ -556,4 +521,11 @@ class AlgorithmTrader(
             else -> {}
         }
     }
+
+    override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal =
+        if (firstBalanceForOrderAmount) settings.parameters.minOrderAmount?.countOfDigitsAfterDotForAmount
+            ?.let { amount.round(it) }
+            ?: amount.round(botSettings.countOfDigitsAfterDotForAmount)
+        else settings.parameters.minOrderAmount?.countOfDigitsAfterDotForAmount?.let { amount.div8(price).round(it) }
+            ?: amount.div8(price).round(botSettings.countOfDigitsAfterDotForAmount)
 }

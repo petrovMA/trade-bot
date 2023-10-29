@@ -88,281 +88,250 @@ class AlgorithmBobblesIndicator(
 
     private var exchangePosition: ExchangePosition? = null
 
-    override fun run() {
-//        saveBotSettings(botSettings)
-        stopThread = false
-        try {
-//            if (File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
+    override fun setup() {
+        client.getCandlestickBars(settings.pair, INTERVAL.FIVE_MINUTES, 5).run {
+            currentKline = last()
+            prevKline = get(size - 2)
+        }
+    }
 
-//            synchronizeOrders()
+    override fun handle(msg: CommonExchangeData?) {
+        when (msg) {
+            is Candlestick -> {
+                log?.trace("{} Kline:\n{}", settings.pair, msg)
 
-            // todo: This takes only spot candles (not futures)
-            client.getCandlestickBars(settings.pair, INTERVAL.FIVE_MINUTES, 5).run {
-                currentKline = last()
-                prevKline = get(size - 2)
+                if (msg.closeTime > currentKline.closeTime)
+                    prevKline = currentKline
+
+                currentKline = msg
             }
 
-            stream.run { start() }
+            is ExchangePosition -> exchangePosition = msg
 
-            var msg = if (isEmulate) client.nextEvent() /* only for test */
-            else queue.poll(waitTime)
+            is Balance -> balances[msg.asset] = msg
 
-            do {
-                if (stopThread) return
-                try {
-                    when (msg) {
-                        is Candlestick -> {
-                            log?.trace("{} Kline:\n{}", settings.pair, msg)
+            is Order -> {
+                if (msg.pair == settings.pair) {
 
-                            if (msg.closeTime > currentKline.closeTime)
-                                prevKline = currentKline
+                    log?.info("OrderUpdate:\n$msg")
 
-                            currentKline = msg
+                    when (msg.status) {
+                        STATUS.NEW -> orders[msg.orderId] = msg
+                        STATUS.PARTIALLY_FILLED -> {
+                            if (orders[msg.orderId] == null)
+                                synchronizeOrders()
                         }
 
-                        is ExchangePosition -> exchangePosition = msg
+                        STATUS.FILLED -> {
+                            orders.remove(msg.orderId)
 
-                        is Balance -> balances[msg.asset] = msg
-
-                        is Order -> {
-                            if (msg.pair == settings.pair) {
-
-                                log?.info("OrderUpdate:\n$msg")
-
-                                when (msg.status) {
-                                    STATUS.NEW -> orders[msg.orderId] = msg
-                                    STATUS.PARTIALLY_FILLED -> {
-                                        if (orders[msg.orderId] == null)
-                                            synchronizeOrders()
-                                    }
-
-                                    STATUS.FILLED -> {
-                                        orders.remove(msg.orderId)
-
-                                        try {
-                                            orderService?.saveOrder(
-                                                bot.trade.database.data.entities.Order(
-                                                    botName = settings.name,
-                                                    orderId = msg.orderId,
-                                                    tradePair = msg.pair.toString(),
-                                                    orderSide = msg.side,
-                                                    amount = msg.executedQty,
-                                                    price = calcPriceWithFee(msg.executedQty, msg.price!!, msg.side),
-                                                    notificationType = NotificationType.ORDER_FILLED,
-                                                    dateTime = Timestamp(System.currentTimeMillis())
-                                                )
-                                            )
-                                        } catch (t: Throwable) {
-                                            send("Error while saving order to db: ${t.message}")
-                                            log?.error("Error while saving order to db: ${t.message}")
-                                        }
-
-                                        positions =
-                                            readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
-
-                                        positions = if (msg.side == SIDE.BUY)
-                                            updatePositionsBuy(
-                                                msg.executedQty.negate(),
-                                                calcPriceWithFee(msg.executedQty, msg.price!!, msg.side)
-                                            )
-                                        else
-                                            updatePositionsSell(
-                                                msg.executedQty.negate(),
-                                                calcPriceWithFee(msg.executedQty, msg.price!!, msg.side)
-                                            )
-
-                                        reWriteObject(positions, File("$path/positions.json"))
-
-                                    }
-
-                                    STATUS.CANCELED, STATUS.REJECTED -> orders.remove(msg.orderId)
-                                    else -> log?.info("${settings.name} Unsupported order status: ${msg.status}")
-                                }
-
-                                send(
-                                    "#${msg.status} Order update:\n```json\n$msg```\n\n" +
-                                            "Exchange Position:\n```json\n${exchangePosition?.let { json(it) }}```\n\n" +
-                                            "Position:\n```json\n${json(positions)}```\n\n" +
-                                            "Balances:\n```json\n${json(balances.map { it.value })}```", true
+                            try {
+                                orderService?.saveOrder(
+                                    bot.trade.database.data.entities.Order(
+                                        botName = settings.name,
+                                        orderId = msg.orderId,
+                                        tradePair = msg.pair.toString(),
+                                        orderSide = msg.side,
+                                        amount = msg.executedQty,
+                                        price = calcPriceWithFee(msg.executedQty, msg.price!!, msg.side),
+                                        notificationType = NotificationType.ORDER_FILLED,
+                                        dateTime = Timestamp(System.currentTimeMillis())
+                                    )
                                 )
+                            } catch (t: Throwable) {
+                                send("Error while saving order to db: ${t.message}")
+                                log?.error("Error while saving order to db: ${t.message}")
                             }
+
+                            positions =
+                                readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+
+                            positions = if (msg.side == SIDE.BUY)
+                                updatePositionsBuy(
+                                    msg.executedQty.negate(),
+                                    calcPriceWithFee(msg.executedQty, msg.price!!, msg.side)
+                                )
+                            else
+                                updatePositionsSell(
+                                    msg.executedQty.negate(),
+                                    calcPriceWithFee(msg.executedQty, msg.price!!, msg.side)
+                                )
+
+                            reWriteObject(positions, File("$path/positions.json"))
+
                         }
 
-                        is BotEvent -> {
-                            when (msg.type) {
-                                BotEvent.Type.GET_PAIR_OPEN_ORDERS -> {
-                                    val symbols = msg.text.split("[^a-zA-Z]+".toRegex())
-                                        .filter { it.isNotBlank() }
-
-                                    send(
-                                        client.getOpenOrders(TradePair(symbols[0], symbols[1]))
-                                            .joinToString("\n\n")
-                                    )
-                                }
-
-                                BotEvent.Type.GET_ALL_OPEN_ORDERS -> {
-                                    val pairs = msg.text
-                                        .split("\\s+".toRegex())
-                                        .filter { it.isNotBlank() }
-                                        .map { pair ->
-                                            val symbols = pair.split("[^a-zA-Z]+".toRegex())
-                                                .filter { it.isNotBlank() }
-                                            TradePair(symbols[0], symbols[1])
-                                        }
-
-                                    client.getAllOpenOrders(pairs)
-                                        .forEach { send("${it.key}\n${it.value.joinToString("\n\n")}") }
-                                }
-
-                                BotEvent.Type.SHOW_BALANCES -> {
-                                    send(
-                                        "#AllBalances " +
-                                                client.getBalances()
-                                                    ?.toList()
-                                                    ?.joinToString(prefix = "\n", separator = "\n") {
-                                                        it.first + "\n" + it.second.joinToString(
-                                                            prefix = "\n",
-                                                            separator = "\n"
-                                                        )
-                                                    }
-                                    )
-                                }
-
-                                BotEvent.Type.CREATE_ORDER -> {
-                                    val notification = msg.text.deserialize<Notification>()
-
-                                    val kline = if (
-                                        abs(currentKline.closeTime - System.currentTimeMillis())
-                                        < abs(prevKline.closeTime - System.currentTimeMillis())
-                                    )
-                                        currentKline
-                                    else
-                                        prevKline
-
-                                    log?.info("Kline with indicator:\n$kline")
-                                    val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
-                                    val price = if (side == SIDE.BUY) kline.low else kline.high
-
-                                    try {
-                                        orderService?.saveOrder(
-                                            bot.trade.database.data.entities.Order(
-                                                botName = settings.name,
-                                                tradePair = settings.pair.toString(),
-                                                orderSide = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
-                                                amount = notification.amount,
-                                                price = price,
-                                                notificationType = NotificationType.SIGNAL,
-                                                dateTime = Timestamp(System.currentTimeMillis())
-                                            )
-                                        )
-                                    } catch (t: Throwable) {
-                                        send("Error while saving order to db: ${t.message}")
-                                        log?.error("Error while saving order to db: ${t.message}")
-                                    }
-
-                                    positions =
-                                        readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
-
-                                    positions = if (notification.type.equals("buy", true))
-                                        updatePositionsBuy(notification.amount, notification.price ?: price)
-                                    else
-                                        updatePositionsSell(notification.amount, notification.price ?: price)
-
-                                    reWriteObject(positions, File("$path/positions.json"))
-
-                                    log?.info("Positions After update:\n$positions")
-
-                                    if (notification.amount > settings.minOrderSize
-                                        && notification.price == null
-                                        && notification.placeOrder
-                                    ) {
-
-                                        when (side) {
-                                            SIDE.BUY -> {
-                                                if (settings.buyAmountMultiplication > BigDecimal.ZERO) {
-                                                    try {
-                                                        sentOrder(
-                                                            price = price,
-                                                            amount = notification.amount * settings.buyAmountMultiplication,
-                                                            orderSide = side,
-                                                            orderType = TYPE.LIMIT
-                                                        )
-                                                    } catch (e: ExchangeException) {
-                                                        send("HttpStatusException:\n```\n${e.message}```", true)
-                                                        log?.warn(e.stackTraceToString())
-                                                    }
-                                                } else send(
-                                                    "Buy orders disabled, because of buyAmountMultiplication = ${settings.buyAmountMultiplication}" +
-                                                            "\n\nPosition:\n```json\n${json(positions)}```"
-                                                )
-                                            }
-
-                                            SIDE.SELL -> {
-                                                if (settings.sellAmountMultiplication > BigDecimal.ZERO) {
-
-                                                    val shortPositionAndShortOrders = (exchangePosition?.positionAmount
-                                                        ?: 0.toBigDecimal()) - shortOrdersSum()
-
-                                                    if (settings.maxShortPosition.negate() <= shortPositionAndShortOrders)
-                                                        try {
-                                                            sentOrder(
-                                                                price = price,
-                                                                amount = notification.amount * settings.sellAmountMultiplication,
-                                                                orderSide = side,
-                                                                orderType = TYPE.LIMIT
-                                                            )
-                                                        } catch (e: ExchangeException) {
-                                                            send("HttpStatusException:\n```\n${e.message}```", true)
-                                                            log?.warn(e.stackTraceToString())
-                                                        }
-                                                    else send(
-                                                        "Short position and sum of short orders are too big: " +
-                                                                "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
-                                                    )
-                                                } else send(
-                                                    "Sell orders disabled, because of sellAmountMultiplication = ${settings.sellAmountMultiplication}" +
-                                                            "\n\nPosition:\n```json\n${json(positions)}```"
-                                                )
-                                            }
-
-                                            else -> send("Unsupported OrderSide: $side")
-                                        }
-                                    }
-                                }
-
-                                BotEvent.Type.SET_SETTINGS -> {
-                                    updateSettings(msg.text.deserialize())
-
-                                    send("Settings:\n```json\n${json(settings)}```", true)
-                                }
-
-                                BotEvent.Type.INTERRUPT -> {
-                                    stream.interrupt()
-                                    return
-                                }
-
-                                else -> send("${settings.name} Unsupported command: ${msg.type}")
-                            }
-                        }
-
-                        else -> log?.warn("${settings.name} Unsupported message: $msg")
+                        STATUS.CANCELED, STATUS.REJECTED -> orders.remove(msg.orderId)
+                        else -> log?.info("${settings.name} Unsupported order status: ${msg.status}")
                     }
 
-                    msg = if (isEmulate) client.nextEvent() /* only for test */
-                    else queue.poll(waitTime)
-
-                } catch (e: InterruptedException) {
-                    log?.error("${settings.name} ${e.message}", e)
-                    send("#Error_${settings.name}: \n${printTrace(e)}")
-                    if (stopThread) return
+                    send(
+                        "#${msg.status} Order update:\n```json\n$msg```\n\n" +
+                                "Exchange Position:\n```json\n${exchangePosition?.let { json(it) }}```\n\n" +
+                                "Position:\n```json\n${json(positions)}```\n\n" +
+                                "Balances:\n```json\n${json(balances.map { it.value })}```", true
+                    )
                 }
-            } while (true)
+            }
 
-        } catch (e: Exception) {
-            log?.error("${settings.name} MAIN ERROR:\n", e)
-            send("#Error_${settings.name}: \n${printTrace(e)}")
-        } finally {
-            interruptThis()
+            is BotEvent -> {
+                when (msg.type) {
+                    BotEvent.Type.GET_PAIR_OPEN_ORDERS -> {
+                        val symbols = msg.text.split("[^a-zA-Z]+".toRegex())
+                            .filter { it.isNotBlank() }
+
+                        send(
+                            client.getOpenOrders(TradePair(symbols[0], symbols[1]))
+                                .joinToString("\n\n")
+                        )
+                    }
+
+                    BotEvent.Type.GET_ALL_OPEN_ORDERS -> {
+                        val pairs = msg.text
+                            .split("\\s+".toRegex())
+                            .filter { it.isNotBlank() }
+                            .map { pair ->
+                                val symbols = pair.split("[^a-zA-Z]+".toRegex())
+                                    .filter { it.isNotBlank() }
+                                TradePair(symbols[0], symbols[1])
+                            }
+
+                        client.getAllOpenOrders(pairs)
+                            .forEach { send("${it.key}\n${it.value.joinToString("\n\n")}") }
+                    }
+
+                    BotEvent.Type.SHOW_BALANCES -> {
+                        send(
+                            "#AllBalances " +
+                                    client.getBalances()
+                                        ?.toList()
+                                        ?.joinToString(prefix = "\n", separator = "\n") {
+                                            it.first + "\n" + it.second.joinToString(
+                                                prefix = "\n",
+                                                separator = "\n"
+                                            )
+                                        }
+                        )
+                    }
+
+                    BotEvent.Type.CREATE_ORDER -> {
+                        val notification = msg.text.deserialize<Notification>()
+
+                        val kline = if (
+                            abs(currentKline.closeTime - System.currentTimeMillis())
+                            < abs(prevKline.closeTime - System.currentTimeMillis())
+                        )
+                            currentKline
+                        else
+                            prevKline
+
+                        log?.info("Kline with indicator:\n$kline")
+                        val side = if (notification.type == "buy") SIDE.BUY else SIDE.SELL
+                        val price = if (side == SIDE.BUY) kline.low else kline.high
+
+                        try {
+                            orderService?.saveOrder(
+                                bot.trade.database.data.entities.Order(
+                                    botName = settings.name,
+                                    tradePair = settings.pair.toString(),
+                                    orderSide = if (notification.type == "buy") SIDE.BUY else SIDE.SELL,
+                                    amount = notification.amount,
+                                    price = price,
+                                    notificationType = NotificationType.SIGNAL,
+                                    dateTime = Timestamp(System.currentTimeMillis())
+                                )
+                            )
+                        } catch (t: Throwable) {
+                            send("Error while saving order to db: ${t.message}")
+                            log?.error("Error while saving order to db: ${t.message}")
+                        }
+
+                        positions =
+                            readObject<VirtualPositions>("$path/positions.json") ?: VirtualPositions()
+
+                        positions = if (notification.type.equals("buy", true))
+                            updatePositionsBuy(notification.amount, notification.price ?: price)
+                        else
+                            updatePositionsSell(notification.amount, notification.price ?: price)
+
+                        reWriteObject(positions, File("$path/positions.json"))
+
+                        log?.info("Positions After update:\n$positions")
+
+                        if (notification.amount > settings.minOrderSize
+                            && notification.price == null
+                            && notification.placeOrder
+                        ) {
+
+                            when (side) {
+                                SIDE.BUY -> {
+                                    if (settings.buyAmountMultiplication > BigDecimal.ZERO) {
+                                        try {
+                                            sentOrder(
+                                                price = price,
+                                                amount = notification.amount * settings.buyAmountMultiplication,
+                                                orderSide = side,
+                                                orderType = TYPE.LIMIT
+                                            )
+                                        } catch (e: ExchangeException) {
+                                            send("HttpStatusException:\n```\n${e.message}```", true)
+                                            log?.warn(e.stackTraceToString())
+                                        }
+                                    } else send(
+                                        "Buy orders disabled, because of buyAmountMultiplication = ${settings.buyAmountMultiplication}" +
+                                                "\n\nPosition:\n```json\n${json(positions)}```"
+                                    )
+                                }
+
+                                SIDE.SELL -> {
+                                    if (settings.sellAmountMultiplication > BigDecimal.ZERO) {
+
+                                        val shortPositionAndShortOrders = (exchangePosition?.positionAmount
+                                            ?: 0.toBigDecimal()) - shortOrdersSum()
+
+                                        if (settings.maxShortPosition.negate() <= shortPositionAndShortOrders)
+                                            try {
+                                                sentOrder(
+                                                    price = price,
+                                                    amount = notification.amount * settings.sellAmountMultiplication,
+                                                    orderSide = side,
+                                                    orderType = TYPE.LIMIT
+                                                )
+                                            } catch (e: ExchangeException) {
+                                                send("HttpStatusException:\n```\n${e.message}```", true)
+                                                log?.warn(e.stackTraceToString())
+                                            }
+                                        else send(
+                                            "Short position and sum of short orders are too big: " +
+                                                    "$shortPositionAndShortOrders, limit is: ${settings.maxShortPosition}"
+                                        )
+                                    } else send(
+                                        "Sell orders disabled, because of sellAmountMultiplication = ${settings.sellAmountMultiplication}" +
+                                                "\n\nPosition:\n```json\n${json(positions)}```"
+                                    )
+                                }
+
+                                else -> send("Unsupported OrderSide: $side")
+                            }
+                        }
+                    }
+
+                    BotEvent.Type.SET_SETTINGS -> {
+                        updateSettings(msg.text.deserialize())
+
+                        send("Settings:\n```json\n${json(settings)}```", true)
+                    }
+
+                    BotEvent.Type.INTERRUPT -> {
+                        stream.interrupt()
+                        return
+                    }
+
+                    else -> send("${settings.name} Unsupported command: ${msg.type}")
+                }
+            }
+
+            else -> log?.warn("${settings.name} Unsupported message: $msg")
         }
     }
 
@@ -373,16 +342,6 @@ class AlgorithmBobblesIndicator(
             .getAllOpenOrders(listOf(settings.pair))[settings.pair]
             ?.forEach { orders[it.orderId] = it }
     }
-
-    /*private fun getKlineWithIndicator(): Candlestick? {
-        return if (candlestickList.isNotEmpty()) {
-            val now = System.currentTimeMillis()
-            if (abs(now - candlestickList.last().closeTime) > abs(now - klineConstructor.getCandlestick().closeTime))
-                klineConstructor.getCandlestick()
-            else
-                candlestickList.last()
-        } else null
-    }*/
 
     data class VirtualPositions(
         var sellAmount: BigDecimal = BigDecimal.ZERO,
@@ -469,4 +428,8 @@ class AlgorithmBobblesIndicator(
         SIDE.SELL -> (amount * price).let { (it - it.percent(feePercent)) / amount }
         SIDE.UNSUPPORTED -> price
     }
+
+    override fun calcAmount(amount: BigDecimal, price: BigDecimal) =
+        if (firstBalanceForOrderAmount) amount
+        else amount.div8(price)
 }

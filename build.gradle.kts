@@ -21,7 +21,7 @@ repositories {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.springframework.boot:spring-boot-starter-web:3.1.2") {
+    implementation("org.springframework.boot:spring-boot-starter-web:3.1.5") {
         exclude(group = "ch.qos.logback", module = "logback-classic")
         exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
     }
@@ -54,7 +54,7 @@ dependencies {
 
     // todo  Instruction https://gist.github.com/rppowell-lasfs/f0e3b2d18c3be03ada38a3e367eaf1b8
     // https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc
-    implementation("org.xerial:sqlite-jdbc:3.40.1.0")
+    implementation("org.xerial:sqlite-jdbc:3.43.2.1")
 
     // logging
     implementation("org.slf4j:slf4j-log4j12:2.0.5")

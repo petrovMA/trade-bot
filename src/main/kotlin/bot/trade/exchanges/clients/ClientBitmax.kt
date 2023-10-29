@@ -114,10 +114,10 @@ class ClientBitmax(
 //        }
 //    }
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order {
+    override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
 
-        val formattedCount = java.lang.String.format(formatCount, order.origQty).replace(",", ".")
-        val formattedPrice = java.lang.String.format(formatPrice, order.price).replace(",", ".")
+        val formattedCount = java.lang.String.format(qty, order.origQty).replace(",", ".")
+        val formattedPrice = java.lang.String.format(price, order.price).replace(",", ".")
 
         val time = System.currentTimeMillis()
         val placeCoid = "coid_$time"

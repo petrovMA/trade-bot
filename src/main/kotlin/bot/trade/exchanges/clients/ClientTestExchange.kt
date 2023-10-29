@@ -5,6 +5,9 @@ import bot.trade.exchanges.clients.stream.StreamThreadStub
 import java.util.concurrent.BlockingQueue
 
 class ClientTestExchange : Client {
+
+    val orders: MutableList<Order> = mutableListOf()
+
     override fun getAllPairs(): List<TradePair> {
         TODO("Not yet implemented")
     }
@@ -37,8 +40,9 @@ class ClientTestExchange : Client {
         TODO("Not yet implemented")
     }
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, formatCount: String, formatPrice: String): Order {
-        TODO("Not yet implemented")
+    override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
+        orders.add(order.also {})
+        return order
     }
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {
@@ -50,5 +54,4 @@ class ClientTestExchange : Client {
     override fun close() {
         TODO("Not yet implemented")
     }
-
 }
