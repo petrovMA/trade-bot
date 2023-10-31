@@ -41,8 +41,9 @@ class AlgorithmTrader(
     private val orderQuantity = settings.parameters.inOrderQuantity.value
     private val triggerDistance = settings.parameters.triggerDistance.distance
     private val orderMaxQuantity = settings.parameters.orderMaxQuantity
-    private val stopOrderDistance = settings.parameters.stopOrderDistance.distance
-    private val triggerInOrderDistance = settings.parameters.triggerInOrderDistance.distance // todo:: Implement it!!!
+    private val triggerInOrderDistance = settings.parameters.triggerInOrderDistance?.distance
+    private val minTpDistance = settings.parameters.minTpDistance.distance
+    private val maxTpDistance = settings.parameters.maxTpDistance.distance
     private val trailingInOrderDistance = settings.parameters.trailingInOrderDistance?.distance
     private val setCloseOrders = settings.parameters.setCloseOrders
     private val ordersType = settings.ordersType
@@ -81,7 +82,7 @@ class AlgorithmTrader(
                                 )
                             } ?: run {
                                 if (orders.size < orderMaxQuantity) {
-                                    if (trailingInOrderDistance == null) {
+                                    if (triggerInOrderDistance == null) {
                                         orders[priceIn] = sentOrder(
                                             amount = calcAmount(orderQuantity, BigDecimal(priceIn)),
                                             orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
@@ -97,7 +98,7 @@ class AlgorithmTrader(
                                                 it.side = SIDE.BUY
                                             }
                                         }
-                                    }/* else {
+                                    } else {
                                         orders[priceIn] = Order(
                                             orderId = "",
                                             pair = botSettings.pair,
@@ -109,12 +110,12 @@ class AlgorithmTrader(
                                             type = TYPE.MARKET,
                                             status = STATUS.NEW,
                                             lastBorderPrice = if (direction == DIRECTION.LONG)
-                                                priceIn.toBigDecimal() + trailingInOrderDistance
+                                                priceIn.toBigDecimal() + triggerInOrderDistance
                                             else
-                                                priceIn.toBigDecimal() - trailingInOrderDistance,
+                                                priceIn.toBigDecimal() - triggerInOrderDistance,
                                             stopPrice = null
                                         )
-                                    }*/
+                                    }
                                 }
                             }
                         }
@@ -189,11 +190,12 @@ class AlgorithmTrader(
                                 if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
                                     v.lastBorderPrice = currentPrice
 
-                                    if (
-                                        v.stopPrice?.run { this < currentPrice - triggerDistance } == true
-                                        || v.stopPrice == null && k.toBigDecimal() < (currentPrice - triggerDistance - stopOrderDistance)
-                                    ) {
-                                        v.stopPrice = currentPrice - triggerDistance
+                                    v.stopPrice?.let {
+                                        if (it + maxTpDistance < currentPrice)
+                                            v.stopPrice = currentPrice - maxTpDistance
+                                    } ?: {
+                                        if (k.toBigDecimal() < (currentPrice - triggerDistance))
+                                            v.stopPrice = currentPrice - minTpDistance
                                     }
 
                                     orders[k] = v
@@ -202,12 +204,12 @@ class AlgorithmTrader(
                                     log?.debug("{} Order close: {}", botSettings.name, v)
                                     ordersListForExecute[k] = v
                                 }
-                            } else if (trailingInOrderDistance != null) {
+                            } else if (trailingInOrderDistance != null && triggerInOrderDistance != null) {
                                 if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
                                     v.lastBorderPrice = currentPrice
 
                                     if (
-                                        v.stopPrice?.run { this > currentPrice + trailingInOrderDistance } == true
+                                        v.stopPrice?.run { this > currentPrice + triggerInOrderDistance } == true
                                         || v.stopPrice == null && k.toBigDecimal() > (currentPrice + trailingInOrderDistance)
                                     ) {
                                         v.stopPrice = currentPrice + trailingInOrderDistance
@@ -237,11 +239,12 @@ class AlgorithmTrader(
                                 if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
                                     v.lastBorderPrice = currentPrice
 
-                                    if (
-                                        v.stopPrice?.run { this > currentPrice + triggerDistance } == true
-                                        || v.stopPrice == null && k.toBigDecimal() > (currentPrice + triggerDistance + stopOrderDistance)
-                                    ) {
-                                        v.stopPrice = currentPrice + triggerDistance
+                                    v.stopPrice?.let {
+                                        if (it - maxTpDistance > currentPrice)
+                                            v.stopPrice = currentPrice + maxTpDistance
+                                    } ?: {
+                                        if (k.toBigDecimal() > (currentPrice + triggerDistance))
+                                            v.stopPrice = currentPrice + minTpDistance
                                     }
 
                                     orders[k] = v
@@ -250,12 +253,12 @@ class AlgorithmTrader(
                                     log?.debug("{} Order close: {}", botSettings.name, v)
                                     ordersListForExecute[k] = v
                                 }
-                            } else if (trailingInOrderDistance != null) {
+                            } else if (trailingInOrderDistance != null && triggerInOrderDistance != null) {
                                 if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
                                     v.lastBorderPrice = currentPrice
 
                                     if (
-                                        v.stopPrice?.run { this < currentPrice - trailingInOrderDistance } == true
+                                        v.stopPrice?.run { this < currentPrice - triggerInOrderDistance } == true
                                         || v.stopPrice == null && k.toBigDecimal() < (currentPrice - trailingInOrderDistance)
                                     ) {
                                         v.stopPrice = currentPrice - trailingInOrderDistance

@@ -1,5 +1,5 @@
 {
-  "flow_name": "ETHUSDT_LONG",
+  "flow_name": "ETHUSDT_LONG_TEST",
   "symbol": {
     "first": "ETH",
     "second": "USDT"
@@ -22,18 +22,22 @@
       "use_percent": false
     },
     "trailing_in_order_distance": {
-      "distance": 3,
-      "use_percent": false
-    },
-    "trigger_in_order_distance": {
-      "distance": 0.0,
-      "use_percent": false
-    },
-    "trigger_distance": {
       "distance": 3.0,
       "use_percent": false
     },
-    "stop_order_distance": {
+    "trigger_in_order_distance": {
+      "distance": 3.0,
+      "use_percent": false
+    },
+    "trigger_distance": {
+      "distance": 8.0,
+      "use_percent": false
+    },
+    "min_tp_distance": {
+      "distance": 5.0,
+      "use_percent": false
+    },
+    "max_tp_distance": {
       "distance": 5.0,
       "use_percent": false
     },

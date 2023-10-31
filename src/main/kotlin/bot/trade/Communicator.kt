@@ -732,7 +732,11 @@ class Communicator(
                             distance = triggerDistance,
                             usePercent = false
                         ),
-                        stopOrderDistance = BotSettingsTrader.Parameters.StopOrderDistance(
+                        minTpDistance = BotSettingsTrader.Parameters.MinTpDistance(
+                            distance = enableStopOrderDistance,
+                            usePercent = false
+                        ),
+                        maxTpDistance = BotSettingsTrader.Parameters.MaxTpDistance(
                             distance = enableStopOrderDistance,
                             usePercent = false
                         ),

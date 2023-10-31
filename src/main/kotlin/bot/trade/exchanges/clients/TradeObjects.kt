@@ -345,9 +345,10 @@ class BotSettingsTrader(
         @SerializedName("in_order_quantity") val inOrderQuantity: InOrderQuantity, // Order Quantity:: order size
         @SerializedName("in_order_distance") val inOrderDistance: InOrderDistance, // Order Distance:: distance between every order
         @SerializedName("trailing_in_order_distance") val trailingInOrderDistance: TrailingInOrderDistance?, // Trailing in Distance:: distance between in_order and when_order_be_executed
-        @SerializedName("trigger_in_order_distance") val triggerInOrderDistance: TriggerInOrderDistance, // Trigger in Distance //todo:: Implement It!!!
+        @SerializedName("trigger_in_order_distance") val triggerInOrderDistance: TriggerInOrderDistance?, // Trigger in Distance
         @SerializedName("trigger_distance") val triggerDistance: TriggerDistance, // Trigger Distance:: distance between order and stop-order
-        @SerializedName("stop_order_distance") val stopOrderDistance: StopOrderDistance, // enable stop order distance (stopOrderDistance = triggerDistance + stopOrderDistance)
+        @SerializedName("min_tp_distance") val minTpDistance: MinTpDistance,
+        @SerializedName("max_tp_distance") val maxTpDistance: MaxTpDistance,
         @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
         @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts,\
         @SerializedName("min_order_amount") val minOrderAmount: MinOrderAmount? = null
@@ -388,7 +389,12 @@ class BotSettingsTrader(
             @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
         )
 
-        class StopOrderDistance( // todo:: Obsolete
+        class MaxTpDistance(
+            @SerializedName("distance") val distance: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+
+        class MinTpDistance(
             @SerializedName("distance") val distance: BigDecimal,
             @SerializedName("use_percent") val usePercent: Boolean = false
         )
