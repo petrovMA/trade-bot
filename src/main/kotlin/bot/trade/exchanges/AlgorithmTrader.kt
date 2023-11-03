@@ -205,7 +205,7 @@ class AlgorithmTrader(
                                         if (it + maxTpDistance < currentPrice)
                                             v.stopPrice = currentPrice - maxTpDistance
                                     } ?: run {
-                                        if (k.toBigDecimal() < (currentPrice - triggerDistance))
+                                        if (k.toBigDecimal() <= (currentPrice - triggerDistance))
                                             v.stopPrice = currentPrice - minTpDistance
                                     }
 
@@ -220,8 +220,8 @@ class AlgorithmTrader(
                                     v.lastBorderPrice = currentPrice
 
                                     if (
-                                        v.stopPrice?.run { this > currentPrice + triggerInOrderDistance } == true
-                                        || v.stopPrice == null && k.toBigDecimal() > (currentPrice + trailingInOrderDistance)
+                                        v.stopPrice?.run { this > currentPrice + trailingInOrderDistance } == true
+                                        || v.stopPrice == null && k.toBigDecimal() > (currentPrice + triggerInOrderDistance)
                                     ) {
                                         v.stopPrice = currentPrice + trailingInOrderDistance
                                     }
@@ -254,7 +254,7 @@ class AlgorithmTrader(
                                         if (it - maxTpDistance > currentPrice)
                                             v.stopPrice = currentPrice + maxTpDistance
                                     } ?: run {
-                                        if (k.toBigDecimal() > (currentPrice + triggerDistance))
+                                        if (k.toBigDecimal() >= (currentPrice + triggerDistance))
                                             v.stopPrice = currentPrice + minTpDistance
                                     }
 
@@ -269,8 +269,8 @@ class AlgorithmTrader(
                                     v.lastBorderPrice = currentPrice
 
                                     if (
-                                        v.stopPrice?.run { this < currentPrice - triggerInOrderDistance } == true
-                                        || v.stopPrice == null && k.toBigDecimal() < (currentPrice - trailingInOrderDistance)
+                                        v.stopPrice?.run { this < currentPrice - trailingInOrderDistance } == true
+                                        || v.stopPrice == null && k.toBigDecimal() < (currentPrice - triggerInOrderDistance)
                                     ) {
                                         v.stopPrice = currentPrice - trailingInOrderDistance
                                     }

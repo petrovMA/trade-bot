@@ -1,0 +1,53 @@
+{
+  "flow_name": "ETHUSDT_SHORT_TEST",
+  "symbol": {
+    "first": "ETH",
+    "second": "USDT"
+  },
+  "exchange_type": "Bybit",
+  "strategy_type": "SHORT",
+  "order_type": "MARKET",
+  "parameters": {
+    "trading_range": {
+      "lower_bound": 1400,
+      "upper_bound": 1600,
+      "use_percent": false
+    },
+    "in_order_quantity": {
+      "value": 30,
+      "use_percent": false
+    },
+    "in_order_distance": {
+      "distance": 10.0,
+      "use_percent": false
+    },
+    "trailing_in_order_distance": {
+      "distance": 5.0,
+      "use_percent": false
+    },
+    "trigger_in_order_distance": {
+      "distance": 20.0,
+      "use_percent": false
+    },
+    "trigger_distance": {
+      "distance": 30.0,
+      "use_percent": false
+    },
+    "min_tp_distance": {
+      "distance": 10.0,
+      "use_percent": false
+    },
+    "max_tp_distance": {
+      "distance": 15.0,
+      "use_percent": false
+    },
+    "max_trigger_count": 150,
+    "set_close_orders": false
+  },
+  "market_type": "USDT Perpetual",
+  "market_type_comment": "USDT Perpetual, Inverse Perpetual, Spot",
+  "strategy_type_comment": "Long, Short, Spot",
+  "orderBalanceType": "second",
+  "countOfDigitsAfterDotForAmount": 2,
+  "countOfDigitsAfterDotForPrice": 2
+}

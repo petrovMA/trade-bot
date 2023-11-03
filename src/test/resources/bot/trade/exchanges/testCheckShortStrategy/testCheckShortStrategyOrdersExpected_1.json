@@ -1,0 +1,16 @@
+{
+  "1580.00000000": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 1580.00000000,
+    "origQty": 0.02,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 1584.00000000
+  }
+}

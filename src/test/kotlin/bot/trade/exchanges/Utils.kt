@@ -21,11 +21,15 @@ fun assertOrders(expected: List<Order>, actual: List<Order>) {
     }
 }
 
-fun assertOrders(expectedFile: File, actual: Map<String, Order>) {
-    val expected = Mapper.asMapObjects<String, Order>(expectedFile, object : TypeToken<Map<String?, Order?>?>() {}.type)
-    assert(expected.size == actual.size) { "expected.size != actual.size, (${expected.size} != ${actual.size})" }
+fun assertOrders(expectedFile: File?, actual: Map<String, Order>, messagePredicate: String = "") {
+
+    val expected = expectedFile
+        ?.let { Mapper.asMapObjects<String, Order>(it, object : TypeToken<Map<String?, Order?>?>() {}.type) }
+        ?: mapOf()
+
+    assert(expected.size == actual.size) { "${messagePredicate}expected.size != actual.size, (${expected.size} != ${actual.size})" }
     expected.forEach { (k, v) ->
-        assert(actual.containsKey(k)) { "actual not contains key $k" }
-        assert(v == actual[k]) { "[$k] not equals,\nExpected:\n${json(v)}\n\nActual:\n${json(actual[k]!!)}" }
+        assert(actual.containsKey(k)) { "${messagePredicate}actual not contains key $k" }
+        assert(v == actual[k]) { "${messagePredicate}[$k] not equals,\nExpected:\n${json(v)}\n\nActual:\n${json(actual[k]!!)}" }
     }
 }
