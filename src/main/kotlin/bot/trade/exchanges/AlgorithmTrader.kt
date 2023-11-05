@@ -190,7 +190,12 @@ class AlgorithmTrader(
                                 BigDecimal(priceIn) > BigDecimal(prevPriceIn))
                     )
                 } else
-                    log?.warn("${botSettings.name} Price ${format(currentPrice)}, not in range: ${minRange to maxRange}")
+                    log?.trace(
+                        "{} Price {}, not in range: {}",
+                        botSettings.name,
+                        format(currentPrice),
+                        minRange to maxRange
+                    )
 
                 when (direction) {
                     DIRECTION.LONG -> {

@@ -4,6 +4,7 @@ import bot.trade.Communicator
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.clients.ExchangeEnum
 import bot.trade.libs.escapeMarkdownV2Text
+import bot.trade.libs.m
 import mu.KotlinLogging
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument
@@ -31,10 +32,12 @@ class TelegramBot(
     private val defaultCommands: Map<String, String>
 ) : TelegramLongPollingBot(botToken) {
 
-    private val log = KotlinLogging.logger {}
+    private val orderIds = mutableMapOf<String, Long>()
 
-    val communicator: Communicator = Communicator(
-        intervalCandlestick = intervalCandlestick,
+    private val log = KotlinLogging.logger {}
+    private val regex = """"orderId":\s*"([a-fA-F0-9-]+)"""".toRegex()
+
+    val communicator: Communicator = Communicator(intervalCandlestick = intervalCandlestick,
         exchangeBotsFiles = exchangeBotsFiles,
         orderService = orderService,
         intervalStatistic = intervalStatistic,
@@ -44,26 +47,23 @@ class TelegramBot(
         taskQueue = taskQueue,
         exchangeFiles = exchangeFiles,
         sendFile = { sendFile(it) },
-        sendMessage = { message, isMarkDown -> sendMessage(message, isMarkDown) }
-    )
+        sendMessage = { message, isMarkDown -> sendMessage(message, isMarkDown) })
 
     override fun onUpdateReceived(update: Update) {
         log.info("Income update message: $update")
         val text = try {
-            if (chatId == adminId)
-                update.message.text
+            if (chatId == adminId) update.message.text
             else {
-                if (update.message.from.id.toString() == adminId && Regex("@?$botUsername.+").matches(update.message.text))
-                    update.message.text.replace(Regex("@?$botUsername\\s+"), "")
-                else
-                    null
+                if (update.message.from.id.toString() == adminId && Regex("@?$botUsername.+").matches(update.message.text)) update.message.text.replace(
+                    Regex("@?$botUsername\\s+"),
+                    ""
+                )
+                else null
             }
         } catch (e: java.lang.NullPointerException) {
-            if (update.inlineQuery.from.id.toString() == adminId)
-                null
-                //update.inlineQuery.query
-            else
-                null
+            if (update.inlineQuery.from.id.toString() == adminId) null
+            //update.inlineQuery.query
+            else null
         } catch (e: java.lang.NullPointerException) {
             update.channelPost.text
         } catch (e: java.lang.NullPointerException) {
@@ -77,7 +77,9 @@ class TelegramBot(
     override fun getBotUsername(): String = botUsername
 
     private fun sendMessage(messageText: String, isMarkDown: Boolean = false): Unit = try {
-        execute(SendMessage().also {
+
+        if (getOrderIdFromMessages(messageText) != null) Unit // todo:: STUB for filter orders notifications by orderId
+        else execute(SendMessage().also {
             log.debug("Send to chatId = $chatId\nMessage: \"$messageText\"")
             it.chatId = chatId
             it.text = messageText.let { text ->
@@ -99,5 +101,21 @@ class TelegramBot(
         log.info("Emulate results sent: $resultFile")
     } catch (e: Exception) {
         log.warn("Can't send file with emulate results", e)
+    }
+
+
+    // todo:: STUB for filter orders notifications by orderId
+    private fun getOrderIdFromMessages(text: String): String? {
+        val id = regex.find(text)?.groups?.get(1)?.value
+
+        if (id != null) {
+            orderIds[id]?.let {
+                orderIds.entries.removeIf { (_, v) -> (v < System.currentTimeMillis() - 5.m().toMillis()) }
+                return text
+            } ?: run {
+                orderIds[id] = System.currentTimeMillis()
+                return null
+            }
+        } else return null
     }
 }
