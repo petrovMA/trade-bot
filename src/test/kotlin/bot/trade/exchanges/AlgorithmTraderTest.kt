@@ -5,7 +5,6 @@ import bot.trade.libs.div8
 import bot.trade.libs.readConf
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.fail
 import utils.mapper.Mapper
 import utils.resourceFile
 import java.math.BigDecimal
@@ -67,7 +66,7 @@ class AlgorithmTraderTest {
             orderId = "",
             pair = TradePair("ETH", "USDT"),
             price = "1502.00".toBigDecimal(),
-            origQty = 0.13.toBigDecimal(),
+            origQty = 0.14.toBigDecimal(),
             executedQty = 0.toBigDecimal(),
             side = SIDE.BUY,
             type = TYPE.MARKET,
@@ -89,7 +88,7 @@ class AlgorithmTraderTest {
             orderId = "",
             pair = TradePair("ETH", "USDT"),
             price = "1511.00".toBigDecimal(),
-            origQty = 0.04.toBigDecimal(),
+            origQty = 0.05.toBigDecimal(),
             executedQty = 0.toBigDecimal(),
             side = SIDE.SELL,
             type = TYPE.MARKET,

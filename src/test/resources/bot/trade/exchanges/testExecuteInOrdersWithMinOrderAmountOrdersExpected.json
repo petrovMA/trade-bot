@@ -50,10 +50,10 @@
     "price": 1503.00000000,
     "origQty": 0.001,
     "executedQty": 0,
-    "side": "BUY",
+    "side": "SELL",
     "type": "MARKET",
     "status": "NEW",
-    "lastBorderPrice": 1500
+    "lastBorderPrice": 1508
   },
   "1504.00000000": {
     "orderId": "",
