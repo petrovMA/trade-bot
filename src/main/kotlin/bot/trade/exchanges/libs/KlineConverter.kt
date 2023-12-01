@@ -24,7 +24,7 @@ class KlineConverter(
             .sortedBy { it.openTime }
             .forEach {
                 if (it.closeTime - it.openTime != inputKlineInterval.toMillis())
-                    throw Exception("kline has no inputKlineInterval:\n${it}")
+                    throw Exception("kline interval not equals to inputKlineInterval:\n${it}")
 
                 if (currentCandlestick == null) {
                     currentCandlestick = Candlestick(
@@ -51,11 +51,14 @@ class KlineConverter(
                         throw Exception("inputCandlesticks has a gap in sequence:\n${currentCandlestick}\n${it}")
                 }
 
-                if (currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L) {
-                    candlesticks.add(currentCandlestick!!)
-                    currentCandlestick = null
-                }
+                if (currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L)
+                    closeCurrentCandlestick()
             }
+    }
+
+    fun closeCurrentCandlestick() {
+        candlesticks.add(currentCandlestick!!)
+        currentCandlestick = null
     }
 
     fun getCandlesticks(): List<Candlestick> = candlesticks.reversed()
