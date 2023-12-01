@@ -1,4 +1,4 @@
-package bot.trade
+package bot.trade.libs
 
 
 class ListLimit<E>(internal val limit: Int = Int.MAX_VALUE) : ArrayList<E>() {

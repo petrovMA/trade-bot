@@ -24,7 +24,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
 
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
-        client.getKline(pair.first + pair.second, "linear", ByBitRestApiClient.INTERVAL.FIVE_MINUTES)
+        client.getKline(pair.first + pair.second, "linear", interval.toByBitInterval())
             .list
             .map { asCandlestick(it, interval) }
 
@@ -287,5 +287,23 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
         SIDE.BUY -> OrderSide.BUY
         SIDE.SELL -> OrderSide.SELL
         else -> throw UnknownOrderSide("Unsupported Order side!")
+    }
+
+    private fun INTERVAL.toByBitInterval(): ByBitRestApiClient.INTERVAL = when (this) {
+        INTERVAL.ONE_MINUTE -> ByBitRestApiClient.INTERVAL.ONE_MINUTE
+        INTERVAL.THREE_MINUTES -> ByBitRestApiClient.INTERVAL.THREE_MINUTES
+        INTERVAL.FIVE_MINUTES -> ByBitRestApiClient.INTERVAL.FIVE_MINUTES
+        INTERVAL.FIFTEEN_MINUTES -> ByBitRestApiClient.INTERVAL.FIFTEEN_MINUTES
+        INTERVAL.HALF_HOURLY -> ByBitRestApiClient.INTERVAL.HALF_HOURLY
+        INTERVAL.HOURLY -> ByBitRestApiClient.INTERVAL.HOURLY
+        INTERVAL.TWO_HOURLY -> ByBitRestApiClient.INTERVAL.TWO_HOURLY
+        INTERVAL.FOUR_HOURLY -> ByBitRestApiClient.INTERVAL.FOUR_HOURLY
+        INTERVAL.SIX_HOURLY -> ByBitRestApiClient.INTERVAL.SIX_HOURLY
+        INTERVAL.EIGHT_HOURLY -> throw RuntimeException("ByBit not support 8h interval")
+        INTERVAL.TWELVE_HOURLY -> ByBitRestApiClient.INTERVAL.TWELVE_HOURLY
+        INTERVAL.DAILY -> ByBitRestApiClient.INTERVAL.DAILY
+        INTERVAL.THREE_DAILY -> throw RuntimeException("ByBit not support 3d interval")
+        INTERVAL.WEEKLY -> ByBitRestApiClient.INTERVAL.WEEKLY
+        INTERVAL.MONTHLY -> ByBitRestApiClient.INTERVAL.MONTHLY
     }
 }

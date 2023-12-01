@@ -238,8 +238,7 @@ class ByBitApiWebSocketListener {
     fun setOrderBookCallback(orderBookCallback: (OrderBook) -> Unit) =
         apply { this.orderBookCallback = orderBookCallback }
 
-    fun setTradeCallback(tradeCallback: (Trade) -> Unit) =
-        apply { this.tradeCallback = tradeCallback }
+    fun setTradeCallback(tradeCallback: (Trade) -> Unit) = apply { this.tradeCallback = tradeCallback }
 
     fun setInsuranceCallback(insuranceCallback: (Insurance) -> Unit) =
         apply { this.insuranceCallback = insuranceCallback }
@@ -247,14 +246,12 @@ class ByBitApiWebSocketListener {
     fun setInstrumentInfoCallback(instrumentInfoCallback: (InstrumentInfo) -> Unit) =
         apply { this.instrumentInfoCallback = instrumentInfoCallback }
 
-    fun setKlineCallback(klineCallback: (Kline) -> Unit) =
-        apply { this.klineCallback = klineCallback }
+    fun setKlineCallback(klineCallback: (Kline) -> Unit) = apply { this.klineCallback = klineCallback }
 
     fun setLiquidationCallback(liquidationCallback: (Liquidation) -> Unit) =
         apply { this.liquidationCallback = liquidationCallback }
 
-    fun setOrderCallback(orderCallback: (Order) -> Unit) =
-        apply { this.orderCallback = orderCallback }
+    fun setOrderCallback(orderCallback: (Order) -> Unit) = apply { this.orderCallback = orderCallback }
 
     companion object {
         /**

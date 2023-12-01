@@ -4,7 +4,7 @@ import bot.trade.libs.*
 import bot.trade.libs.UnknownOrderSide
 import bot.trade.libs.UnknownOrderStatus
 import com.google.gson.annotations.SerializedName
-import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition
+//import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition // todo: works only on org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT
 import io.bybit.api.websocket.messages.response.Kline
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.trade.OrderSide
@@ -36,7 +36,8 @@ data class ExchangePosition(
     val positionSide: String?,
     val breakEvenPrice: BigDecimal
 ) : CommonExchangeData {
-    constructor(position: BinanceFuturesPosition) : this(
+    // todo: works only on org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT
+    /*constructor(position: BinanceFuturesPosition) : this(
         pair = TradePair(position.futuresContract).toString(),
         positionAmount = if (position.positionAmount == BigDecimal(0.0)) BigDecimal(0.0)
         else position.positionAmount.round(),
@@ -52,7 +53,7 @@ data class ExchangePosition(
         positionSide = position.positionSide,
         breakEvenPrice = if (position.positionAmount == BigDecimal(0.0)) BigDecimal(0.0)
         else (position.entryPrice - position.accumulatedRealized / position.positionAmount).round()
-    )
+    )*/
 }
 
 data class Order(

@@ -2,7 +2,7 @@ package bot.trade.exchanges.clients.stream
 
 import bot.trade.exchanges.clients.*
 import info.bitrich.xchangestream.binancefuture.BinanceFutureStreamingExchange
-import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesOrderUpdateRaw
+//import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesOrderUpdateRaw // todo: works only on org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT
 import info.bitrich.xchangestream.core.ProductSubscription
 import info.bitrich.xchangestream.core.StreamingExchangeFactory
 import mu.KotlinLogging
@@ -56,33 +56,34 @@ class StreamBinanceFuturesImpl(
                 )
 
             if (api != null && sec != null) {
-                exchangeFutures
-                    .streamingTradeService
-                    .getOrderUpdate(pair)
-                    .subscribe({ oc: BinanceFuturesOrderUpdateRaw? ->
-                        log.info("Order change: {}", oc)
-
-                        oc?.let { order ->
-                            queue.add(
-                                Order(
-                                    orderId = order.clientOrderId,
-                                    pair = TradePair(oc.contract.toString()),
-                                    price = order.originalPrice,
-                                    origQty = order.originalQuantity,
-                                    executedQty = order.orderFilledAccumulatedQuantity,
-                                    side = SIDE.valueOf(order.side),
-                                    type = when (order.orderType) {
-                                        OrderType.MARKET -> TYPE.MARKET
-                                        OrderType.LIMIT -> TYPE.LIMIT
-                                        else -> TYPE.UNSUPPORTED
-                                    },
-                                    status = STATUS.valueOf(order.orderStatus),
-                                    fee = order.commissionAmount
-                                )
-                            )
-                        }
-                    }, { error -> log.warn("Order stream Error:", error) }
-                    )
+// todo: works only on org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT
+//                exchangeFutures
+//                    .streamingTradeService
+//                    .getOrderUpdate(pair)
+//                    .subscribe({ oc: BinanceFuturesOrderUpdateRaw? ->
+//                        log.info("Order change: {}", oc)
+//
+//                        oc?.let { order ->
+//                            queue.add(
+//                                Order(
+//                                    orderId = order.clientOrderId,
+//                                    pair = TradePair(oc.contract.toString()),
+//                                    price = order.originalPrice,
+//                                    origQty = order.originalQuantity,
+//                                    executedQty = order.orderFilledAccumulatedQuantity,
+//                                    side = SIDE.valueOf(order.side),
+//                                    type = when (order.orderType) {
+//                                        OrderType.MARKET -> TYPE.MARKET
+//                                        OrderType.LIMIT -> TYPE.LIMIT
+//                                        else -> TYPE.UNSUPPORTED
+//                                    },
+//                                    status = STATUS.valueOf(order.orderStatus),
+//                                    fee = order.commissionAmount
+//                                )
+//                            )
+//                        }
+//                    }, { error -> log.warn("Order stream Error:", error) }
+//                    )
 
                 exchangeFutures
                     .streamingAccountService
@@ -92,15 +93,15 @@ class StreamBinanceFuturesImpl(
                         queue.add(Balance(balance))
                     }, { error -> log.warn("Balance stream Error:", error) }
                     )
-
-                exchangeFutures
-                    .streamingAccountService
-                    .getPositionChanges(pair)
-                    .subscribe({ position ->
-                        log.info("Position change: {}", position)
-                        queue.add(ExchangePosition(position))
-                    }, { error -> log.warn("Position stream Error:", error) }
-                    )
+// todo: works only on org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT
+//                exchangeFutures
+//                    .streamingAccountService
+//                    .getPositionChanges(pair)
+//                    .subscribe({ position ->
+//                        log.info("Position change: {}", position)
+//                        queue.add(ExchangePosition(position))
+//                    }, { error -> log.warn("Position stream Error:", error) }
+//                    )
             }
 
         } catch (e: Exception) {
