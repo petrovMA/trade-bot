@@ -124,51 +124,7 @@ class AlgorithmTrader(
                             TYPE.LIMIT -> {
                                 when (direction) {
                                     DIRECTION.LONG -> {
-                                        var keyPrice = currPriceIn.toBigDecimal()
-                                        while (keyPrice > minRange) {
-                                            keyPrice.toPrice().let {
-                                                orders[it]?.let { order ->
-                                                    log?.trace(
-                                                        "{} Order already exist: {}",
-                                                        botSettings.name,
-                                                        order
-                                                    )
-                                                } ?: run {
-                                                    if (orders.size < orderMaxQuantity) {
-                                                        orders[it] = sentOrder(
-                                                            price = keyPrice,
-                                                            amount = orderQuantity,
-                                                            orderSide = SIDE.BUY,
-                                                            orderType = TYPE.LIMIT
-                                                        )
-                                                    } else log?.trace(
-                                                        "{} Orders count limit reached: price = {}; orderMaxQuantity = {}",
-                                                        botSettings.name,
-                                                        keyPrice,
-                                                        orderMaxQuantity
-                                                    )
-                                                }
-                                            }
-                                            keyPrice -= orderDistance
-                                        }
-
-                                        val prev = (prevPrice - (prevPrice % orderDistance)).toPrice()
-
-                                        if (currPriceIn.toBigDecimal() != prev.toBigDecimal()) {
-                                            orders[prev]?.let { order ->
-                                                if (order.price?.let { it > currentPrice } == true && order.status != STATUS.FILLED && order.status != STATUS.REJECTED && order.type != TYPE.MARKET) {
-                                                    val o = getOrder(botSettings.pair, order.orderId)
-                                                        ?: order.apply { status = STATUS.FILLED }
-
-                                                    if (o.status == STATUS.FILLED || o.status == STATUS.REJECTED) {
-                                                        orders[prev] = o.also {
-                                                            it.type = TYPE.MARKET
-                                                            it.lastBorderPrice = BigDecimal.ZERO
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        TODO("LONG strategy not implemented for TYPE.LIMIT (find implementation on Git history)")
                                     }
 
                                     DIRECTION.SHORT -> {
