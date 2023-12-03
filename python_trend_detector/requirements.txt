@@ -1,0 +1,4 @@
+Flask==3.0.0
+pandas~=1.3.5
+numpy==1.21.6
+talipp==1.9.1
