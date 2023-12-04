@@ -1,12 +1,12 @@
 from flask import Flask, jsonify, request
-from Trend.TrendDetection import RsiTrendDetector, TrendType, CoupleRsiTrendDetector, HmaTrendDetector, serialize_trend_type
+from talipp.indicators import HMA
+from Trend.TrendDetection import RsiTrendDetector, TrendType, CoupleRsiTrendDetector, HmaTrendDetector, serialize_trend_type, RSI
 
 app = Flask(__name__)
 
 
 @app.route('/calc_trend', methods=['POST'])
 def create_message():
-    # Store a message
     message = request.json
     rsi_small_tf_period = message['rsiSmallPeriod']
     rsi_big_tf_period = message['rsiBigPeriod']
@@ -27,13 +27,49 @@ def create_message():
     return jsonify(
         {
             "hma_trend": serialize_trend_type(hma_detector.current_trend),
-            "hma_fastest_hma": hma_detector._fastest_hma._calculate_new_value(),
-            "hma_fast_hma": hma_detector._fast_hma._calculate_new_value(),
-            "hma_slow_hma": hma_detector._slow_hma._calculate_new_value(),
+            "hma_fastest_hma": hma_detector._fastest_hma[-1],
+            "hma_fast_hma": hma_detector._fast_hma[-1],
+            "hma_slow_hma": hma_detector._slow_hma[-1],
             "rsi_small_tf_detector": serialize_trend_type(rsi_detector.rsi_small_tf_detector.current_trend),
             "rsi_big_tf_detector": serialize_trend_type(rsi_detector.rsi_big_tf_detector.current_trend),
             "rsi_small_tf_detector_current_rsi": rsi_detector.rsi_small_tf_detector.current_rsi,
             "rsi_big_tf_detector.current_rsi": rsi_detector.rsi_big_tf_detector.current_rsi
+        }
+    ), 200
+
+
+@app.route('/hma', methods=['POST'])
+def calc_hma():
+    message = request.json
+    data_list = message['data_list']
+    hma_period = message['hma_period']
+
+    hma = HMA(hma_period)
+
+    hma.set_input_values(data_list)
+
+    return jsonify(
+        {
+            "hma": hma[-1],
+            "hma_period": hma_period
+        }
+    ), 200
+
+
+@app.route('/rsi', methods=['POST'])
+def calc_rsi():
+    message = request.json
+    data_list = message['data_list']
+    rsi_period = message['rsi_period']
+
+    rsi = RSI(rsi_period)
+
+    rsi.set_input_values(data_list)
+
+    return jsonify(
+        {
+            "rsi": rsi[-1],
+            "rsi_period": rsi_period
         }
     ), 200
 

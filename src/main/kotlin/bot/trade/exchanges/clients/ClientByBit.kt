@@ -24,7 +24,23 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
 
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
-        client.getKline(pair.first + pair.second, "linear", interval.toByBitInterval())
+        getCandlestickBars(pair, interval, countCandles, null, null)
+
+    fun getCandlestickBars(
+        pair: TradePair,
+        interval: INTERVAL,
+        countCandles: Int,
+        start: Long?,
+        end: Long?
+    ): List<Candlestick> =
+        client.getKline(
+            symbol = pair.first + pair.second,
+            category = "linear",
+            interval = interval.toByBitInterval(),
+            limit = countCandles.toLong(),
+            start = start,
+            end = end
+        )
             .list
             .map { asCandlestick(it, interval) }
 

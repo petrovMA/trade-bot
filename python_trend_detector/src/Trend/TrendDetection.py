@@ -97,10 +97,6 @@ class HmaTrendDetector(ITrendDetection):
         self._fast_hma.set_input_values(data_list)
         self._slow_hma.set_input_values(data_list)
 
-        self._fastest_hma.add_input_value(data_list[-1])
-        self._fast_hma.add_input_value(data_list[-1])
-        self._slow_hma.add_input_value(data_list[-1])
-
         self.__define_trend()
 
     def process_data(self, data: float) -> None:

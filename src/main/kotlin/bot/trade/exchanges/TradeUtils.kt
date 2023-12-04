@@ -10,14 +10,19 @@ import java.math.BigDecimal
 import java.time.Duration
 
 
-fun initKlineForIndicator(client: ClientByBit, pair: TradePair, outputKlineInterval: Duration /* todo Add functionality: one call `getCandlestickBars` for generate several KlineConverters */, klineAmount: Int): KlineConverter {
+fun initKlineForIndicator(
+    client: ClientByBit,
+    pair: TradePair,
+    klineConverterParams: Map<Duration, Int>,
+    endIndicatorTime: Long = System.currentTimeMillis()
+): Map<Duration, KlineConverter> {
     val inputKlineInterval = 5.m() to INTERVAL.FIVE_MINUTES
 
-    val milliseconds = outputKlineInterval.toMillis() * klineAmount
+    val milliseconds = klineConverterParams.map { (k, v) -> k.toMillis() * v }.max()
 
-    val klineConverter = KlineConverter(inputKlineInterval.first, outputKlineInterval, klineAmount)
+    val klineConverters = klineConverterParams.mapValues { (k, v) -> KlineConverter(inputKlineInterval.first, k, v) }
 
-    val endTime = System.currentTimeMillis().let { it - it % inputKlineInterval.first.toMillis() }
+    val endTime = endIndicatorTime.let { it - it % inputKlineInterval.first.toMillis() }
     var startTime = endTime - milliseconds
 
     do {
@@ -29,12 +34,12 @@ fun initKlineForIndicator(client: ClientByBit, pair: TradePair, outputKlineInter
             end = null
         )
 
-        klineConverter.addCandlesticks(*fiveMinutes.toTypedArray())
+        klineConverters.forEach { it.value.addCandlesticks(*fiveMinutes.toTypedArray()) }
         startTime = fiveMinutes.first().closeTime
 
     } while (startTime < endTime)
 
-    return klineConverter
+    return klineConverters
 }
 
 fun calcAveragePriceStatic(

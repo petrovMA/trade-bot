@@ -44,14 +44,22 @@ open class ClientBinance(
     override fun getAllPairs(): List<TradePair> =
         instance.exchangeMetaData.instruments.map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
 
-
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
+        getCandlestickBars(pair, interval, countCandles, null, null)
+
+    fun getCandlestickBars(
+        pair: TradePair,
+        interval: INTERVAL,
+        countCandles: Int,
+        start: Long?,
+        end: Long?
+    ): List<Candlestick> =
         marketDataService.klines(
             pair.toCurrencyPair(),
             asKlineInterval(interval),
             countCandles,
-            null,
-            null
+            start,
+            end
         ).map { Candlestick(it) }
 
     override fun getOpenOrders(pair: TradePair): List<Order> = tradeService
