@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from talipp.indicators import HMA
-from Trend.TrendDetection import RsiTrendDetector, TrendType, CoupleRsiTrendDetector, HmaTrendDetector, serialize_trend_type, RSI
+from Trend.TrendDetection import RsiTrendDetector, TrendType, CoupleRsiTrendDetector, HmaTrendDetector, serialize_trend_type
+import pandas as pd
+from Trend.calculations import rsi_tradingview, RSI
 
 app = Flask(__name__)
 
@@ -65,6 +67,23 @@ def calc_rsi():
     rsi = RSI(rsi_period)
 
     rsi.set_input_values(data_list)
+
+    return jsonify(
+        {
+            "rsi": rsi[-1],
+            "rsi_period": rsi_period
+        }
+    ), 200
+
+
+@app.route('/rsi2', methods=['POST'])
+def calc_rsi2():
+    message = request.json
+    data_list = message['data_list']
+    rsi_period = message['rsi_period']
+
+    df = pd.DataFrame(data_list, columns=['close'])
+    rsi = rsi_tradingview(df, rsi_period, True)
 
     return jsonify(
         {
