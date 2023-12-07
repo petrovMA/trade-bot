@@ -16,6 +16,6 @@ data class Kline(
         val start: Long,
         val timestamp: Long,
         val turnover: Double,
-        val volume: Long
+        val volume: Double
     )
 }

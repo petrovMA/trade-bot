@@ -2,45 +2,9 @@ package bot.trade.exchanges
 
 import bot.trade.libs.ListLimit
 import bot.trade.exchanges.clients.*
-import bot.trade.exchanges.libs.KlineConverter
-import bot.trade.libs.m
 import bot.trade.libs.readConf
 import mu.KLogger
 import java.math.BigDecimal
-import java.time.Duration
-
-
-fun initKlineForIndicator(
-    client: ClientByBit,
-    pair: TradePair,
-    klineConverterParams: Map<Duration, Int>,
-    endIndicatorTime: Long = System.currentTimeMillis()
-): Map<Duration, KlineConverter> {
-    val inputKlineInterval = 5.m() to INTERVAL.FIVE_MINUTES
-
-    val milliseconds = klineConverterParams.map { (k, v) -> k.toMillis() * v }.max()
-
-    val klineConverters = klineConverterParams.mapValues { (k, v) -> KlineConverter(inputKlineInterval.first, k, v) }
-
-    val endTime = endIndicatorTime.let { it - it % inputKlineInterval.first.toMillis() }
-    var startTime = endTime - milliseconds
-
-    do {
-        val fiveMinutes = client.getCandlestickBars(
-            pair = pair,
-            interval = inputKlineInterval.second,
-            countCandles = 1000,
-            start = startTime,
-            end = null
-        )
-
-        klineConverters.forEach { it.value.addCandlesticks(*fiveMinutes.toTypedArray()) }
-        startTime = fiveMinutes.first().closeTime
-
-    } while (startTime < endTime)
-
-    return klineConverters
-}
 
 fun calcAveragePriceStatic(
     currentCandlestickList: ListLimit<Candlestick>,

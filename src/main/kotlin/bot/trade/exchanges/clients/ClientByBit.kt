@@ -11,7 +11,7 @@ import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 
-class ClientByBit(private val api: String? = null, private val sec: String? = null) : Client {
+open class ClientByBit(private val api: String? = null, private val sec: String? = null) : Client {
 
     val client = if (api != null && sec != null) ByBitRestApiClient(api, sec)
     else throw IllegalArgumentException("api and sec must be not null")
@@ -26,7 +26,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
         getCandlestickBars(pair, interval, countCandles, null, null)
 
-    fun getCandlestickBars(
+    open fun getCandlestickBars(
         pair: TradePair,
         interval: INTERVAL,
         countCandles: Int,
