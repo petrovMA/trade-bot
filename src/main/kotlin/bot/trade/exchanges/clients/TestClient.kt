@@ -102,6 +102,14 @@ class TestClient(
         return candlesticks.subList(from, to)
     }
 
+    override fun getCandlestickBars(
+        pair: TradePair,
+        interval: INTERVAL,
+        countCandles: Int,
+        start: Long?,
+        end: Long?
+    ): List<Candlestick> = TODO("Not yet implemented")
+
     override fun newOrder(
         order: Order,
         isStaticUpdate: Boolean,

@@ -51,6 +51,14 @@ class ClientBitmax(
         }
     }
 
+    override fun getCandlestickBars(
+        pair: TradePair,
+        interval: INTERVAL,
+        countCandles: Int,
+        start: Long?,
+        end: Long?
+    ): List<Candlestick> = TODO("Not yet implemented")
+
     override fun getOpenOrders(pair: TradePair): List<Order> = instance.openOrders!!.data
         .filter { it.symbol == "${pair.first}/${pair.second}" }
         .map { it.toOrder() }

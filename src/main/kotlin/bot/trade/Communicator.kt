@@ -614,8 +614,8 @@ class Communicator(
                 null
             }
 
-            val direction: DIRECTION? = try {
-                DIRECTION.valueOf(directionStr.uppercase())
+            val direction: BotSettingsTrader.Direction? = try {
+                BotSettingsTrader.Direction.valueOf(directionStr.uppercase())
             } catch (t: Throwable) {
                 msg += "Incorrect value 'direction': $directionStr"
                 log.warn("Incorrect value 'direction': $directionStr", t)

@@ -2,6 +2,7 @@ package bot.trade.exchanges
 
 import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
+import bot.trade.exchanges.libs.TrendCalculator
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.math.BigDecimal
@@ -47,8 +48,13 @@ class AlgorithmTrader(
     private val trailingInOrderDistance = settings.parameters.trailingInOrderDistance?.distance
     private val setCloseOrders = settings.parameters.setCloseOrders
     private val ordersType = settings.ordersType
-    private val direction = settings.direction
     private val minOrderAmount = settings.parameters.minOrderAmount?.amount ?: BigDecimal.ZERO
+    private var currentDirection: DIRECTION = when (settings.direction) {
+        BotSettingsTrader.Direction.LONG -> DIRECTION.LONG
+        BotSettingsTrader.Direction.SHORT -> DIRECTION.SHORT
+        else -> DIRECTION.LONG
+    }
+    private var trendCalculator: TrendCalculator? = null
 
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val ordersListForExecute: MutableMap<String, Order> = mutableMapOf()
@@ -56,7 +62,17 @@ class AlgorithmTrader(
     var from: Long = Long.MAX_VALUE
     var to: Long = Long.MIN_VALUE
 
-    override fun setup() = Unit
+    override fun setup() {
+        trendCalculator = TrendCalculator(
+            client,
+            botSettings.pair,
+            settings.trendDetector!!.hmaParameters.timeFrame.toDuration() to settings.trendDetector.hmaParameters.hma1Period,
+            settings.trendDetector.hmaParameters.timeFrame.toDuration() to settings.trendDetector.hmaParameters.hma2Period,
+            settings.trendDetector.hmaParameters.timeFrame.toDuration() to settings.trendDetector.hmaParameters.hma3Period,
+            settings.trendDetector.rsi1.timeFrame.toDuration() to settings.trendDetector.rsi1.rsiPeriod,
+            settings.trendDetector.rsi2.timeFrame.toDuration() to settings.trendDetector.rsi2.rsiPeriod
+        )
+    }
 
     override fun handle(msg: CommonExchangeData?) {
         when (msg) {
@@ -86,12 +102,12 @@ class AlgorithmTrader(
                                         if (triggerInOrderDistance == null) {
                                             orders[currPriceIn] = sentOrder(
                                                 amount = calcAmount(orderQuantity, BigDecimal(currPriceIn)),
-                                                orderSide = if (direction == DIRECTION.LONG) SIDE.BUY
+                                                orderSide = if (currentDirection == DIRECTION.LONG) SIDE.BUY
                                                 else SIDE.SELL,
                                                 price = BigDecimal(currPriceIn),
                                                 orderType = TYPE.MARKET
                                             ).also {
-                                                if (direction == DIRECTION.LONG) {
+                                                if (currentDirection == DIRECTION.LONG) {
                                                     it.lastBorderPrice = BigDecimal(-99999999999999L)
                                                     it.side = SIDE.SELL
                                                 } else {
@@ -106,11 +122,11 @@ class AlgorithmTrader(
                                                 price = BigDecimal(currPriceIn),
                                                 origQty = calcAmount(orderQuantity, BigDecimal(currPriceIn)),
                                                 executedQty = BigDecimal(0),
-                                                side = if (direction == DIRECTION.LONG) SIDE.BUY
+                                                side = if (currentDirection == DIRECTION.LONG) SIDE.BUY
                                                 else SIDE.SELL,
                                                 type = TYPE.MARKET,
                                                 status = STATUS.NEW,
-                                                lastBorderPrice = if (direction == DIRECTION.LONG)
+                                                lastBorderPrice = if (currentDirection == DIRECTION.LONG)
                                                     currPriceIn.toBigDecimal()
                                                 else
                                                     currPriceIn.toBigDecimal(),
@@ -122,7 +138,7 @@ class AlgorithmTrader(
                             }
 
                             TYPE.LIMIT -> {
-                                when (direction) {
+                                when (currentDirection) {
                                     DIRECTION.LONG -> {
                                         TODO("LONG strategy not implemented for TYPE.LIMIT (find implementation on Git history)")
                                     }
@@ -153,7 +169,7 @@ class AlgorithmTrader(
                         minRange to maxRange
                     )
 
-                when (direction) {
+                when (currentDirection) {
                     DIRECTION.LONG -> {
                         val ordersForUpdate = orders.filter { (_, v) -> v.type == TYPE.MARKET }
 
@@ -362,7 +378,7 @@ class AlgorithmTrader(
     private fun checkOrders() {
         ordersListForExecute.forEach {
             if (trailingInOrderDistance != null) {
-                when (direction) {
+                when (currentDirection) {
                     DIRECTION.LONG -> {
                         when (it.value.side) {
                             SIDE.BUY -> {
@@ -434,12 +450,12 @@ class AlgorithmTrader(
 
                             val qty = calcAmount(orderQuantity, price).percent(10.toBigDecimal())
 
-                            if (direction == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
+                            if (currentDirection == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
                                 if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
                                     orders[price.toPrice()] = openOrder
                                     log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
                                 }
-                            } else if (direction == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
+                            } else if (currentDirection == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
                                 if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
                                     orders[price.toPrice()] = openOrder
                                     log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
@@ -481,7 +497,7 @@ class AlgorithmTrader(
                                 price = priceIn.toBigDecimal(),
                                 origQty = calcAmount(orderQuantity, price),
                                 executedQty = BigDecimal(0),
-                                side = if (direction == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
+                                side = if (currentDirection == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
                                 type = TYPE.MARKET,
                                 status = STATUS.FILLED,
                                 lastBorderPrice = BigDecimal.ZERO

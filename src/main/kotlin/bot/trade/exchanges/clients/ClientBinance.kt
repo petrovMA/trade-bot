@@ -47,7 +47,7 @@ open class ClientBinance(
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
         getCandlestickBars(pair, interval, countCandles, null, null)
 
-    fun getCandlestickBars(
+    override fun getCandlestickBars(
         pair: TradePair,
         interval: INTERVAL,
         countCandles: Int,

@@ -7,6 +7,7 @@ import java.util.concurrent.BlockingQueue
 class ClientTestExchange : Client {
 
     val orders: MutableList<Order> = mutableListOf()
+    private val candlesticksData: MutableList<Candlestick> = mutableListOf()
 
     override fun getAllPairs(): List<TradePair> {
         TODO("Not yet implemented")
@@ -36,9 +37,16 @@ class ClientTestExchange : Client {
         TODO("Not yet implemented")
     }
 
-    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> {
-        TODO("Not yet implemented")
-    }
+    override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
+        candlesticksData
+
+    override fun getCandlestickBars(
+        pair: TradePair,
+        interval: INTERVAL,
+        countCandles: Int,
+        start: Long?,
+        end: Long?
+    ): List<Candlestick> = candlesticksData
 
     override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
         orders.add(order.also {})
@@ -49,9 +57,12 @@ class ClientTestExchange : Client {
         TODO("Not yet implemented")
     }
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream = StreamThreadStub()
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
+        StreamThreadStub()
 
     override fun close() {
         TODO("Not yet implemented")
     }
+
+    fun addKlineData(candlesticks: List<Candlestick>) = candlesticksData.addAll(candlesticks)
 }

@@ -49,6 +49,22 @@ class ClientBinanceFutures(
         )
             .map { asCandlestick(it) }
 
+
+    override fun getCandlestickBars(
+        pair: TradePair,
+        interval: INTERVAL,
+        countCandles: Int,
+        start: Long?,
+        end: Long?
+    ): List<Candlestick> =
+        marketDataService.klines(
+            pair.toCurrencyPair(),
+            asKlineInterval(interval),
+            countCandles,
+            start,
+            end
+        ).map { Candlestick(it) }
+
     override fun getOpenOrders(pair: TradePair): List<Order> = tradeService
         .getOpenOrders(pair.toCurrencyPair())
         .openOrders

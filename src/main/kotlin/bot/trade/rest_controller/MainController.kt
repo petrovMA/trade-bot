@@ -136,7 +136,7 @@ class MainController(orderService: OrderService) {
             .run {
                 when (val settings = infoResponse.first) {
                     is BotSettingsTrader -> when (settings.direction) {
-                        DIRECTION.SHORT -> reversed()
+                        BotSettingsTrader.Direction.SHORT -> reversed()
                         else -> this
                     }
                     else -> this

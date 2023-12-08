@@ -8,6 +8,7 @@ import utils.mapper.Mapper.asListObjects
 import utils.mapper.Mapper.asObject
 import utils.mapper.Mapper.asString
 import mu.KotlinLogging
+import org.springframework.boot.convert.DurationStyle
 import utils.mapper.Mapper.asMapObjects
 import java.io.File
 import java.io.IOException
@@ -229,6 +230,8 @@ fun String.toInterval(): INTERVAL = when {
     this == "1M" -> INTERVAL.MONTHLY
     else -> throw Exception("Not supported CandlestickInterval!")
 }
+
+fun String.toDuration() = DurationStyle.detectAndParse(this)
 
 fun format(value: BigDecimal?, locale: Locale? = null): String =
     locale?.let { String.format(it, "%.8f", value) } ?: String.format("%.8f", value)

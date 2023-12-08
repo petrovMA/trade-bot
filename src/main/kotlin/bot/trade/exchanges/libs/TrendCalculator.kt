@@ -1,9 +1,6 @@
 package bot.trade.exchanges.libs
 
-import bot.trade.exchanges.clients.Candlestick
-import bot.trade.exchanges.clients.ClientByBit
-import bot.trade.exchanges.clients.INTERVAL
-import bot.trade.exchanges.clients.TradePair
+import bot.trade.exchanges.clients.*
 import bot.trade.libs.m
 import bot.trade.libs.round
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -20,7 +17,7 @@ import java.util.*
 
 
 class TrendCalculator(
-    client: ClientByBit,
+    client: Client,
     pair: TradePair,
     private val hma1: Pair<Duration, Int>,
     private val hma2: Pair<Duration, Int>,
@@ -64,7 +61,7 @@ class TrendCalculator(
     )
 
     private fun initKlineForIndicator(
-        client: ClientByBit,
+        client: Client,
         pair: TradePair,
         klineConverterParams: Set<Pair<Duration, Int>>,
         endIndicatorTime: Long

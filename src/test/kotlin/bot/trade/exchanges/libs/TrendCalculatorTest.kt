@@ -1,6 +1,7 @@
 package bot.trade.exchanges.libs
 
 import bot.trade.exchanges.clients.Candlestick
+import bot.trade.exchanges.clients.ClientTestExchange
 import bot.trade.exchanges.clients.TradePair
 import bot.trade.libs.h
 import bot.trade.libs.m
@@ -17,8 +18,17 @@ class TrendCalculatorTest {
 
     // @Test // TODO:: this test works only with server: http://95.217.0.250:5000/
     fun getTrend() {
+        val client = ClientTestExchange()
+
+        client.addKlineData(
+            Mapper.asListObjects(
+                resourceFile<KlineConverterTest>("trend_calc_input.json").readText(),
+                object : TypeToken<List<Candlestick>>() {}.type
+            )
+        )
+
         val trendCalculator = TrendCalculator(
-            ClientByBitStub(),
+            client,
             TradePair("ETH_USDT"),
             30.m() to 10,
             15.m() to 70,

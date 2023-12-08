@@ -80,6 +80,14 @@ class ClientHuobi(
 //            )
 //        }
 
+    override fun getCandlestickBars(
+        pair: TradePair,
+        interval: INTERVAL,
+        countCandles: Int,
+        start: Long?,
+        end: Long?
+    ): List<Candlestick> = TODO("Not yet implemented")
+
     override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> = tradeService
         .openOrders
         .openOrders

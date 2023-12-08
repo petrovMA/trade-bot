@@ -327,9 +327,10 @@ class BotSettingsTrader(
     orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
     countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
     countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    @SerializedName("strategy_type") val direction: DIRECTION,
+    @SerializedName("strategy_type") val direction: Direction,
     @SerializedName("order_type") val ordersType: TYPE,
     @SerializedName("parameters") val parameters: Parameters,
+    @SerializedName("trend_detector") val trendDetector: TrendDetector? = null,
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
     @SerializedName("strategy_type_comment") val strategyTypeComment: String
@@ -341,6 +342,26 @@ class BotSettingsTrader(
     countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
     countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
 ) {
+
+    enum class Direction { LONG, SHORT, BOTH }
+
+    class TrendDetector(
+        @SerializedName("rsi1") val rsi1: Rsi,
+        @SerializedName("rsi2") val rsi2: Rsi,
+        @SerializedName("hma_parameters") val hmaParameters: HmaParameters
+    ) {
+        class Rsi(
+            @SerializedName("rsi_period") val rsiPeriod: Int,
+            @SerializedName("time_frame") val timeFrame: String
+        )
+        class HmaParameters(
+            @SerializedName("hma1_period") val hma1Period: Int,
+            @SerializedName("hma2_period") val hma2Period: Int,
+            @SerializedName("hma3_period") val hma3Period: Int,
+            @SerializedName("time_frame") val timeFrame: String
+        )
+    }
+
     class Parameters(
         @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
         @SerializedName("in_order_quantity") val inOrderQuantity: InOrderQuantity, // Order Quantity:: order size
