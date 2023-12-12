@@ -13,6 +13,16 @@ import java.util.concurrent.LinkedBlockingDeque
 
 class AlgorithmTraderTest {
 
+    private fun Trade.toKline() = Candlestick(
+        openTime = time,
+        closeTime = time + 1000000,
+        open = 0.toBigDecimal(),
+        high = 0.toBigDecimal(),
+        low = 0.toBigDecimal(),
+        close = price,
+        volume = 0.toBigDecimal()
+    )
+
     @Test
     fun testExecuteInOrdersWithMinOrderAmount() {
         val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersWithMinOrderAmountSettings.json")
@@ -24,20 +34,20 @@ class AlgorithmTraderTest {
             object : TypeToken<Map<String?, Order?>?>() {}.type
         ).forEach { (k, v) -> algorithmTrader.orders[k] = v }
 
-        algorithmTrader.handle(Trade(1518.toBigDecimal(), 1.toBigDecimal(), 0))
-        algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 1))
-        algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 2))
-        algorithmTrader.handle(Trade(1513.toBigDecimal(), 1.toBigDecimal(), 3))
-        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 4))
+        algorithmTrader.handle(Trade(1518.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
+        algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
+        algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 2).toKline())
+        algorithmTrader.handle(Trade(1513.toBigDecimal(), 1.toBigDecimal(), 3).toKline())
+        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 4).toKline())
 
         assertOrders(listOf(), exchange.orders)
 
-        algorithmTrader.handle(Trade(1500.toBigDecimal(), 1.toBigDecimal(), 5))
-        algorithmTrader.handle(Trade(1510.toBigDecimal(), 1.toBigDecimal(), 4))
-        algorithmTrader.handle(Trade(1508.toBigDecimal(), 1.toBigDecimal(), 6))
-        algorithmTrader.handle(Trade(1507.toBigDecimal(), 1.toBigDecimal(), 7))
-        algorithmTrader.handle(Trade(1506.toBigDecimal(), 1.toBigDecimal(), 8))
-        algorithmTrader.handle(Trade(1505.toBigDecimal(), 1.toBigDecimal(), 9))
+        algorithmTrader.handle(Trade(1500.toBigDecimal(), 1.toBigDecimal(), 5).toKline())
+        algorithmTrader.handle(Trade(1510.toBigDecimal(), 1.toBigDecimal(), 4).toKline())
+        algorithmTrader.handle(Trade(1508.toBigDecimal(), 1.toBigDecimal(), 6).toKline())
+        algorithmTrader.handle(Trade(1507.toBigDecimal(), 1.toBigDecimal(), 7).toKline())
+        algorithmTrader.handle(Trade(1506.toBigDecimal(), 1.toBigDecimal(), 8).toKline())
+        algorithmTrader.handle(Trade(1505.toBigDecimal(), 1.toBigDecimal(), 9).toKline())
 
         assertOrders(
             listOf(
@@ -97,42 +107,42 @@ class AlgorithmTraderTest {
 
         algorithmTrader.orders.clear()
 
-        algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 0))
-        algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 1))
-        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 2))
-        algorithmTrader.handle(Trade(1510.toBigDecimal(), 1.toBigDecimal(), 3))
-        algorithmTrader.handle(Trade(1508.toBigDecimal(), 1.toBigDecimal(), 4))
-        algorithmTrader.handle(Trade(1506.toBigDecimal(), 1.toBigDecimal(), 5))
-        algorithmTrader.handle(Trade(1504.toBigDecimal(), 1.toBigDecimal(), 6))
-        algorithmTrader.handle(Trade(1502.toBigDecimal(), 1.toBigDecimal(), 7))
-        algorithmTrader.handle(Trade(1500.toBigDecimal(), 1.toBigDecimal(), 8))
-        algorithmTrader.handle(Trade(1501.toBigDecimal(), 1.toBigDecimal(), 9))
+        algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
+        algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
+        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 2).toKline())
+        algorithmTrader.handle(Trade(1510.toBigDecimal(), 1.toBigDecimal(), 3).toKline())
+        algorithmTrader.handle(Trade(1508.toBigDecimal(), 1.toBigDecimal(), 4).toKline())
+        algorithmTrader.handle(Trade(1506.toBigDecimal(), 1.toBigDecimal(), 5).toKline())
+        algorithmTrader.handle(Trade(1504.toBigDecimal(), 1.toBigDecimal(), 6).toKline())
+        algorithmTrader.handle(Trade(1502.toBigDecimal(), 1.toBigDecimal(), 7).toKline())
+        algorithmTrader.handle(Trade(1500.toBigDecimal(), 1.toBigDecimal(), 8).toKline())
+        algorithmTrader.handle(Trade(1501.toBigDecimal(), 1.toBigDecimal(), 9).toKline())
 
         assertOrders(listOf(), exchange.orders)
 
-        algorithmTrader.handle(Trade(1502.toBigDecimal(), 1.toBigDecimal(), 10))
+        algorithmTrader.handle(Trade(1502.toBigDecimal(), 1.toBigDecimal(), 10).toKline())
 
         assertOrders(listOf(expectedOrder1), exchange.orders)
 
-        algorithmTrader.handle(Trade(1503.toBigDecimal(), 1.toBigDecimal(), 11))
-        algorithmTrader.handle(Trade(1506.toBigDecimal(), 1.toBigDecimal(), 12))
-        algorithmTrader.handle(Trade(1509.toBigDecimal(), 1.toBigDecimal(), 13))
-        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 14))
-        algorithmTrader.handle(Trade(1515.toBigDecimal(), 1.toBigDecimal(), 15))
-        algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 16))
-        algorithmTrader.handle(Trade(1513.toBigDecimal(), 1.toBigDecimal(), 17))
+        algorithmTrader.handle(Trade(1503.toBigDecimal(), 1.toBigDecimal(), 11).toKline())
+        algorithmTrader.handle(Trade(1506.toBigDecimal(), 1.toBigDecimal(), 12).toKline())
+        algorithmTrader.handle(Trade(1509.toBigDecimal(), 1.toBigDecimal(), 13).toKline())
+        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 14).toKline())
+        algorithmTrader.handle(Trade(1515.toBigDecimal(), 1.toBigDecimal(), 15).toKline())
+        algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 16).toKline())
+        algorithmTrader.handle(Trade(1513.toBigDecimal(), 1.toBigDecimal(), 17).toKline())
 
         assertOrders(listOf(expectedOrder1, expectedOrder2), exchange.orders)
 
-        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 17))
+        algorithmTrader.handle(Trade(1512.toBigDecimal(), 1.toBigDecimal(), 17).toKline())
 
         assertOrders(listOf(expectedOrder1, expectedOrder2), exchange.orders)
 
-        algorithmTrader.handle(Trade(1511.toBigDecimal(), 1.toBigDecimal(), 18))
+        algorithmTrader.handle(Trade(1511.toBigDecimal(), 1.toBigDecimal(), 18).toKline())
 
         assertOrders(listOf(expectedOrder1, expectedOrder2, expectedOrder3), exchange.orders)
 
-        algorithmTrader.handle(Trade(1510.toBigDecimal(), 1.toBigDecimal(), 19))
+        algorithmTrader.handle(Trade(1510.toBigDecimal(), 1.toBigDecimal(), 19).toKline())
 
         assertOrders(listOf(expectedOrder1, expectedOrder2, expectedOrder3), exchange.orders)
 
@@ -162,7 +172,7 @@ class AlgorithmTraderTest {
         for (i in 15840 downTo 14400 step 5) {
             number++
             price = BigDecimal(i).div8(BigDecimal(10))
-            algorithmTrader.handle(Trade(price, BigDecimal(1), number))
+            algorithmTrader.handle(Trade(price, BigDecimal(1), number).toKline())
 
             if (i in 15800..15840) {
                 assertOrders(
@@ -274,7 +284,7 @@ class AlgorithmTraderTest {
         for (i in 14400..15385 step 5) {
             number++
             price = BigDecimal(i).div8(BigDecimal(10))
-            algorithmTrader.handle(Trade(price, BigDecimal(1), number))
+            algorithmTrader.handle(Trade(price, BigDecimal(1), number).toKline())
 
             if (i in 14400 until 14500) {
                 assertOrders(
@@ -294,7 +304,7 @@ class AlgorithmTraderTest {
         for (i in 15385 downTo 14240 step 5) {
             number++
             price = BigDecimal(i).div8(BigDecimal(10))
-            algorithmTrader.handle(Trade(price, BigDecimal(1), number))
+            algorithmTrader.handle(Trade(price, BigDecimal(1), number).toKline())
 
             if (i in 15335 startExclusive 15385) {
                 assertOrders(

@@ -30,11 +30,17 @@ class StreamByBitFuturesImpl(
                 keepConnection = true,
                 pingTimeInterval = 50.s(),
                 reconnectIfNoMessagesDuring = 2.m(),
-                WebSocketMsg("subscribe", listOf("publicTrade.${pair.first}${pair.second}"))
+//                WebSocketMsg("subscribe", listOf("publicTrade.${pair.first}${pair.second}"))
+                WebSocketMsg("subscribe", listOf("kline.5.${pair.first}${pair.second}"))
             )
 
-            publicStream.setKlineCallback { queue.addAll(it.data.map { kline -> Candlestick(kline) }) }
-            publicStream.setTradeCallback {
+            publicStream.setKlineCallback {
+                it.data
+                    .map { kline -> Candlestick(kline) }
+                    .sortedBy { kline -> kline.closeTime * -1 }
+                    .forEach { kline -> queue.add(kline) }
+            }
+            /*publicStream.setTradeCallback {
                 queue.addAll(it.data.map { trade ->
                     Trade(
                         price = trade.price.toBigDecimal(),
@@ -42,7 +48,7 @@ class StreamByBitFuturesImpl(
                         time = trade.timestamp
                     )
                 })
-            }
+            }*/
 
             if (api != null && sec != null) {
                 val privateStream = ByBitApiWebSocketListener(

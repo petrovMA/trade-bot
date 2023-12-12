@@ -23,7 +23,10 @@ class KlineConverter(
         inputCandlesticks
             .sortedBy { it.openTime }
             .forEach {
-                if (it.closeTime - it.openTime != inputKlineInterval.toMillis())
+                if (
+                    it.closeTime - it.openTime != inputKlineInterval.toMillis()
+                    && it.closeTime + 1 - it.openTime != inputKlineInterval.toMillis()
+                )
                     throw Exception("kline interval not equals to inputKlineInterval:\n${it}")
 
                 if (currentCandlestick == null) {
@@ -37,7 +40,7 @@ class KlineConverter(
                         volume = it.volume
                     )
                 } else {
-                    if (currentCandlestick!!.closeTime == it.openTime)
+                    if (currentCandlestick!!.closeTime == it.openTime || currentCandlestick!!.closeTime + 1 == it.openTime)
                         currentCandlestick = Candlestick(
                             openTime = currentCandlestick!!.openTime,
                             closeTime = it.closeTime,
@@ -47,11 +50,14 @@ class KlineConverter(
                             close = it.close,
                             volume = currentCandlestick!!.volume + it.volume
                         )
-                    else if (currentCandlestick!!.closeTime < it.openTime)
+                    else if (currentCandlestick!!.closeTime + 1 < it.openTime)
                         throw Exception("inputCandlesticks has a gap in sequence:\n${currentCandlestick}\n${it}")
                 }
 
-                if (currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L)
+                if (
+                    (currentCandlestick!!.closeTime + 1) % outputKlineInterval.toMillis() == 0L
+                    || currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L
+                )
                     closeCurrentCandlestick()
             }
     }
@@ -61,5 +67,5 @@ class KlineConverter(
         currentCandlestick = null
     }
 
-    fun getCandlesticks(): List<Candlestick> = candlesticks.reversed()
+    fun getCandlesticks(): List<Candlestick> = candlesticks
 }

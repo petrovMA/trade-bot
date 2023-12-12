@@ -9,6 +9,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.lang.Thread.sleep
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
@@ -52,13 +53,35 @@ class TrendCalculator(
         rsi2Converter.addCandlesticks(*candlesticks)
     }
 
-    fun getTrend(): Trend = Trend(
-        hma1 = calcHMA(hma1Converter.getCandlesticks(), hma1.second),
-        hma2 = calcHMA(hma2Converter.getCandlesticks(), hma2.second),
-        hma3 = calcHMA(hma3Converter.getCandlesticks(), hma3.second),
-        rsi1 = calcRSI(rsi1Converter.getCandlesticks(), rsi1.second),
-        rsi2 = calcRSI(rsi2Converter.getCandlesticks(), rsi2.second)
-    )
+    fun getTrend(): Trend {
+        val hma1 = calcHMA(hma1Converter.getCandlesticks(), hma1.second)
+        val hma2 = calcHMA(hma2Converter.getCandlesticks(), hma2.second)
+        val hma3 = calcHMA(hma3Converter.getCandlesticks(), hma3.second)
+        val rsi1 = rsiTradingView(rsi1Converter.getCandlesticks(), rsi1.second)
+        val rsi2 = rsiTradingView(rsi2Converter.getCandlesticks(), rsi2.second)
+        val trend = if (rsi1 > BigDecimal(50)) {
+            if (rsi2 > BigDecimal(50)) {
+                if (hma1 < hma2 && hma2 < hma3) Trend.TREND.HEDGE
+                else Trend.TREND.LONG
+            } else Trend.TREND.FLAT
+        } else {
+            if (rsi2 < BigDecimal(50)) {
+                if (hma1 > hma2 && hma2 > hma3) Trend.TREND.HEDGE
+                else Trend.TREND.SHORT
+            } else Trend.TREND.FLAT
+        }
+
+        log.info("Trend: $trend hma1=$hma1, hma2=$hma2, hma3=$hma3, rsi1=$rsi1, rsi2=$rsi2")
+
+        return Trend(
+            hma1 = hma1,
+            hma2 = hma2,
+            hma3 = hma3,
+            rsi1 = rsi1,
+            rsi2 = rsi2,
+            trend = trend
+        )
+    }
 
     private fun initKlineForIndicator(
         client: Client,
@@ -67,7 +90,7 @@ class TrendCalculator(
         endIndicatorTime: Long
     ) {
 
-        val milliseconds = klineConverterParams.maxOfOrNull { it.first.toMillis() * it.second }!!
+        val milliseconds = klineConverterParams.maxOfOrNull { it.first.toMillis() * (it.second + 1) }!!
 
         val endTime = endIndicatorTime.let { it - it % inputKlineInterval.first.toMillis() }
         var startTime = endTime - milliseconds
@@ -81,7 +104,7 @@ class TrendCalculator(
                 end = null
             )
                 .also { startTime = it.first().closeTime }
-                .filter { it.closeTime < endTime }
+                .filter { it.closeTime < endIndicatorTime }
                 .toTypedArray()
                 .also {
                     hma1Converter.addCandlesticks(*it)
@@ -98,7 +121,7 @@ class TrendCalculator(
 
         val client = OkHttpClient()
 
-        val dataList = kline.map { it.close }.reversed()
+        val dataList = kline.map { it.close }
 
         val params = TreeMap<String, Any>().apply {
             put("data_list", dataList)
@@ -107,11 +130,25 @@ class TrendCalculator(
 
         val request = Request.Builder().url("http://95.217.0.250:5000/hma").post(body(params)).build()
 
-        val respBody = client.newCall(request).execute().body!!.string()
+        var resp: okhttp3.Response
+
+        do {
+            resp = try {
+                client.newCall(request).execute()
+            } catch (t: Throwable) {
+                log.error("Error hma calculation request: ${t.message}")
+                sleep(200)
+                continue
+            }
+            if (resp.code != 200) {
+                log.error("Error hma calculation response, code: ${resp.code}, bode: \n${resp.body!!.string()}")
+                sleep(200)
+            } else break
+        } while (true)
 
         val time = Instant.ofEpochMilli(kline.first().closeTime).atOffset(ZoneOffset.UTC).toString()
 
-        val result = objectMapper.readTree(respBody)["hma"].decimalValue().round(2)
+        val result = objectMapper.readTree(resp.body!!.string())["hma"].decimalValue().round(2)
 
         log.info("HMA_$period for time $time: $result")
 
@@ -122,7 +159,7 @@ class TrendCalculator(
 
         val client = OkHttpClient()
 
-        val dataList = kline.map { it.close }.reversed()
+        val dataList = kline.map { it.close }
 
         val params = TreeMap<String, Any>().apply {
             put("data_list", dataList)
@@ -146,19 +183,25 @@ class TrendCalculator(
         objectMapper.writeValueAsString(obj).toRequestBody("application/json".toMediaTypeOrNull()!!)
 
     data class Trend(
-        val hma1: BigDecimal? = null,
-        val hma2: BigDecimal? = null,
-        val hma3: BigDecimal? = null,
-        val rsi1: BigDecimal? = null,
-        val rsi2: BigDecimal? = null
-    )
+        val hma1: BigDecimal,
+        val hma2: BigDecimal,
+        val hma3: BigDecimal,
+        val rsi1: BigDecimal,
+        val rsi2: BigDecimal,
+        val trend: TREND
+    ) {
+        enum class TREND { LONG, SHORT, FLAT, HEDGE }
+    }
 
-    fun rsiTradingView(closingPrices: List<Double>, period: Int = 14, roundRsi: Boolean = true): List<Double> {
-        if (closingPrices.size <= period) {
+    private fun rsiTradingView(kline: List<Candlestick>, period: Int = 14, roundRsi: Boolean = true): BigDecimal {
+
+        val dataList = kline.map { it.close.toDouble() }
+
+        if (dataList.size <= period) {
             throw IllegalArgumentException("Not enough data to calculate RSI")
         }
 
-        val delta = closingPrices.zipWithNext { a, b -> b - a }
+        val delta = dataList.zipWithNext { a, b -> b - a }
         val up = delta.map { if (it > 0) it else 0.0 }
         val down = delta.map { if (it < 0) -it else 0.0 }
 
@@ -178,6 +221,6 @@ class TrendCalculator(
             rsi.add(if (roundRsi) "%.2f".format(rsiValue).replace(",", ".").toDouble() else rsiValue)
         }
 
-        return rsi
+        return rsi.last().toBigDecimal()
     }
 }

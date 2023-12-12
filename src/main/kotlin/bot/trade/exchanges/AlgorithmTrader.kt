@@ -55,7 +55,8 @@ class AlgorithmTrader(
         else -> DIRECTION.LONG
     }
     private var trendCalculator: TrendCalculator? = null
-
+    private var trend: TrendCalculator.Trend? = null
+    private var prevCandlestick: Candlestick? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val ordersListForExecute: MutableMap<String, Order> = mutableMapOf()
 
@@ -63,27 +64,63 @@ class AlgorithmTrader(
     var to: Long = Long.MIN_VALUE
 
     override fun setup() {
-        trendCalculator = TrendCalculator(
-            client,
-            botSettings.pair,
-            settings.trendDetector!!.hmaParameters.timeFrame.toDuration() to settings.trendDetector.hmaParameters.hma1Period,
-            settings.trendDetector.hmaParameters.timeFrame.toDuration() to settings.trendDetector.hmaParameters.hma2Period,
-            settings.trendDetector.hmaParameters.timeFrame.toDuration() to settings.trendDetector.hmaParameters.hma3Period,
-            settings.trendDetector.rsi1.timeFrame.toDuration() to settings.trendDetector.rsi1.rsiPeriod,
-            settings.trendDetector.rsi2.timeFrame.toDuration() to settings.trendDetector.rsi2.rsiPeriod
-        )
+//        if (settings.direction == BotSettingsTrader.Direction.BOTH)
+        trendCalculator = settings.trendDetector?.run {
+            TrendCalculator(
+                client,
+                botSettings.pair,
+                hmaParameters.timeFrame.toDuration() to hmaParameters.hma1Period,
+                hmaParameters.timeFrame.toDuration() to hmaParameters.hma2Period,
+                hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
+                rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
+                rsi2.timeFrame.toDuration() to rsi2.rsiPeriod
+            )
+        } ?: run {
+            send("Not found trendDetector settings")
+            throw RuntimeException("Not found trendDetector settings")
+        }
     }
 
     override fun handle(msg: CommonExchangeData?) {
         when (msg) {
-            is Trade -> {
-                prevPrice = if (prevPrice == BigDecimal(0)) msg.price
-                else currentPrice
-                currentPrice = msg.price
-                log?.debug("{} TradeEvent: {}", botSettings.name, msg)
+            is Candlestick -> {
 
-                from = if (from > msg.time) msg.time else from
-                to = if (to < msg.time) msg.time else to
+                prevCandlestick?.let { prevCandlestick ->
+                    if (msg.openTime >= prevCandlestick.closeTime) {
+                        trendCalculator?.addCandlesticks(prevCandlestick)
+
+                        val currentTrend = trendCalculator?.getTrend()
+
+                        log?.debug("{} Trend: {}\nnew Kline: {}", botSettings.name, currentTrend, msg)
+
+                        trend?.let {
+                            if (it.trend != currentTrend?.trend) {
+                                trend = currentTrend
+                                send("#${botSettings.name} #Trend :\n```json\n${json(it)}\n```", true)
+                            }
+                        } ?: run { trend = currentTrend }
+                    }
+                }
+
+                prevCandlestick = msg.let { k ->
+                    Candlestick(
+                        openTime = k.openTime,
+                        closeTime = k.closeTime,
+                        open = k.open.round(),
+                        high = k.high.round(),
+                        low = k.low.round(),
+                        close = k.close.round(),
+                        volume = k.volume.round()
+                    )
+                }
+
+
+                prevPrice = if (prevPrice == BigDecimal(0)) msg.close
+                else currentPrice
+                currentPrice = msg.close
+
+                from = if (from > msg.closeTime) msg.closeTime else from
+                to = if (to < msg.closeTime) msg.closeTime else to
 
                 if (currentPrice > minRange && currentPrice < maxRange) {
 

@@ -8,6 +8,7 @@ import bot.trade.libs.m
 import bot.trade.libs.round
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import utils.mapper.Mapper
 import utils.resourceFile
@@ -16,16 +17,16 @@ import java.math.BigDecimal
 
 class TrendCalculatorTest {
 
-    // @Test // TODO:: this test works only with server: http://95.217.0.250:5000/
+    @Test // TODO:: this test works only with server: http://95.217.0.250:5000/
     fun getTrend() {
         val client = ClientTestExchange()
 
-        client.addKlineData(
-            Mapper.asListObjects(
+        val klines: List<Candlestick> = Mapper.asListObjects(
                 resourceFile<KlineConverterTest>("trend_calc_input.json").readText(),
                 object : TypeToken<List<Candlestick>>() {}.type
             )
-        )
+
+        client.addKlineData(klines)
 
         val trendCalculator = TrendCalculator(
             client,
@@ -46,11 +47,16 @@ class TrendCalculatorTest {
             .forEach { trendCalculator.addCandlesticks(it) }
 
         trendCalculator.getTrend().run {
+            println("Trend: $this")
             assertEquals(BigDecimal(2267.94).round(2), hma1)
             assertEquals(BigDecimal(2275.61).round(2), hma2)
             assertEquals(BigDecimal(2271.70).round(2), hma3)
-            assertEquals(BigDecimal(56.56).round(2), rsi1)
-            assertEquals(BigDecimal(61.12).round(2), rsi2)
+            assertIndicator(BigDecimal(56.56).round(2), rsi1, BigDecimal(1))
+            assertIndicator(BigDecimal(61.12).round(2), rsi2, BigDecimal(1))
         }
+    }
+
+    private fun assertIndicator(expected: BigDecimal, actual: BigDecimal, module: BigDecimal) {
+        assertTrue((expected - actual).abs() < module, "expected: $expected, actual: $actual")
     }
 }

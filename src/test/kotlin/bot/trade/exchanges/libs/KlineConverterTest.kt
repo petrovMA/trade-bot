@@ -16,13 +16,13 @@ class KlineConverterTest {
     @Test
     fun checkKlineConverter() {
         val type = object : TypeToken<List<Candlestick>>() {}.type
-        val expected = asListObjects<Candlestick>(resourceFile<KlineConverterTest>("expected.json").readText(), type)
+        val expected = asListObjects<Candlestick>(resourceFile<KlineConverterTest>("expected.json").readText(), type).reversed()
         val input = asListObjects<Candlestick>(resourceFile<KlineConverterTest>("input.json").readText(), type)
 
         val klineConverter = KlineConverter(5.m(), 2.h(), 20)
         klineConverter.addCandlesticks(*input.toTypedArray())
 
-        assertEquals(expected.takeLast(7), klineConverter.getCandlesticks())
+        assertEquals(expected.take(7), klineConverter.getCandlesticks())
         klineConverter.closeCurrentCandlestick()
         assertEquals(expected, klineConverter.getCandlesticks())
     }
