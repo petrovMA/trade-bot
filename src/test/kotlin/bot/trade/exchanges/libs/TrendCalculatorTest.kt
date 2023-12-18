@@ -47,7 +47,6 @@ class TrendCalculatorTest {
             .forEach { trendCalculator.addCandlesticks(it) }
 
         trendCalculator.getTrend().run {
-            println("Trend: $this")
             assertEquals(BigDecimal(2267.94).round(2), hma1)
             assertEquals(BigDecimal(2275.61).round(2), hma2)
             assertEquals(BigDecimal(2271.70).round(2), hma3)

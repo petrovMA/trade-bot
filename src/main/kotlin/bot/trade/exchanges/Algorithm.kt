@@ -26,6 +26,7 @@ abstract class Algorithm(
     var client: Client,
     isLog: Boolean,
     val isEmulate: Boolean,
+    private val logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
     val sendMessage: (String, Boolean) -> Unit
 ) : Thread() {
     val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
@@ -125,7 +126,7 @@ abstract class Algorithm(
 
         var retryCount = retrySentOrderCount
 
-        log?.info("${botSettings.name} Sent $orderType order with params: price = $price; amount = $amount; side = $orderSide")
+        log?.info("${botSettings.name} Send $orderType order with params: price = $price; amount = $amount; side = $orderSide")
 
         var order = Order(
             orderId = "",
@@ -137,6 +138,8 @@ abstract class Algorithm(
             type = orderType,
             status = STATUS.NEW
         )
+
+        log("Send to exchange order: ${json(order)}")
 
         do {
             try {
@@ -209,7 +212,7 @@ abstract class Algorithm(
     fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
 
     fun saveBotSettings(botSettings: BotSettings, settingsPath: String = this.settingsPath) {
-        if(isEmulate.not()) {
+        if (isEmulate.not()) {
             val settingsDir = File(path)
 
             if (settingsDir.isDirectory.not()) Files.createDirectories(Paths.get(path))
@@ -229,4 +232,7 @@ abstract class Algorithm(
     override fun toString(): String = "status = $state, settings = $botSettings"
 
     fun orders() = botSettings to orders
+
+    fun log(message: String, file: File = File("$path/common_log.txt")) =
+        logMessageQueue?.add(CustomFileLoggingProcessor.Message(file, message))
 }

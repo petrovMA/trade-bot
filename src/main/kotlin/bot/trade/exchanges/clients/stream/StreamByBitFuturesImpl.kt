@@ -37,7 +37,7 @@ class StreamByBitFuturesImpl(
             publicStream.setKlineCallback {
                 it.data
                     .map { kline -> Candlestick(kline) }
-                    .sortedBy { kline -> kline.closeTime * -1 }
+                    .sortedBy { kline -> kline.closeTime }
                     .forEach { kline -> queue.add(kline) }
             }
             /*publicStream.setTradeCallback {

@@ -1,10 +1,15 @@
 package bot.trade.exchanges
 
-import bot.trade.exchanges.clients.Order
+import bot.trade.exchanges.clients.*
 import bot.trade.libs.json
+import bot.trade.libs.readConf
 import com.google.gson.reflect.TypeToken
 import utils.mapper.Mapper
+import utils.resourceFile
 import java.io.File
+import java.math.BigDecimal
+import java.util.*
+import java.util.concurrent.LinkedBlockingDeque
 
 fun assertOrders(expected: Map<String, Order>, actual: Map<String, Order>) {
     assert(expected.size == actual.size) { "expected.size != actual.size" }
@@ -33,3 +38,27 @@ fun assertOrders(expectedFile: File?, actual: Map<String, Order>, messagePredica
         assert(v == actual[k]) { "${messagePredicate}[$k] not equals,\nExpected:\n${json(v)}\n\nActual:\n${json(actual[k]!!)}" }
     }
 }
+
+
+
+fun testExchange(settingsFile: String, endTime: Long? = null) = ClientTestExchange().let { exchange ->
+    AlgorithmTrader(
+        botSettings = Mapper.asObject<BotSettingsTrader>(settingsFile.file().readText()),
+        exchangeBotsFiles = "",
+        queue = LinkedBlockingDeque<CommonExchangeData>(),
+        exchangeEnum = ExchangeEnum.TEST,
+        conf = readConf("TEST.conf".file().path)!!,
+        api = "",
+        sec = "",
+        client = exchange,
+        isLog = false,
+        isEmulate = true,
+        endTimeForTrendCalculator = endTime,
+    ) { _, _ -> } to exchange
+}
+
+fun String.file() = resourceFile<AlgorithmTraderTest>(this)
+
+infix fun Int.startExclusive(other: Int): IntRange = IntRange(this + 1, other)
+
+fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)

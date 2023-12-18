@@ -308,6 +308,15 @@ data class Candlestick(
         close = kline.close.toBigDecimal(),
         volume = kline.volume.toBigDecimal()
     )
+
+    override fun equals(other: Any?): Boolean = other is Candlestick
+            && other.openTime == openTime
+            && other.closeTime == closeTime
+            && other.open.round() == open.round()
+            && other.high.round() == high.round()
+            && other.low.round() == low.round()
+            && other.close.round() == close.round()
+            && other.volume.round() == volume.round()
 }
 
 abstract class BotSettings(

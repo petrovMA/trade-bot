@@ -103,18 +103,21 @@ class TrendCalculator(
                 start = startTime,
                 end = null
             )
+                .sortedBy { it.closeTime }
                 .also { startTime = it.first().closeTime }
-                .filter { it.closeTime < endIndicatorTime }
-                .toTypedArray()
-                .also {
-                    hma1Converter.addCandlesticks(*it)
-                    hma2Converter.addCandlesticks(*it)
-                    hma3Converter.addCandlesticks(*it)
-                    rsi1Converter.addCandlesticks(*it)
-                    rsi2Converter.addCandlesticks(*it)
+                .forEach {
+
+                    if (endTime < it.closeTime)
+                        return
+
+                    hma1Converter.addCandlesticks(it)
+                    hma2Converter.addCandlesticks(it)
+                    hma3Converter.addCandlesticks(it)
+                    rsi1Converter.addCandlesticks(it)
+                    rsi2Converter.addCandlesticks(it)
                 }
 
-        } while (startTime < endTime)
+        } while (true)
     }
 
     private fun calcHMA(kline: List<Candlestick>, period: Int): BigDecimal {

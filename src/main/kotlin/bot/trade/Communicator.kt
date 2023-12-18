@@ -14,6 +14,7 @@ import java.time.Duration
 import java.time.LocalDate
 import java.util.*
 import java.util.concurrent.BlockingQueue
+import java.util.concurrent.LinkedBlockingDeque
 
 class Communicator(
     private val exchangeFiles: File,
@@ -30,6 +31,7 @@ class Communicator(
         cmd.commandAllBalance to "commandAllBalance BTC ETH BNB",
         cmd.commandBalance to "commandFreeBalance BTC ETH BNB"
     ),
+    private val logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
     private val sendFile: (File) -> Unit,
     val sendMessage: (String, Boolean) -> Unit
 ) {
@@ -223,7 +225,12 @@ class Communicator(
                 val (msgErrors, tradeBotSettings) = parseTradeBotSettings(params)
 
                 tradeBotSettings?.let {
-                    tradeBots[it.name] = AlgorithmTrader(tradeBotSettings, exchangeBotsFiles, sendMessage = sendMessage)
+                    tradeBots[it.name] = AlgorithmTrader(
+                        tradeBotSettings,
+                        exchangeBotsFiles,
+                        logMessageQueue = logMessageQueue,
+                        sendMessage = sendMessage
+                    )
                 } ?: run { msg += "Parse params errors:\n$msgErrors" }
 
                 log.info(msg)
@@ -243,7 +250,12 @@ class Communicator(
                         sendMessage = sendMessage
                     )
 
-                    else -> AlgorithmTrader(tradeBotSettings, exchangeBotsFiles, sendMessage = sendMessage)
+                    else -> AlgorithmTrader(
+                        tradeBotSettings,
+                        exchangeBotsFiles,
+                        logMessageQueue = logMessageQueue,
+                        sendMessage = sendMessage
+                    )
                 }
 
                 msg += "Trade bot ${tradeBotSettings.name} loaded, settings:\n```json\n${json(tradeBotSettings)}\n```"

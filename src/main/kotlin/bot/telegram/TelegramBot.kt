@@ -3,6 +3,7 @@ package bot.telegram
 import bot.trade.Communicator
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.clients.ExchangeEnum
+import bot.trade.libs.CustomFileLoggingProcessor
 import bot.trade.libs.escapeMarkdownV2Text
 import bot.trade.libs.m
 import mu.KotlinLogging
@@ -14,6 +15,7 @@ import org.telegram.telegrambots.meta.api.objects.Update
 import java.io.File
 import java.time.Duration
 import java.util.concurrent.BlockingQueue
+import java.util.concurrent.LinkedBlockingDeque
 
 class TelegramBot(
     private val chatId: String,
@@ -28,6 +30,7 @@ class TelegramBot(
     timeDifference: Duration?,
     candlestickDataCommandStr: String?,
     candlestickDataPath: Map<ExchangeEnum, String>,
+    logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
     taskQueue: BlockingQueue<Thread>,
     private val defaultCommands: Map<String, String>
 ) : TelegramLongPollingBot(botToken) {
@@ -46,6 +49,7 @@ class TelegramBot(
         candlestickDataPath = candlestickDataPath,
         taskQueue = taskQueue,
         exchangeFiles = exchangeFiles,
+        logMessageQueue = logMessageQueue,
         sendFile = { sendFile(it) },
         sendMessage = { message, isMarkDown -> sendMessage(message, isMarkDown) })
 

@@ -5,6 +5,7 @@ import bot.trade.database.service.OrderService
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.readConf
 import bot.telegram.TelegramBot
+import bot.trade.libs.CustomFileLoggingProcessor
 import mu.KLogger
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
@@ -25,6 +26,9 @@ class MainController(orderService: OrderService) {
         val taskExecutor = TaskExecutor(LinkedBlockingDeque())
         val propConf = readConf("common.conf") ?: throw RuntimeException("Can't read Config File!")
 
+        val logMessageQueue = LinkedBlockingDeque<CustomFileLoggingProcessor.Message>()
+        CustomFileLoggingProcessor(logMessageQueue)
+
         taskExecutor.start()
 
         bot = try {
@@ -41,6 +45,7 @@ class MainController(orderService: OrderService) {
                 timeDifference = null,
                 candlestickDataCommandStr = null,
                 candlestickDataPath = mapOf(),
+                logMessageQueue = logMessageQueue,
                 taskQueue = taskExecutor.getQueue(),
                 exchangeFiles = exchangeFile
             ).also { TelegramBotsApi(DefaultBotSession::class.java).registerBot(it) }

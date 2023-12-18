@@ -49,7 +49,7 @@ class ClientTestExchange : Client {
     ): List<Candlestick> = candlesticksData
 
     override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
-        orders.add(order.also {})
+        orders.add(order)
         return order
     }
 

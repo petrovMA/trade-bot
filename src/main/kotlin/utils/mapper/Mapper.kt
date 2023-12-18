@@ -18,6 +18,8 @@ object Mapper {
         .registerTypeAdapter(BotSettings::class.java, BotSettingsDeserializer())
         .create()
 
+    private val simpleGson: Gson = GsonBuilder().create()
+
     @JvmStatic
     inline fun <reified T> asObject(json: String): T = gson.fromJson(json, T::class.java)
 
@@ -34,7 +36,10 @@ object Mapper {
     fun <K, V> asMapObjects(file: File, type: Type): Map<K, V> = gson.fromJson(FileReader(file), type)
 
     @JvmStatic
-    fun asString(message: Any): String = gson.toJson(message)
+    fun asString(message: Any, pretty: Boolean = true): String = if (pretty)
+        gson.toJson(message)
+    else
+        simpleGson.toJson(message)
 
     @JvmStatic
     fun asFile(message: Any, file: File) {

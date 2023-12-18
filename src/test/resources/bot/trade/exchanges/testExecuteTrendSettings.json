@@ -1,0 +1,69 @@
+{
+  "flow_name": "MANAUSDT_LONG_TEST",
+  "symbol": {
+    "first": "MANA",
+    "second": "USDT"
+  },
+  "exchange_type": "Bybit",
+  "strategy_type": "LONG",
+  "order_type": "MARKET",
+  "parameters": {
+    "trading_range": {
+      "lower_bound": 0.2,
+      "upper_bound": 0.6,
+      "use_percent": false
+    },
+    "in_order_quantity": {
+      "value": 15.0,
+      "use_percent": false
+    },
+    "in_order_distance": {
+      "distance": 2.0,
+      "use_percent": false
+    },
+    "trailing_in_order_distance": {
+      "distance": 3.0,
+      "use_percent": false
+    },
+    "trigger_in_order_distance": {
+      "distance": 3.0,
+      "use_percent": false
+    },
+    "trigger_distance": {
+      "distance": 8.0,
+      "use_percent": false
+    },
+    "min_tp_distance": {
+      "distance": 5.0,
+      "use_percent": false
+    },
+    "max_tp_distance": {
+      "distance": 5.0,
+      "use_percent": false
+    },
+    "max_trigger_count": -1,
+    "set_close_orders": false
+  },
+  "trend_detector": {
+    "rsi1": {
+      "rsi_period": 14,
+      "time_frame": "30m"
+    },
+    "rsi2": {
+      "rsi_period": 14,
+      "time_frame": "1h"
+    },
+    "hma_parameters": {
+      "hma1_period": 10,
+      "hma2_period": 70,
+      "hma3_period": 200,
+      "time_frame": "5m"
+    }
+  },
+  "market_type": "USDT Perpetual",
+  "market_type_comment": "USDT Perpetual, Inverse Perpetual, Spot",
+  "strategy_type_comment": "Long, Short, Spot",
+  "orderBalanceType": "second",
+  "countOfDigitsAfterDotForAmount": 1,
+  "countOfDigitsAfterDotForPrice": 4
+}

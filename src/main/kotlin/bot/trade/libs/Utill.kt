@@ -75,7 +75,7 @@ fun reWriteObject(obj: Any, file: File) {
 
 fun writeObject(obj: Any, file: File) = asFile(obj, file)
 
-fun json(obj: Any) = asString(obj)
+fun json(obj: Any, pretty: Boolean = true) = asString(obj, pretty)
 
 fun escapeMarkdownV2Text(inputText: String): String = StringBuilder().run {
     for (char in inputText) {

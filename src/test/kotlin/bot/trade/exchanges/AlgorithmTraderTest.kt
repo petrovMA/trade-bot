@@ -2,14 +2,10 @@ package bot.trade.exchanges
 
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.div8
-import bot.trade.libs.readConf
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Test
 import utils.mapper.Mapper
-import utils.resourceFile
 import java.math.BigDecimal
-import java.util.*
-import java.util.concurrent.LinkedBlockingDeque
 
 class AlgorithmTraderTest {
 
@@ -331,25 +327,4 @@ class AlgorithmTraderTest {
             "Assertion failed on price = ${price.toPrice()}, "
         )
     }
-
-    private fun testExchange(settingsFile: String) = ClientTestExchange().let { exchange ->
-        AlgorithmTrader(
-            botSettings = Mapper.asObject<BotSettingsTrader>(settingsFile.file().readText()),
-            exchangeBotsFiles = "",
-            queue = LinkedBlockingDeque<CommonExchangeData>(),
-            exchangeEnum = ExchangeEnum.TEST,
-            conf = readConf("TEST.conf".file().path)!!,
-            api = "",
-            sec = "",
-            client = exchange,
-            isLog = false,
-            isEmulate = true,
-        ) { _, _ -> } to exchange
-    }
-
-    fun String.file() = resourceFile<AlgorithmTraderTest>(this)
-
-    infix fun Int.startExclusive(other: Int): IntRange = IntRange(this + 1, other)
-
-    fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
 }

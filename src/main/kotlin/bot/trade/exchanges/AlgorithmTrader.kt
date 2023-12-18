@@ -21,6 +21,8 @@ class AlgorithmTrader(
     client: Client = newClient(exchangeEnum, api, sec),
     isLog: Boolean = true,
     isEmulate: Boolean = false,
+    logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
+    private val endTimeForTrendCalculator: Long? = null,
     sendMessage: (String, Boolean) -> Unit
 ) : Algorithm(
     botSettings = botSettings,
@@ -33,6 +35,7 @@ class AlgorithmTrader(
     client = client,
     isLog = isLog,
     isEmulate = isEmulate,
+    logMessageQueue = logMessageQueue,
     sendMessage = sendMessage
 ) {
     private val settings: BotSettingsTrader = super.botSettings as BotSettingsTrader
@@ -67,13 +70,14 @@ class AlgorithmTrader(
 //        if (settings.direction == BotSettingsTrader.Direction.BOTH)
         trendCalculator = settings.trendDetector?.run {
             TrendCalculator(
-                client,
-                botSettings.pair,
-                hmaParameters.timeFrame.toDuration() to hmaParameters.hma1Period,
-                hmaParameters.timeFrame.toDuration() to hmaParameters.hma2Period,
-                hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
-                rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
-                rsi2.timeFrame.toDuration() to rsi2.rsiPeriod
+                client = client,
+                pair = botSettings.pair,
+                hma1 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma1Period,
+                hma2 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma2Period,
+                hma3 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
+                rsi1 = rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
+                rsi2 = rsi2.timeFrame.toDuration() to rsi2.rsiPeriod,
+                endTime = endTimeForTrendCalculator
             )
         } ?: run {
             send("Not found trendDetector settings")
@@ -85,35 +89,7 @@ class AlgorithmTrader(
         when (msg) {
             is Candlestick -> {
 
-                prevCandlestick?.let { prevCandlestick ->
-                    if (msg.openTime >= prevCandlestick.closeTime) {
-                        trendCalculator?.addCandlesticks(prevCandlestick)
-
-                        val currentTrend = trendCalculator?.getTrend()
-
-                        log?.debug("{} Trend: {}\nnew Kline: {}", botSettings.name, currentTrend, msg)
-
-                        trend?.let {
-                            if (it.trend != currentTrend?.trend) {
-                                trend = currentTrend
-                                send("#${botSettings.name} #Trend :\n```json\n${json(it)}\n```", true)
-                            }
-                        } ?: run { trend = currentTrend }
-                    }
-                }
-
-                prevCandlestick = msg.let { k ->
-                    Candlestick(
-                        openTime = k.openTime,
-                        closeTime = k.closeTime,
-                        open = k.open.round(),
-                        high = k.high.round(),
-                        low = k.low.round(),
-                        close = k.close.round(),
-                        volume = k.volume.round()
-                    )
-                }
-
+                trendCalculator?.addCandlesticks(msg)
 
                 prevPrice = if (prevPrice == BigDecimal(0)) msg.close
                 else currentPrice
@@ -145,10 +121,10 @@ class AlgorithmTrader(
                                                 orderType = TYPE.MARKET
                                             ).also {
                                                 if (currentDirection == DIRECTION.LONG) {
-                                                    it.lastBorderPrice = BigDecimal(-99999999999999L)
+                                                    it.lastBorderPrice = null
                                                     it.side = SIDE.SELL
                                                 } else {
-                                                    it.lastBorderPrice = BigDecimal(99999999999999L)
+                                                    it.lastBorderPrice = null
                                                     it.side = SIDE.BUY
                                                 }
                                             }
@@ -318,6 +294,7 @@ class AlgorithmTrader(
                 }
 
                 if (buySumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                    log("Orders before execute:\n${json(orders, false)}")
                     checkOrders()
                     sentOrder(
                         amount = buySumAmount,
@@ -325,9 +302,11 @@ class AlgorithmTrader(
                         price = currentPrice,
                         orderType = TYPE.MARKET
                     )
+                    log("Orders after execute:\n${json(orders, false)}")
                 }
 
                 if (sellSumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                    log("Orders before execute:\n${json(orders, false)}")
                     checkOrders()
                     sentOrder(
                         amount = sellSumAmount,
@@ -335,6 +314,7 @@ class AlgorithmTrader(
                         price = currentPrice,
                         orderType = TYPE.MARKET
                     )
+                    log("Orders after execute:\n${json(orders, false)}")
                 }
             }
 
@@ -343,13 +323,12 @@ class AlgorithmTrader(
                 if (msg.pair == botSettings.pair) {
                     if (msg.status == STATUS.FILLED) {
                         if (msg.type == TYPE.LIMIT) {
-                            val order = msg
-                            val ordersForUpdate = orders.filter { (_, v) -> v.orderId == order.orderId }
+                            val ordersForUpdate = orders.filter { (_, v) -> v.orderId == msg.orderId }
 
                             ordersForUpdate.forEach { (k, _) ->
-                                orders[k] = order.also {
+                                orders[k] = msg.also {
                                     it.type = TYPE.MARKET
-                                    it.lastBorderPrice = BigDecimal.ZERO
+                                    it.lastBorderPrice = null
                                 }
                             }
                         }
@@ -428,7 +407,7 @@ class AlgorithmTrader(
                                     side = SIDE.SELL,
                                     type = TYPE.MARKET,
                                     status = STATUS.NEW,
-                                    lastBorderPrice = BigDecimal(-99999999999999L),
+                                    lastBorderPrice = null,
                                     stopPrice = null
                                 )
                             }
@@ -450,7 +429,7 @@ class AlgorithmTrader(
                                     side = SIDE.BUY,
                                     type = TYPE.MARKET,
                                     status = STATUS.NEW,
-                                    lastBorderPrice = BigDecimal(99999999999999L),
+                                    lastBorderPrice = null,
                                     stopPrice = null
                                 )
                             }
@@ -463,12 +442,7 @@ class AlgorithmTrader(
             } else orders.remove(it.key)
         }
 
-        log?.info(
-            "{} Price = '{}' Orders for execute:\n{}",
-            botSettings.name,
-            currentPrice.toPrice(),
-            json(ordersListForExecute)
-        )
+        log("Price = '${currentPrice.toPrice()}' Orders for execute:\n${json(ordersListForExecute)}")
 
         ordersListForExecute.clear()
     }
@@ -537,7 +511,7 @@ class AlgorithmTrader(
                                 side = if (currentDirection == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
                                 type = TYPE.MARKET,
                                 status = STATUS.FILLED,
-                                lastBorderPrice = BigDecimal.ZERO
+                                lastBorderPrice = null
                             )
                         }
 
