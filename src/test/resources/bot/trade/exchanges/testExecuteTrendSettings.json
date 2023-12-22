@@ -45,6 +45,7 @@
     "set_close_orders": false
   },
   "trend_detector": {
+    "not_auto_calc_trend": true,
     "rsi1": {
       "rsi_period": 14,
       "time_frame": "30m"

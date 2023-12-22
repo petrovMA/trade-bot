@@ -30,30 +30,33 @@ class TrendCalculator(
 ) {
     private val log = KotlinLogging.logger {}
 
+    private var trend: Trend? = null
+
     private val objectMapper: ObjectMapper = ObjectMapper()
 
-    private val hma1Converter = KlineConverter(inputKlineInterval.first, hma1.first, (hma1.second * 1.5).toInt())
-    private val hma2Converter = KlineConverter(inputKlineInterval.first, hma2.first, (hma2.second * 1.3).toInt())
-    private val hma3Converter = KlineConverter(inputKlineInterval.first, hma3.first, (hma3.second * 1.2).toInt())
-    private val rsi1Converter = KlineConverter(inputKlineInterval.first, rsi1.first, (rsi1.second + 1))
-    private val rsi2Converter = KlineConverter(inputKlineInterval.first, rsi2.first, (rsi2.second + 1))
+    private var isTrendUpdated = true
+
+    val hma1Converter = KlineConverter(inputKlineInterval.first, hma1.first, (hma1.second * 1.5).toInt())
+    val hma2Converter = KlineConverter(inputKlineInterval.first, hma2.first, (hma2.second * 1.3).toInt())
+    val hma3Converter = KlineConverter(inputKlineInterval.first, hma3.first, (hma3.second * 1.2).toInt())
+    val rsi1Converter = KlineConverter(inputKlineInterval.first, rsi1.first, (rsi1.second + 1))
+    val rsi2Converter = KlineConverter(inputKlineInterval.first, rsi2.first, (rsi2.second + 1))
 
     init {
         initKlineForIndicator(client, pair, setOf(hma1, hma2, hma3, rsi1, rsi2), endTime ?: System.currentTimeMillis())
     }
 
-    /**
-     * @param candlesticks - small candlesticks !! put here only closed candlesticks
-     */
     fun addCandlesticks(vararg candlesticks: Candlestick) {
-        hma1Converter.addCandlesticks(*candlesticks)
-        hma2Converter.addCandlesticks(*candlesticks)
-        hma3Converter.addCandlesticks(*candlesticks)
-        rsi1Converter.addCandlesticks(*candlesticks)
-        rsi2Converter.addCandlesticks(*candlesticks)
+        val isHma1 = hma1Converter.addCandlesticks(*candlesticks)
+        val isHma2 = hma2Converter.addCandlesticks(*candlesticks)
+        val isHma3 = hma3Converter.addCandlesticks(*candlesticks)
+        val isRsi1 = rsi1Converter.addCandlesticks(*candlesticks)
+        val isRsi2 = rsi2Converter.addCandlesticks(*candlesticks)
+
+        isTrendUpdated = (isTrendUpdated || isHma1 || isHma2 || isHma3 || isRsi1 || isRsi2)
     }
 
-    fun getTrend(): Trend {
+    private fun calcTrend() {
         val hma1 = calcHMA(hma1Converter.getCandlesticks(), hma1.second)
         val hma2 = calcHMA(hma2Converter.getCandlesticks(), hma2.second)
         val hma3 = calcHMA(hma3Converter.getCandlesticks(), hma3.second)
@@ -73,7 +76,7 @@ class TrendCalculator(
 
         log.info("Trend: $trend hma1=$hma1, hma2=$hma2, hma3=$hma3, rsi1=$rsi1, rsi2=$rsi2")
 
-        return Trend(
+        this.trend = Trend(
             hma1 = hma1,
             hma2 = hma2,
             hma3 = hma3,
@@ -81,6 +84,14 @@ class TrendCalculator(
             rsi2 = rsi2,
             trend = trend
         )
+    }
+
+    fun getTrend(): Trend? {
+        if (isTrendUpdated) {
+            calcTrend()
+            isTrendUpdated = false
+        }
+        return trend
     }
 
     private fun initKlineForIndicator(
@@ -106,15 +117,14 @@ class TrendCalculator(
                 .sortedBy { it.closeTime }
                 .also { startTime = it.first().closeTime }
                 .forEach {
-
-                    if (endTime < it.closeTime)
-                        return
-
                     hma1Converter.addCandlesticks(it)
                     hma2Converter.addCandlesticks(it)
                     hma3Converter.addCandlesticks(it)
                     rsi1Converter.addCandlesticks(it)
                     rsi2Converter.addCandlesticks(it)
+
+                    if (endTime < it.closeTime)
+                        return
                 }
 
         } while (true)
@@ -133,7 +143,9 @@ class TrendCalculator(
 
         val request = Request.Builder().url("http://95.217.0.250:5000/hma").post(body(params)).build()
 
-        var resp: okhttp3.Response
+        var resp: okhttp3.Response? = null
+
+        var trying = 0
 
         do {
             resp = try {
@@ -143,11 +155,14 @@ class TrendCalculator(
                 sleep(200)
                 continue
             }
-            if (resp.code != 200) {
+            if (resp!!.code != 200) {
                 log.error("Error hma calculation response, code: ${resp.code}, bode: \n${resp.body!!.string()}")
                 sleep(200)
             } else break
-        } while (true)
+        } while (trying++ < 10)
+
+        if (resp == null)
+            throw Exception("Error hma calculation request")
 
         val time = Instant.ofEpochMilli(kline.first().closeTime).atOffset(ZoneOffset.UTC).toString()
 

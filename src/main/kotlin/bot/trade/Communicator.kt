@@ -4,6 +4,7 @@ import bot.trade.database.service.OrderService
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.emulate.Emulate
+import bot.trade.exchanges.libs.TrendCalculator
 import bot.trade.libs.*
 import bot.trade.rest_controller.Notification
 import com.typesafe.config.Config
@@ -170,70 +171,11 @@ class Communicator(
             }
 
             cmd.commandEmulateTradeBot.matches(message) -> {
-
-                val params = message.split("[\\n|]".toRegex())
-                val (msgErrors, tradeBotSettings) = parseTradeBotSettings(params)
-
-                val (startDate, msg0) = getBotStartParam(params, "startDate", msgErrors)
-                val (endDate, msg1) = getBotStartParam(params, "endDate", msg0)
-                val (exchange, msg2) = getBotStartParam(params, "exchange", msg1)
-
-                val (firstBalanceStr, msg3) = getBotStartParam(params, "firstBalance", msg2)
-                val (secondBalanceStr, msg4) = getBotStartParam(params, "secondBalance", msg3)
-
-                val firstBalance: BigDecimal? = try {
-                    firstBalanceStr.toBigDecimal()
-                } catch (t: Throwable) {
-                    msg += "Incorrect value 'firstBalance': $firstBalanceStr"
-                    log.warn("Incorrect value 'firstBalance': $firstBalanceStr", t)
-                    null
-                }
-
-                val secondBalance: BigDecimal? = try {
-                    secondBalanceStr.toBigDecimal()
-                } catch (t: Throwable) {
-                    msg += "Incorrect value 'secondBalance': $secondBalanceStr"
-                    log.warn("Incorrect value 'secondBalance': $secondBalanceStr", t)
-                    null
-                }
-
-                if (tradeBotSettings != null
-                    && firstBalance != null
-                    && secondBalance != null
-                ) {
-                    taskQueue.put(
-                        Emulate(
-                            sendFile = sendFile,
-                            sendMessage = sendMessage,
-                            botSettings = tradeBotSettings,
-                            firstBalance = firstBalance,
-                            secondBalance = secondBalance,
-                            startDate = startDate,
-                            endDate = endDate,
-                            candlestickDataPath = candlestickDataPath,
-                            exchangeEnum = ExchangeEnum.valueOf(exchange.uppercase(Locale.getDefault()))
-                        )
-                    )
-                } else msg += "Parse params errors:\n$msg4"
-
-                log.info(msg)
+                TODO("not implemented yet")
             }
 
             cmd.commandCreateTradeBot.matches(message) -> {
-
-                val params = message.split("[\\n|]".toRegex())
-                val (msgErrors, tradeBotSettings) = parseTradeBotSettings(params)
-
-                tradeBotSettings?.let {
-                    tradeBots[it.name] = AlgorithmTrader(
-                        tradeBotSettings,
-                        exchangeBotsFiles,
-                        logMessageQueue = logMessageQueue,
-                        sendMessage = sendMessage
-                    )
-                } ?: run { msg += "Parse params errors:\n$msgErrors" }
-
-                log.info(msg)
+                TODO("not implemented yet")
             }
 
             cmd.commandLoadTradeBot.matches(message) -> {
@@ -591,184 +533,13 @@ class Communicator(
             ?: sendMessage("TradeBot ${notification.botName} not found", false)
     }
 
-    private fun parseTradeBotSettings(p: List<String>): Pair<String, BotSettings?> {
-
-        var msg = ""
-        val (name, msg0) = getBotStartParam(p, "name", msg)
-        val (pair, msg1) = getBotStartParam(p, "pair", msg0)
-        val (exchange, msg2) = getBotStartParam(p, "exchange", msg1)
-        val (ordersTypeStr, msg3) = getBotStartParam(p, "ordersType", msg2)
-        val (tradingRangeStr, msg4) = getBotStartParam(p, "tradingRange", msg3)
-        val (orderSizeStr, msg5) = getBotStartParam(p, "orderSize", msg4)
-        val (orderDistanceStr, msg6) = getBotStartParam(p, "orderDistance", msg5)
-        val (triggerDistanceStr, msg7) = getBotStartParam(p, "triggerDistance", msg6)
-        val (orderMaxQuantityStr, msg8) = getBotStartParam(p, "orderMaxQuantity", msg7)
-        val (directionStr, msg9) = getBotStartParam(p, "direction", msg8)
-        val (orderBalanceTypeStr, msg10) = getBotStartParam(p, "orderBalanceType", msg9)
-        val (countOfDigitsAfterDotForAmountStr, msg11) = getBotStartParam(p, "countOfDigitsAfterDotForAmount", msg10)
-        val (countOfDigitsAfterDotForPriceStr, msg12) = getBotStartParam(p, "countOfDigitsAfterDotForPrice", msg11)
-        val (enableStopOrderDistanceStr, msg13) = getBotStartParam(p, "enableStopOrderDistance", msg12)
-
-        msg += msg13
-
-        if (msg.isEmpty()) {
-
-            if (name.matches("^[a-zA-Z0-9_]+$".toRegex()).not()) {
-                msg += "Incorrect value 'name': $name should match '^[a-zA-Z0-9_]+$'"
-                log.warn("Incorrect value 'name': $name should match '^[a-zA-Z0-9_]+$'")
-            }
-
-            val ordersType: TYPE? = try {
-                TYPE.valueOf(ordersTypeStr.uppercase())
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'ordersType': $ordersTypeStr"
-                log.warn("Incorrect value 'ordersType': $ordersTypeStr", t)
-                null
-            }
-
-            val direction: BotSettingsTrader.Direction? = try {
-                BotSettingsTrader.Direction.valueOf(directionStr.uppercase())
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'direction': $directionStr"
-                log.warn("Incorrect value 'direction': $directionStr", t)
-                null
-            }
-
-            val tradingRange: Pair<BigDecimal, BigDecimal>? = try {
-                tradingRangeStr.split("[-\\s,]+".toRegex()).let { it[0].toBigDecimal() to it[1].toBigDecimal() }
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'tradingRange': $tradingRangeStr"
-                log.warn("Incorrect value 'tradingRange': $tradingRangeStr", t)
-                null
-            }
-
-            val orderSize: BigDecimal? = try {
-                orderSizeStr.toBigDecimal()
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'orderSize': $orderSizeStr"
-                log.warn("Incorrect value 'orderSize': $orderSizeStr", t)
-                null
-            }
-
-            val orderDistance: BigDecimal? = try {
-                orderDistanceStr.toBigDecimal()
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'orderDistance': $orderDistanceStr"
-                log.warn("Incorrect value 'orderDistance': $orderDistanceStr", t)
-                null
-            }
-
-            val triggerDistance: BigDecimal? = try {
-                triggerDistanceStr.toBigDecimal()
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'triggerDistance': $triggerDistanceStr"
-                log.warn("Incorrect value 'triggerDistance': $triggerDistanceStr", t)
-                null
-            }
-
-            val orderMaxQuantity: Int? = try {
-                orderMaxQuantityStr.toInt()
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'orderMaxQuantity': $orderMaxQuantityStr"
-                log.warn("Incorrect value 'orderMaxQuantity': $orderMaxQuantityStr", t)
-                null
-            }
-
-            val countOfDigitsAfterDotForAmount: Int? = try {
-                countOfDigitsAfterDotForAmountStr.toInt()
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'countOfDigitsAfterDotForAmount': $countOfDigitsAfterDotForAmountStr"
-                log.warn("Incorrect value 'countOfDigitsAfterDotForAmount': $countOfDigitsAfterDotForAmountStr", t)
-                null
-            }
-
-            val countOfDigitsAfterDotForPrice: Int? = try {
-                countOfDigitsAfterDotForPriceStr.toInt()
-            } catch (t: Throwable) {
-                msg += "Incorrect value 'countOfDigitsAfterDotForPrice': $countOfDigitsAfterDotForPriceStr"
-                log.warn("Incorrect value 'countOfDigitsAfterDotForPrice': $countOfDigitsAfterDotForPriceStr", t)
-                null
-            }
-
-            val orderBalanceType: String = if (orderBalanceTypeStr == "first" || orderBalanceTypeStr == "second") {
-                orderBalanceTypeStr
-            } else "second"
-
-            val enableStopOrderDistance: BigDecimal = try {
-                enableStopOrderDistanceStr.toBigDecimal()
-            } catch (t: Throwable) {
-                0.toBigDecimal()
-            }
-
-            if (name.isNotBlank()
-                && pair.isNotBlank()
-                && exchange.isNotBlank()
-                && ordersType != null
-                && direction != null
-                && tradingRange != null
-                && orderSize != null
-                && orderDistance != null
-                && triggerDistance != null
-                && orderMaxQuantity != null
-                && countOfDigitsAfterDotForAmount != null
-                && countOfDigitsAfterDotForPrice != null
-            ) {
-                return msg to BotSettingsTrader(
-                    name = name,
-                    pair = TradePair(pair),
-                    exchange = exchange.uppercase(),
-                    direction = direction,
-                    ordersType = ordersType,
-                    orderBalanceType = orderBalanceType,
-                    countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
-                    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice,
-                    marketType = "",
-                    marketTypeComment = "",
-                    strategyTypeComment = "",
-                    parameters = BotSettingsTrader.Parameters(
-                        orderMaxQuantity = orderMaxQuantity,
-                        tradingRange = BotSettingsTrader.Parameters.TradingRange(
-                            lowerBound = tradingRange.first,
-                            upperBound = tradingRange.second,
-                            usePercent = false
-                        ),
-                        inOrderQuantity = BotSettingsTrader.Parameters.InOrderQuantity(
-                            value = orderSize,
-                            usePercent = false
-                        ),
-                        inOrderDistance = BotSettingsTrader.Parameters.InOrderDistance(
-                            distance = orderDistance,
-                            usePercent = false
-                        ),
-                        triggerDistance = BotSettingsTrader.Parameters.TriggerDistance(
-                            distance = triggerDistance,
-                            usePercent = false
-                        ),
-                        minTpDistance = BotSettingsTrader.Parameters.MinTpDistance(
-                            distance = enableStopOrderDistance,
-                            usePercent = false
-                        ),
-                        maxTpDistance = BotSettingsTrader.Parameters.MaxTpDistance(
-                            distance = enableStopOrderDistance,
-                            usePercent = false
-                        ),
-                        triggerInOrderDistance = BotSettingsTrader.Parameters.TriggerInOrderDistance(
-                            distance = BigDecimal(0.0),
-                            usePercent = false
-                        ),
-                        trailingInOrderDistance = BotSettingsTrader.Parameters.TrailingInOrderDistance(
-                            distance = BigDecimal(0.0),
-                            usePercent = false
-                        )
-                    )
-                )
-            }
-        }
-        return msg to null
-    }
-
     fun getInfo() = tradeBots.values.map { it.botSettings to (it as AlgorithmBobblesIndicator).positions }
     fun getOrders(botName: String) = tradeBots[botName]?.orders()
+    fun getTrend(botName: String): TrendCalculator.Trend? = tradeBots[botName]?.let { bot ->
+        if (bot is AlgorithmTrader) bot.getTrend()
+        else null
+    }
+
     fun getBotsList() = tradeBots.map { it.key }
 
     private fun getBotStartParam(params: List<String>, paramName: String, prevMsg: String): Pair<String, String> {

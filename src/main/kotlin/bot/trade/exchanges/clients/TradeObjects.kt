@@ -336,9 +336,9 @@ class BotSettingsTrader(
     orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
     countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
     countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    @SerializedName("strategy_type") val direction: Direction,
+    @SerializedName("strategy_type") val strategy: StrategyType,
     @SerializedName("order_type") val ordersType: TYPE,
-    @SerializedName("parameters") val parameters: Parameters,
+    @SerializedName("parameters") val parameters: TradeParameters,
     @SerializedName("trend_detector") val trendDetector: TrendDetector? = null,
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
@@ -352,9 +352,10 @@ class BotSettingsTrader(
     countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
 ) {
 
-    enum class Direction { LONG, SHORT, BOTH }
+    enum class StrategyType { LONG, SHORT, BOTH }
 
     class TrendDetector(
+        @SerializedName("not_auto_calc_trend") val notAutoCalcTrend: Boolean = false,
         @SerializedName("rsi1") val rsi1: Rsi,
         @SerializedName("rsi2") val rsi2: Rsi,
         @SerializedName("hma_parameters") val hmaParameters: HmaParameters
@@ -371,64 +372,82 @@ class BotSettingsTrader(
         )
     }
 
-    class Parameters(
-        @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
-        @SerializedName("in_order_quantity") val inOrderQuantity: InOrderQuantity, // Order Quantity:: order size
-        @SerializedName("in_order_distance") val inOrderDistance: InOrderDistance, // Order Distance:: distance between every order
-        @SerializedName("trailing_in_order_distance") val trailingInOrderDistance: TrailingInOrderDistance?, // Trailing in Distance:: distance between in_order and when_order_be_executed
-        @SerializedName("trigger_in_order_distance") val triggerInOrderDistance: TriggerInOrderDistance?, // Trigger in Distance
-        @SerializedName("trigger_distance") val triggerDistance: TriggerDistance, // Trigger Distance:: distance between order and stop-order
-        @SerializedName("min_tp_distance") val minTpDistance: MinTpDistance,
-        @SerializedName("max_tp_distance") val maxTpDistance: MaxTpDistance,
-        @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
-        @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts,\
-        @SerializedName("min_order_amount") val minOrderAmount: MinOrderAmount? = null
+    class TradeParameters(
+        @SerializedName("long_parameters") val longParameters: Parameters,
+        @SerializedName("short_parameters") val shortParameters: Parameters,
     ) {
-        class TradingRange(
-            @SerializedName("lower_bound") val lowerBound: BigDecimal,
-            @SerializedName("upper_bound") val upperBound: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+        class Parameters(
+            @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
+            @SerializedName("in_order_quantity") val inOrderQuantity: InOrderQuantity, // Order Quantity:: order size
+            @SerializedName("in_order_distance") val inOrderDistance: InOrderDistance, // Order Distance:: distance between every order
+            @SerializedName("trailing_in_order_distance") val trailingInOrderDistance: TrailingInOrderDistance?, // Trailing in Distance:: distance between in_order and when_order_be_executed
+            @SerializedName("trigger_in_order_distance") val triggerInOrderDistance: TriggerInOrderDistance?, // Trigger in Distance
+            @SerializedName("trigger_distance") val triggerDistance: TriggerDistance, // Trigger Distance:: distance between order and stop-order
+            @SerializedName("min_tp_distance") val minTpDistance: MinTpDistance,
+            @SerializedName("max_tp_distance") val maxTpDistance: MaxTpDistance,
+            @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
+            @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts,\
+            @SerializedName("min_order_amount") val minOrderAmount: MinOrderAmount? = null
+        ) {
+            class TradingRange(
+                @SerializedName("lower_bound") val lowerBound: BigDecimal,
+                @SerializedName("upper_bound") val upperBound: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
 
-        class InOrderQuantity(
-            @SerializedName("value") val value: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+            class InOrderQuantity(
+                @SerializedName("value") val value: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
 
-        class InOrderDistance(
-            @SerializedName("distance") val distance: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+            class InOrderDistance(
+                @SerializedName("distance") val distance: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
 
-        class TrailingInOrderDistance(
-            @SerializedName("distance") val distance: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+            class TrailingInOrderDistance(
+                @SerializedName("distance") val distance: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
 
-        class TriggerInOrderDistance(
-            @SerializedName("distance") val distance: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+            class TriggerInOrderDistance(
+                @SerializedName("distance") val distance: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
 
-        class TriggerDistance(
-            @SerializedName("distance") val distance: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+            class TriggerDistance(
+                @SerializedName("distance") val distance: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
 
-        class MinOrderAmount(
-            @SerializedName("distance") val amount: BigDecimal,
-            @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
-        )
+            class MinOrderAmount(
+                @SerializedName("distance") val amount: BigDecimal,
+                @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
+            )
 
-        class MaxTpDistance(
-            @SerializedName("distance") val distance: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+            class MaxTpDistance(
+                @SerializedName("distance") val distance: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
 
-        class MinTpDistance(
-            @SerializedName("distance") val distance: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
+            class MinTpDistance(
+                @SerializedName("distance") val distance: BigDecimal,
+                @SerializedName("use_percent") val usePercent: Boolean = false
+            )
+
+            fun minRange() = tradingRange.lowerBound
+            fun maxRange() = tradingRange.upperBound
+            fun orderDistance() = inOrderDistance.distance
+            fun orderQuantity() = inOrderQuantity.value
+            fun triggerDistance() = triggerDistance.distance
+            fun orderMaxQuantity() = orderMaxQuantity
+            fun triggerInOrderDistance() = triggerInOrderDistance?.distance
+            fun minTpDistance() = minTpDistance.distance
+            fun maxTpDistance() = maxTpDistance.distance
+            fun trailingInOrderDistance() = trailingInOrderDistance?.distance
+            fun setCloseOrders() = setCloseOrders
+            fun minOrderAmount() = minOrderAmount?.amount ?: BigDecimal.ZERO
+        }
     }
 }
 

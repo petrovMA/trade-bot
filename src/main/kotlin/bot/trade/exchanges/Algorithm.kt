@@ -233,6 +233,7 @@ abstract class Algorithm(
 
     fun orders() = botSettings to orders
 
-    fun log(message: String, file: File = File("$path/common_log.txt")) =
-        logMessageQueue?.add(CustomFileLoggingProcessor.Message(file, message))
+    fun log(message: String, file: File = File("logging/$path/common_log.txt")) =
+        if (isEmulate.not()) logMessageQueue?.add(CustomFileLoggingProcessor.Message(file, message))
+        else false
 }

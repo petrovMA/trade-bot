@@ -3,9 +3,7 @@ package bot.trade.exchanges.libs
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.exchanges.clients.ClientTestExchange
 import bot.trade.exchanges.clients.TradePair
-import bot.trade.libs.h
-import bot.trade.libs.m
-import bot.trade.libs.round
+import bot.trade.libs.*
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -46,7 +44,7 @@ class TrendCalculatorTest {
             .sortedBy { it.openTime }
             .forEach { trendCalculator.addCandlesticks(it) }
 
-        trendCalculator.getTrend().run {
+        trendCalculator.getTrend()!!.run {
             assertEquals(BigDecimal(2267.94).round(2), hma1)
             assertEquals(BigDecimal(2275.61).round(2), hma2)
             assertEquals(BigDecimal(2271.70).round(2), hma3)

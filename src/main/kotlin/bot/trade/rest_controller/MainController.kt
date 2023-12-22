@@ -114,6 +114,7 @@ class MainController(orderService: OrderService) {
         """.trimIndent()
 
         val infoResponse = bot.communicator.getOrders(botName)
+        val trend = bot.communicator.getTrend(botName)
         log.info("Response for /orders = $infoResponse")
 
         val botsList = bot.communicator
@@ -140,8 +141,8 @@ class MainController(orderService: OrderService) {
             .sortedBy { it.price }
             .run {
                 when (val settings = infoResponse.first) {
-                    is BotSettingsTrader -> when (settings.direction) {
-                        BotSettingsTrader.Direction.SHORT -> reversed()
+                    is BotSettingsTrader -> when (settings.strategy) {
+                        BotSettingsTrader.StrategyType.SHORT -> reversed()
                         else -> this
                     }
                     else -> this
@@ -165,6 +166,7 @@ class MainController(orderService: OrderService) {
                 File("pages/orders.html")
                     .readText()
                     .replace("${'$'}content", tableHeader + tableContent)
+                    .replace("${'$'}trend", trend.toString())
                     .replace("${'$'}buttons", botsList)
             )
     }

@@ -21,7 +21,9 @@ class KlineConverter(
     private var currentCandlestick: Candlestick? = null
     private var prevKline: Candlestick? = null
 
-    fun addCandlesticks(vararg inputCandlesticks: Candlestick) {
+    fun addCandlesticks(vararg inputCandlesticks: Candlestick): Boolean {
+        var isNewKline = false
+
         inputCandlesticks
             .sortedBy { it.openTime }
             .forEach {
@@ -64,29 +66,38 @@ class KlineConverter(
                         if (
                             (currentCandlestick!!.closeTime + 1) % outputKlineInterval.toMillis() == 0L
                             || currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L
-                        )
+                        ) {
                             closeCurrentCandlestick()
+                            isNewKline = true
+                        }
                     }
                 }
 
-                prevKline = it.let { k ->
-                    Candlestick(
-                        openTime = k.openTime,
-                        closeTime = k.closeTime,
-                        open = k.open.round(),
-                        high = k.high.round(),
-                        low = k.low.round(),
-                        close = k.close.round(),
-                        volume = k.volume.round()
-                    )
-                }
+                setPrevKline(it)
             }
+
+        return isNewKline
     }
 
     fun closeCurrentCandlestick() {
-        candlesticks.add(currentCandlestick!!)
+        currentCandlestick?.let {
+            if (candlesticks.isEmpty() || candlesticks.last().openTime < it.openTime)
+                candlesticks.add(it)
+        }
         currentCandlestick = null
     }
 
     fun getCandlesticks(): List<Candlestick> = candlesticks
+
+    private fun setPrevKline(kline: Candlestick) {
+        prevKline = Candlestick(
+            openTime = kline.openTime,
+            closeTime = kline.closeTime,
+            open = kline.open.round(),
+            high = kline.high.round(),
+            low = kline.low.round(),
+            close = kline.close.round(),
+            volume = kline.volume.round()
+        )
+    }
 }

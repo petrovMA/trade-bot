@@ -39,27 +39,12 @@ class AlgorithmTrader(
     sendMessage = sendMessage
 ) {
     private val settings: BotSettingsTrader = super.botSettings as BotSettingsTrader
-    private val minRange = settings.parameters.tradingRange.lowerBound
-    private val maxRange = settings.parameters.tradingRange.upperBound
-    private val orderDistance = settings.parameters.inOrderDistance.distance
-    private val orderQuantity = settings.parameters.inOrderQuantity.value
-    private val triggerDistance = settings.parameters.triggerDistance.distance
-    private val orderMaxQuantity = settings.parameters.orderMaxQuantity
-    private val triggerInOrderDistance = settings.parameters.triggerInOrderDistance?.distance
-    private val minTpDistance = settings.parameters.minTpDistance.distance
-    private val maxTpDistance = settings.parameters.maxTpDistance.distance
-    private val trailingInOrderDistance = settings.parameters.trailingInOrderDistance?.distance
-    private val setCloseOrders = settings.parameters.setCloseOrders
     private val ordersType = settings.ordersType
-    private val minOrderAmount = settings.parameters.minOrderAmount?.amount ?: BigDecimal.ZERO
-    private var currentDirection: DIRECTION = when (settings.direction) {
-        BotSettingsTrader.Direction.LONG -> DIRECTION.LONG
-        BotSettingsTrader.Direction.SHORT -> DIRECTION.SHORT
-        else -> DIRECTION.LONG
-    }
+    private val notAutoCalcTrend = settings.trendDetector?.notAutoCalcTrend ?: true
+    private val long = settings.parameters.longParameters
+    private val short = settings.parameters.shortParameters
     private var trendCalculator: TrendCalculator? = null
     private var trend: TrendCalculator.Trend? = null
-    private var prevCandlestick: Candlestick? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val ordersListForExecute: MutableMap<String, Order> = mutableMapOf()
 
@@ -67,7 +52,6 @@ class AlgorithmTrader(
     var to: Long = Long.MIN_VALUE
 
     override fun setup() {
-//        if (settings.direction == BotSettingsTrader.Direction.BOTH)
         trendCalculator = settings.trendDetector?.run {
             TrendCalculator(
                 client = client,
@@ -90,6 +74,13 @@ class AlgorithmTrader(
             is Candlestick -> {
 
                 trendCalculator?.addCandlesticks(msg)
+
+                if (!notAutoCalcTrend) getTrend()?.let {
+                    if (trend?.trend != it.trend) {
+                        trend = it
+                        send("#${botSettings.name} #Trend :\n```json\n${json(it)}\n```", true)
+                    }
+                }
 
                 prevPrice = if (prevPrice == BigDecimal(0)) msg.close
                 else currentPrice
@@ -169,8 +160,8 @@ class AlgorithmTrader(
                         else (BigDecimal(currPriceIn) - orderDistance).toPrice()
 
                     } while (
-                        (BigDecimal(currPriceIn) < BigDecimal(prevPriceIn) &&
-                                BigDecimal(priceIn) < BigDecimal(prevPriceIn)) ||
+                        (BigDecimal(currPriceIn) < BigDecimal(prevPriceIn) && BigDecimal(priceIn) < BigDecimal(prevPriceIn))
+                        ||
                         (BigDecimal(currPriceIn) > BigDecimal(prevPriceIn) &&
                                 BigDecimal(priceIn) > BigDecimal(prevPriceIn))
                     )
@@ -530,4 +521,6 @@ class AlgorithmTrader(
             ?: amount.round(botSettings.countOfDigitsAfterDotForAmount)
         else settings.parameters.minOrderAmount?.countOfDigitsAfterDotForAmount?.let { amount.div8(price).round(it) }
             ?: amount.div8(price).round(botSettings.countOfDigitsAfterDotForAmount)
+
+    fun getTrend(): TrendCalculator.Trend? = trendCalculator?.getTrend()
 }
