@@ -10,6 +10,8 @@ import mu.KotlinLogging
 import org.knowm.xchange.exceptions.ExchangeException
 import java.io.File
 import java.math.BigDecimal
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.sql.Timestamp
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
@@ -53,7 +55,16 @@ class AlgorithmBobblesIndicator(
     //    private var klineConstructor = KlineConstructor(interval)
     private lateinit var currentKline: Candlestick
     private lateinit var prevKline: Candlestick
-    override val orders: MutableMap<String, Order> = HashMap()
+
+    private val orders: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
+        filePath = "$path/orders".also {
+            if (isEmulate.not() && File(it).isDirectory.not()) Files.createDirectories(Paths.get(it))
+        },
+        keyToFileName = { key -> key.replace('.', '_') + ".json" },
+        fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
+    )
+    else mutableMapOf()
+
     private val balances: MutableMap<String, Balance> = HashMap()
 
     var positions: VirtualPositions = readObject<VirtualPositions>("$path/positions.json")

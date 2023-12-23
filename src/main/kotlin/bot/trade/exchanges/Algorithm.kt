@@ -50,15 +50,6 @@ abstract class Algorithm(
     var currentPrice: BigDecimal = 0.toBigDecimal()
     var prevPrice: BigDecimal = 0.toBigDecimal()
 
-    val ordersPath = "$path/orders"
-    open val orders: MutableMap<String, Order> =
-        if (isEmulate.not()) ObservableHashMap(
-            filePath = ordersPath,
-            keyToFileName = { key -> key.replace('.', '_') + ".json" },
-            fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
-        )
-        else mutableMapOf()
-
     var stream: Stream = client.stream(botSettings.pair, interval, queue)
 
     /**
@@ -71,8 +62,6 @@ abstract class Algorithm(
         saveBotSettings(botSettings)
         stopThread = false
         try {
-            if (isEmulate.not() && File(ordersPath).isDirectory.not()) Files.createDirectories(Paths.get(ordersPath))
-
             synchronizeOrders()
 
             stream.run { start() }
@@ -168,7 +157,6 @@ abstract class Algorithm(
                 log?.error("${botSettings.name} Can't send: $order", e)
 
                 e.printStackTrace()
-                log?.debug("{} Orders:\n{}", botSettings.name, orders)
                 client = newClient(exchangeEnum, api, sec)
                 synchronizeOrders()
             }
@@ -230,8 +218,6 @@ abstract class Algorithm(
     fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
 
     override fun toString(): String = "status = $state, settings = $botSettings"
-
-    fun orders() = botSettings to orders
 
     fun log(message: String, file: File = File("logging/$path/common_log.txt")) =
         if (isEmulate.not()) logMessageQueue?.add(CustomFileLoggingProcessor.Message(file, message))

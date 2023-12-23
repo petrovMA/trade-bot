@@ -340,6 +340,7 @@ class BotSettingsTrader(
     @SerializedName("order_type") val ordersType: TYPE,
     @SerializedName("parameters") val parameters: TradeParameters,
     @SerializedName("trend_detector") val trendDetector: TrendDetector? = null,
+    @SerializedName("min_order_amount") val minOrderAmount: MinOrderAmount? = null,
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
     @SerializedName("strategy_type_comment") val strategyTypeComment: String
@@ -351,6 +352,11 @@ class BotSettingsTrader(
     countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
     countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
 ) {
+
+    class MinOrderAmount(
+        @SerializedName("distance") val amount: BigDecimal,
+        @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
+    )
 
     enum class StrategyType { LONG, SHORT, BOTH }
 
@@ -373,8 +379,8 @@ class BotSettingsTrader(
     }
 
     class TradeParameters(
-        @SerializedName("long_parameters") val longParameters: Parameters,
-        @SerializedName("short_parameters") val shortParameters: Parameters,
+        @SerializedName("long_parameters") val longParameters: Parameters?,
+        @SerializedName("short_parameters") val shortParameters: Parameters?,
     ) {
         class Parameters(
             @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
@@ -386,8 +392,7 @@ class BotSettingsTrader(
             @SerializedName("min_tp_distance") val minTpDistance: MinTpDistance,
             @SerializedName("max_tp_distance") val maxTpDistance: MaxTpDistance,
             @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
-            @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts,\
-            @SerializedName("min_order_amount") val minOrderAmount: MinOrderAmount? = null
+            @SerializedName("set_close_orders") val setCloseOrders: Boolean = true // set close position orders when bot starts
         ) {
             class TradingRange(
                 @SerializedName("lower_bound") val lowerBound: BigDecimal,
@@ -420,11 +425,6 @@ class BotSettingsTrader(
                 @SerializedName("use_percent") val usePercent: Boolean = false
             )
 
-            class MinOrderAmount(
-                @SerializedName("distance") val amount: BigDecimal,
-                @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
-            )
-
             class MaxTpDistance(
                 @SerializedName("distance") val distance: BigDecimal,
                 @SerializedName("use_percent") val usePercent: Boolean = false
@@ -446,7 +446,6 @@ class BotSettingsTrader(
             fun maxTpDistance() = maxTpDistance.distance
             fun trailingInOrderDistance() = trailingInOrderDistance?.distance
             fun setCloseOrders() = setCloseOrders
-            fun minOrderAmount() = minOrderAmount?.amount ?: BigDecimal.ZERO
         }
     }
 }
