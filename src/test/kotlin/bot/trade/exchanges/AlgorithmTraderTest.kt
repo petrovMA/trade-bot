@@ -23,12 +23,12 @@ class AlgorithmTraderTest {
     fun testExecuteInOrdersWithMinOrderAmount() {
         val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersWithMinOrderAmountSettings.json")
 
-        algorithmTrader.orders.clear()
+        algorithmTrader.orders().second.clear()
 
         Mapper.asMapObjects<String, Order>(
             "testExecuteInOrdersWithMinOrderAmountOrders.json".file(),
             object : TypeToken<Map<String?, Order?>?>() {}.type
-        ).forEach { (k, v) -> algorithmTrader.orders[k] = v }
+        ).forEach { (k, v) -> algorithmTrader.orders().second[k] = v }
 
         algorithmTrader.handle(Trade(1518.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
@@ -51,7 +51,7 @@ class AlgorithmTraderTest {
                     orderId = "",
                     pair = TradePair("ETH", "USDT"),
                     price = "1510.00".toBigDecimal(),
-                    origQty = 0.02.toBigDecimal(),
+                    origQty = 0.016.toBigDecimal(),
                     executedQty = 0.toBigDecimal(),
                     side = SIDE.BUY,
                     type = TYPE.MARKET,
@@ -61,7 +61,7 @@ class AlgorithmTraderTest {
             exchange.orders
         )
 
-        assertOrders("testExecuteInOrdersWithMinOrderAmountOrdersExpected.json".file(), algorithmTrader.orders)
+        assertOrders("testExecuteInOrdersWithMinOrderAmountOrdersExpected.json".file(), algorithmTrader.orders().second)
     }
 
     @Test
@@ -101,7 +101,7 @@ class AlgorithmTraderTest {
             status = STATUS.NEW
         )
 
-        algorithmTrader.orders.clear()
+        algorithmTrader.orders().second.clear()
 
         algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
@@ -142,7 +142,7 @@ class AlgorithmTraderTest {
 
         assertOrders(listOf(expectedOrder1, expectedOrder2, expectedOrder3), exchange.orders)
 
-        assertOrders("testCheckLongStrategyOrdersExpected.json".file(), algorithmTrader.orders)
+        assertOrders("testCheckLongStrategyOrdersExpected.json".file(), algorithmTrader.orders().second)
     }
 
     @Test
@@ -160,7 +160,7 @@ class AlgorithmTraderTest {
             status = STATUS.NEW
         )
 
-        algorithmTrader.orders.clear()
+        algorithmTrader.orders().third.clear()
 
         var number = 0L
         var price = BigDecimal(0)
@@ -173,105 +173,105 @@ class AlgorithmTraderTest {
             if (i in 15800..15840) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_1.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15700 until 15800) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_2.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15600 until 15700) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_3.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15500 until 15600) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_4.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15400 until 15500) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_5.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15300 until 15400) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_6.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15200 until 15300) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_7.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15100 until 15200) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_8.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15000 until 15100) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_9.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14900 until 15000) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_10.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14800 until 14900) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_11.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14700 until 14800) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_12.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14600 until 14700) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_13.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14500 until 14600) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_14.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14400 until 14500) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_15.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -285,7 +285,7 @@ class AlgorithmTraderTest {
             if (i in 14400 until 14500) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_15.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -293,7 +293,7 @@ class AlgorithmTraderTest {
 
         assertOrders(
             "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_16.json".file(),
-            algorithmTrader.orders,
+            algorithmTrader.orders().third,
             "Assertion failed on price = ${price.toPrice()}, "
         )
 
@@ -305,7 +305,7 @@ class AlgorithmTraderTest {
             if (i in 15335 startExclusive 15385) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_16.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -313,7 +313,7 @@ class AlgorithmTraderTest {
             if (i in 14579..14581) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_17.json".file(),
-                    algorithmTrader.orders,
+                    algorithmTrader.orders().third,
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -323,7 +323,7 @@ class AlgorithmTraderTest {
 
         assertOrders(
             "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_18.json".file(),
-            algorithmTrader.orders,
+            algorithmTrader.orders().third,
             "Assertion failed on price = ${price.toPrice()}, "
         )
     }

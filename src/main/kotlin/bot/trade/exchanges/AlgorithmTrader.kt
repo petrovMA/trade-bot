@@ -98,26 +98,7 @@ class AlgorithmTrader(
 
                 trendCalculator?.addCandlesticks(msg)
 
-                if (!notAutoCalcTrend) getTrend()?.let {
-                    if (trend?.trend != it.trend) {
-                        trend = it
-                        send("#${botSettings.name} #Trend :\n```json\n${json(it)}\n```", true)
-
-                        when (it.trend) {
-                            TrendCalculator.Trend.TREND.LONG -> {
-
-                            }
-
-                            TrendCalculator.Trend.TREND.SHORT -> {
-
-                            }
-
-                            TrendCalculator.Trend.TREND.FLAT, TrendCalculator.Trend.TREND.HEDGE -> {
-
-                            }
-                        }
-                    }
-                }
+                log(json(msg, false), File("logging/$path/kline.txt"))
 
                 prevPrice = if (prevPrice == BigDecimal(0)) msg.close
                 else currentPrice
@@ -126,8 +107,45 @@ class AlgorithmTrader(
                 from = if (from > msg.closeTime) msg.closeTime else from
                 to = if (to < msg.closeTime) msg.closeTime else to
 
-                long?.let { createOrdersForExecute(DIRECTION.LONG, it) }
-                short?.let { createOrdersForExecute(DIRECTION.SHORT, it) }
+                if (!notAutoCalcTrend) {
+                    getTrend()?.let {
+                        if (trend?.trend != it.trend) {
+                            trend = it
+                            send("#${botSettings.name} #Trend :\n```json\n${json(it)}\n```", true)
+
+                            when (it.trend) {
+                                TrendCalculator.Trend.TREND.LONG -> {
+                                    ordersShort
+                                        .filter { (_, v) -> v.side == SIDE.BUY }
+                                        .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v
+                                    }
+                                    ordersShort.clear()
+
+                                    long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
+                                }
+
+                                TrendCalculator.Trend.TREND.SHORT -> {
+                                    ordersLong
+                                        .filter { (_, v) -> v.side == SIDE.SELL }
+                                        .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v
+                                    }
+                                    ordersLong.clear()
+
+                                    short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
+                                }
+
+                                TrendCalculator.Trend.TREND.FLAT, TrendCalculator.Trend.TREND.HEDGE -> {
+                                    long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
+                                    short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
+                                }
+                            }
+                        }
+                    }
+                }
+                else {
+                    long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
+                    short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
+                }
 
                 var sellSumAmount = BigDecimal.ZERO
                 var buySumAmount = BigDecimal.ZERO
@@ -141,8 +159,14 @@ class AlgorithmTrader(
                 }
 
                 if (buySumAmount > calcAmount(minOrderAmount, currentPrice)) {
-                    log("LONG Orders before execute:\n${json(ordersLong, false)}", File("logging/$path/orders.txt"))
-                    log("SHORT Orders before execute:\n${json(ordersShort, false)}", File("logging/$path/orders.txt"))
+                    log(
+                        "LONG Orders before execute:\n${json(ordersLong, false)}",
+                        File("logging/$path/long_orders.txt")
+                    )
+                    log(
+                        "SHORT Orders before execute:\n${json(ordersShort, false)}",
+                        File("logging/$path/short_orders.txt")
+                    )
                     checkOrders()
                     sentOrder(
                         amount = buySumAmount,
@@ -150,13 +174,22 @@ class AlgorithmTrader(
                         price = currentPrice,
                         orderType = TYPE.MARKET
                     )
-                    log("LONG Orders after execute:\n${json(ordersLong, false)}", File("logging/$path/orders.txt"))
-                    log("SHORT Orders after execute:\n${json(ordersShort, false)}", File("logging/$path/orders.txt"))
+                    log("LONG Orders after execute:\n${json(ordersLong, false)}", File("logging/$path/long_orders.txt"))
+                    log(
+                        "SHORT Orders after execute:\n${json(ordersShort, false)}",
+                        File("logging/$path/short_orders.txt")
+                    )
                 }
 
                 if (sellSumAmount > calcAmount(minOrderAmount, currentPrice)) {
-                    log("LONG Orders before execute:\n${json(ordersLong, false)}", File("logging/$path/orders.txt"))
-                    log("SHORT Orders before execute:\n${json(ordersShort, false)}", File("logging/$path/orders.txt"))
+                    log(
+                        "LONG Orders before execute:\n${json(ordersLong, false)}",
+                        File("logging/$path/long_orders.txt")
+                    )
+                    log(
+                        "SHORT Orders before execute:\n${json(ordersShort, false)}",
+                        File("logging/$path/short_orders.txt")
+                    )
                     checkOrders()
                     sentOrder(
                         amount = sellSumAmount,
@@ -164,8 +197,11 @@ class AlgorithmTrader(
                         price = currentPrice,
                         orderType = TYPE.MARKET
                     )
-                    log("LONG Orders after execute:\n${json(ordersLong, false)}", File("logging/$path/orders.txt"))
-                    log("SHORT Orders after execute:\n${json(ordersShort, false)}", File("logging/$path/orders.txt"))
+                    log("LONG Orders after execute:\n${json(ordersLong, false)}", File("logging/$path/long_orders.txt"))
+                    log(
+                        "SHORT Orders after execute:\n${json(ordersShort, false)}",
+                        File("logging/$path/short_orders.txt")
+                    )
                 }
             }
 
@@ -447,16 +483,16 @@ class AlgorithmTrader(
 
     private fun checkOrders() {
         ordersListForExecute.forEach { (k, v) ->
-            if (trailingInOrderDistance != null) {
-                when (k.first) {
-                    DIRECTION.LONG -> {
+            when (k.first) {
+                DIRECTION.LONG -> {
+                    if (long?.trailingInOrderDistance != null) {
                         when (v.side) {
                             SIDE.BUY -> {
-                                orders[k.second] = Order(
+                                ordersLong[k.second] = Order(
                                     orderId = "",
                                     pair = botSettings.pair,
                                     price = BigDecimal(k.second),
-                                    origQty = calcAmount(orderQuantity, BigDecimal(k.second)),
+                                    origQty = calcAmount(long.orderQuantity(), BigDecimal(k.second)),
                                     executedQty = BigDecimal(0),
                                     side = SIDE.SELL,
                                     type = TYPE.MARKET,
@@ -466,19 +502,21 @@ class AlgorithmTrader(
                                 )
                             }
 
-                            SIDE.SELL -> orders.remove(k.second)
+                            SIDE.SELL -> ordersLong.remove(k.second)
                             else -> log?.error("${botSettings.name} Unknown side: ${v.side}")
                         }
-                    }
+                    } else ordersLong.remove(k.second)
+                }
 
-                    DIRECTION.SHORT -> {
+                DIRECTION.SHORT -> {
+                    if (short?.trailingInOrderDistance() != null) {
                         when (v.side) {
                             SIDE.SELL -> {
-                                orders[k.second] = Order(
+                                ordersShort[k.second] = Order(
                                     orderId = "",
                                     pair = botSettings.pair,
                                     price = BigDecimal(k.second),
-                                    origQty = calcAmount(orderQuantity, BigDecimal(k.second)),
+                                    origQty = calcAmount(short.orderQuantity(), BigDecimal(k.second)),
                                     executedQty = BigDecimal(0),
                                     side = SIDE.BUY,
                                     type = TYPE.MARKET,
@@ -488,12 +526,12 @@ class AlgorithmTrader(
                                 )
                             }
 
-                            SIDE.BUY -> orders.remove(k.second)
+                            SIDE.BUY -> ordersShort.remove(k.second)
                             else -> log?.error("${botSettings.name} Unknown side: ${v.side}")
                         }
-                    }
+                    } else ordersShort.remove(k.second)
                 }
-            } else orders.remove(k.second)
+            }
         }
 
         log("Price = '${currentPrice.toPrice()}' Orders for execute:\n${json(ordersListForExecute)}")
@@ -543,12 +581,12 @@ class AlgorithmTrader(
                 openOrders
                     .find { v.orderId == it.orderId }
                     ?: run {
-                        ordersListForExecute[k] = v
+                        ordersListForExecute[currentDirection to k] = v
                         log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
                     }
         }
 
-        ordersListForExecute.forEach { (k, _) -> orders.remove(k) }
+        ordersListForExecute.forEach { (k, _) -> orders.remove(k.second) }
         ordersListForExecute.clear()
 
         if (params.setCloseOrders) {
@@ -590,5 +628,5 @@ class AlgorithmTrader(
 
     fun getTrend(): TrendCalculator.Trend? = trendCalculator?.getTrend()
 
-    fun orders() = botSettings to orders
+    fun orders() = Triple(botSettings, ordersLong, ordersShort)
 }

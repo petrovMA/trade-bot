@@ -135,19 +135,27 @@ class MainController(orderService: OrderService) {
 
         var rowNum = 1
 
-        val tableContent = infoResponse
+        val longTableContent = infoResponse
             .second
             .map { it.value }
             .sortedBy { it.price }
-            .run {
-                when (val settings = infoResponse.first) {
-                    is BotSettingsTrader -> when (settings.strategy) {
-                        BotSettingsTrader.StrategyType.SHORT -> reversed()
-                        else -> this
-                    }
-                    else -> this
-                }
+            .joinToString(prefix = "<tbody>", postfix = "</tbody>", separator = "") {
+                """
+                    <tr class="${if (it.side == SIDE.BUY) "buy" else "sell"}">
+            <th scope="row">${rowNum++}</th>
+            <td>${it.price}</td>
+            <td>${it.stopPrice}</td>
+            <td>${it.lastBorderPrice}</td>
+            <td>${it.origQty}</td>
+        </tr>
+                """.trimIndent()
             }
+
+        val shortTableContent = infoResponse
+            .third
+            .map { it.value }
+            .sortedBy { it.price }
+            .run { reversed() }
             .joinToString(prefix = "<tbody>", postfix = "</tbody>", separator = "") {
                 """
                     <tr class="${if (it.side == SIDE.BUY) "buy" else "sell"}">
@@ -165,7 +173,8 @@ class MainController(orderService: OrderService) {
             .body(
                 File("pages/orders.html")
                     .readText()
-                    .replace("${'$'}content", tableHeader + tableContent)
+                    .replace("${'$'}longTable", tableHeader + longTableContent)
+                    .replace("${'$'}shortTable", tableHeader + shortTableContent)
                     .replace("${'$'}trend", trend.toString())
                     .replace("${'$'}buttons", botsList)
             )

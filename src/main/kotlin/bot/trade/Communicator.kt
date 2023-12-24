@@ -534,7 +534,14 @@ class Communicator(
     }
 
     fun getInfo() = tradeBots.values.map { it.botSettings to (it as AlgorithmBobblesIndicator).positions }
-    fun getOrders(botName: String) = tradeBots[botName]?.orders()
+
+    fun getOrders(botName: String) = tradeBots[botName]?.let {
+        if (it is AlgorithmTrader)
+            it.orders()
+        else
+            null
+    }
+
     fun getTrend(botName: String): TrendCalculator.Trend? = tradeBots[botName]?.let { bot ->
         if (bot is AlgorithmTrader) bot.getTrend()
         else null
