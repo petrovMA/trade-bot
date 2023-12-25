@@ -63,7 +63,7 @@ class AlgorithmTrader(
     else mutableMapOf()
 
     private val ordersLong: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
-        filePath = "$path/orders_short".also {
+        filePath = "$path/orders_long".also {
             if (isEmulate.not() && File(it).isDirectory.not()) Files.createDirectories(Paths.get(it))
         },
         keyToFileName = { key -> key.replace('.', '_') + ".json" },
@@ -112,39 +112,34 @@ class AlgorithmTrader(
                         if (trend?.trend != it.trend) {
                             trend = it
                             send("#${botSettings.name} #Trend :\n```json\n${json(it)}\n```", true)
-
-                            when (it.trend) {
-                                TrendCalculator.Trend.TREND.LONG -> {
-                                    ordersShort
-                                        .filter { (_, v) -> v.side == SIDE.BUY }
-                                        .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v
-                                    }
-                                    ordersShort.clear()
-
-                                    long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
-                                }
-
-                                TrendCalculator.Trend.TREND.SHORT -> {
-                                    ordersLong
-                                        .filter { (_, v) -> v.side == SIDE.SELL }
-                                        .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v
-                                    }
-                                    ordersLong.clear()
-
-                                    short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
-                                }
-
-                                TrendCalculator.Trend.TREND.FLAT, TrendCalculator.Trend.TREND.HEDGE -> {
-                                    long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
-                                    short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
-                                }
-                            }
                         }
                     }
                 }
-                else {
-                    long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
-                    short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
+
+                when (trend?.trend) {
+                    TrendCalculator.Trend.TREND.LONG -> {
+                        ordersShort
+                            .filter { (_, v) -> v.side == SIDE.BUY }
+                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v
+                            }
+                        ordersShort.clear()
+
+                        long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
+                    }
+
+                    TrendCalculator.Trend.TREND.SHORT -> {
+                        ordersLong
+                            .filter { (_, v) -> v.side == SIDE.SELL }
+                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v
+                            }
+                        ordersLong.clear()
+
+                        short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
+                    }
+                    else -> {
+                        long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
+                        short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
+                    }
                 }
 
                 var sellSumAmount = BigDecimal.ZERO

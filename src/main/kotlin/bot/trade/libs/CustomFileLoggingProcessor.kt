@@ -27,6 +27,9 @@ class CustomFileLoggingProcessor(private val logMessageQueue: BlockingQueue<Mess
     }
 
     private fun processMessage(message: Message) {
+        if (message.outputFile.parentFile.exists().not())
+            message.outputFile.parentFile.mkdirs()
+
         if (message.outputFile.exists().not())
             message.outputFile.createNewFile()
 
