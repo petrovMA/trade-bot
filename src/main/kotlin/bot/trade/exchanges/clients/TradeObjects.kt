@@ -124,6 +124,22 @@ data class Order(
         },
         fee = data.cumExecFee.toBigDecimal()
     )
+
+    override fun equals(other: Any?) = other is Order
+            && orderId == other.orderId
+            && pair == other.pair
+            && compareBigDecimal(price, other.price)
+            && origQty.compareTo(other.origQty) == 0
+            && executedQty.compareTo(other.executedQty) == 0
+            && side == other.side
+            && type == other.type
+            && status == other.status
+            && compareBigDecimal(stopPrice, other.stopPrice)
+            && compareBigDecimal(lastBorderPrice, other.lastBorderPrice)
+            && compareBigDecimal(fee, other.fee)
+
+    private fun compareBigDecimal(a: BigDecimal?, b: BigDecimal?): Boolean =
+        (a == b || (a != null && b != null && a.compareTo(b) == 0))
 }
 
 data class TradePair(val first: String, val second: String) {
@@ -370,6 +386,7 @@ class BotSettingsTrader(
             @SerializedName("rsi_period") val rsiPeriod: Int,
             @SerializedName("time_frame") val timeFrame: String
         )
+
         class HmaParameters(
             @SerializedName("hma1_period") val hma1Period: Int,
             @SerializedName("hma2_period") val hma2Period: Int,
@@ -437,7 +454,7 @@ class BotSettingsTrader(
 
             fun minRange() = tradingRange.lowerBound
             fun maxRange() = tradingRange.upperBound
-            fun orderDistance() = inOrderDistance.distance
+            fun orderDistance() = inOrderDistance
             fun orderQuantity() = inOrderQuantity.value
             fun triggerDistance() = triggerDistance.distance
             fun orderMaxQuantity() = orderMaxQuantity

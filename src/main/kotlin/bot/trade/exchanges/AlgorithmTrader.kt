@@ -53,13 +53,17 @@ class AlgorithmTrader(
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val ordersListForExecute: MutableMap<Pair<DIRECTION, String>, Order> = mutableMapOf()
 
+    private var isInOrdersInitialized: Boolean = false
+    private var minInOrderLongPrice: BigDecimal? = null
+    private var maxInOrderShortPrice: BigDecimal? = null
+
     private val ordersShort: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
         filePath = "$path/orders_short".also {
             if (isEmulate.not() && File(it).isDirectory.not()) Files.createDirectories(Paths.get(it))
         },
         keyToFileName = { key -> key.replace('.', '_') + ".json" },
         fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
-    )
+    ).also { maxInOrderShortPrice = it.keys.maxOrNull()?.toBigDecimal() }
     else mutableMapOf()
 
     private val ordersLong: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
@@ -68,7 +72,7 @@ class AlgorithmTrader(
         },
         keyToFileName = { key -> key.replace('.', '_') + ".json" },
         fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
-    )
+    ).also { minInOrderLongPrice = it.keys.minOrNull()?.toBigDecimal() }
     else mutableMapOf()
 
     var from: Long = Long.MAX_VALUE
@@ -102,7 +106,11 @@ class AlgorithmTrader(
 
                 prevPrice = if (prevPrice == BigDecimal(0)) msg.close
                 else currentPrice
+
                 currentPrice = msg.close
+
+                minInOrderLongPrice = minInOrderLongPrice ?: currentPrice
+                maxInOrderShortPrice = maxInOrderShortPrice ?: currentPrice
 
                 from = if (from > msg.closeTime) msg.closeTime else from
                 to = if (to < msg.closeTime) msg.closeTime else to
@@ -120,8 +128,7 @@ class AlgorithmTrader(
                     TrendCalculator.Trend.TREND.LONG -> {
                         ordersShort
                             .filter { (_, v) -> v.side == SIDE.BUY }
-                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v
-                            }
+                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v }
                         ordersShort.clear()
 
                         long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
@@ -130,12 +137,12 @@ class AlgorithmTrader(
                     TrendCalculator.Trend.TREND.SHORT -> {
                         ordersLong
                             .filter { (_, v) -> v.side == SIDE.SELL }
-                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v
-                            }
+                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v }
                         ordersLong.clear()
 
                         short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
                     }
+
                     else -> {
                         long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
                         short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
@@ -285,88 +292,98 @@ class AlgorithmTrader(
 
     private fun createOrdersForExecute(
         currentDirection: DIRECTION,
-        params: BotSettingsTrader.TradeParameters.Parameters,
+        params: BotSettingsTrader.TradeParameters.Parameters
     ) = when (currentDirection) {
         DIRECTION.LONG -> ordersLong
         DIRECTION.SHORT -> ordersShort
     }.let { orders ->
         if (currentPrice > params.minRange() && currentPrice < params.maxRange()) {
 
-            val priceIn = (currentPrice - (currentPrice % params.orderDistance())).toPrice()
-            val prevPriceIn = (prevPrice - (prevPrice % params.orderDistance())).toPrice()
+            if (isInOrdersInitialized.not()) {
+                orders.entries.removeIf { (_, v) ->
+                    currentDirection == DIRECTION.LONG && v.side == SIDE.BUY ||
+                            currentDirection == DIRECTION.SHORT && v.side == SIDE.SELL
+                }
+                isInOrdersInitialized = true
+            }
 
-            var currPriceIn = priceIn
+            when (currentDirection) {
+                DIRECTION.LONG -> {
 
-            do {
-                when (ordersType) {
-                    TYPE.MARKET -> {
-                        if (orders[currPriceIn] != null)
-                            log?.trace("{} Order already exist: {}", botSettings.name, orders[currPriceIn])
-                        else {
-                            if (orders.size < params.orderMaxQuantity()) {
-                                if (params.triggerInOrderDistance() == null) {
-                                    orders[currPriceIn] = sentOrder(
-                                        amount = calcAmount(params.orderQuantity(), BigDecimal(currPriceIn)),
-                                        orderSide = if (currentDirection == DIRECTION.LONG) SIDE.BUY
-                                        else SIDE.SELL,
-                                        price = BigDecimal(currPriceIn),
-                                        orderType = TYPE.MARKET
-                                    ).also {
-                                        if (currentDirection == DIRECTION.LONG) {
-                                            it.lastBorderPrice = null
-                                            it.side = SIDE.SELL
-                                        } else {
-                                            it.lastBorderPrice = null
-                                            it.side = SIDE.BUY
-                                        }
-                                    }
-                                } else {
-                                    orders[currPriceIn] = Order(
-                                        orderId = "",
-                                        pair = botSettings.pair,
-                                        price = BigDecimal(currPriceIn),
-                                        origQty = calcAmount(params.orderQuantity(), BigDecimal(currPriceIn)),
-                                        executedQty = BigDecimal(0),
-                                        side = if (currentDirection == DIRECTION.LONG) SIDE.BUY
-                                        else SIDE.SELL,
-                                        type = TYPE.MARKET,
-                                        status = STATUS.NEW,
-                                        lastBorderPrice = if (currentDirection == DIRECTION.LONG)
-                                            currPriceIn.toBigDecimal()
-                                        else
-                                            currPriceIn.toBigDecimal(),
-                                        stopPrice = null
-                                    )
-                                }
-                            }
-                        }
+                    if (orders.isEmpty()) {
+                        val step = calcInPriceStep(currentPrice, params, true)
+                        val price = (currentPrice - step).round()
+                        orders[price.toPrice()] = order(price, currentDirection, params)
+                        minInOrderLongPrice = price
                     }
 
-                    TYPE.LIMIT -> {
-                        when (currentDirection) {
-                            DIRECTION.LONG -> {
-                                TODO("LONG strategy not implemented for TYPE.LIMIT (find implementation on Git history)")
-                            }
+                    while (currentPrice < minInOrderLongPrice!!) {
 
-                            DIRECTION.SHORT -> {
-                                TODO("SHORT strategy not implemented for TYPE.LIMIT")
-                            }
-                        }
+                        val step = calcInPriceStep(minInOrderLongPrice!!, params, true)
+                        val price = (minInOrderLongPrice!! - step).round()
+
+                        if (orders[price.toPrice()] != null)
+                            log?.trace("{} Order already exist: {}", botSettings.name, orders[price.toPrice()])
+                        else
+                            orders[price.toPrice()] = order(price, currentDirection, params)
+
+                        minInOrderLongPrice = price
                     }
 
-                    else -> throw UnsupportedOrderTypeException("Error: Unknown order type '$ordersType'!")
+                    var currPriceIn = minInOrderLongPrice!!
+
+                    while (currPriceIn <= currentPrice) {
+
+                        if (orders[currPriceIn.toPrice()] != null)
+                            log?.trace("{} Order already exist: {}", botSettings.name, orders[currPriceIn.toPrice()])
+                        else
+                            orders[currPriceIn.toPrice()] = order(currPriceIn, currentDirection, params)
+
+                        val step = calcInPriceStep(currPriceIn, params, false)
+                        val price = (currPriceIn + step).round()
+
+                        currPriceIn = price
+                    }
                 }
 
-                currPriceIn =
-                    if (priceIn < prevPriceIn) (BigDecimal(currPriceIn) + params.orderDistance()).toPrice()
-                    else (BigDecimal(currPriceIn) - params.orderDistance()).toPrice()
+                DIRECTION.SHORT -> {
 
-            } while (
-                (BigDecimal(currPriceIn) < BigDecimal(prevPriceIn) && BigDecimal(priceIn) < BigDecimal(prevPriceIn))
-                ||
-                (BigDecimal(currPriceIn) > BigDecimal(prevPriceIn) &&
-                        BigDecimal(priceIn) > BigDecimal(prevPriceIn))
-            )
+                    if (orders.isEmpty()) {
+                        val step = calcInPriceStep(currentPrice, params, false)
+                        val price = (currentPrice + step).round()
+                        orders[price.toPrice()] = order(price, currentDirection, params)
+                        maxInOrderShortPrice = price
+                    }
+
+                    while (currentPrice > maxInOrderShortPrice!!) {
+
+                        val step = calcInPriceStep(maxInOrderShortPrice!!, params, false)
+                        val price = (maxInOrderShortPrice!! + step).round()
+
+                        if (orders[price.toPrice()] != null)
+                            log?.trace("{} Order already exist: {}", botSettings.name, orders[price.toPrice()])
+                        else
+                            orders[price.toPrice()] = order(price, currentDirection, params)
+
+                        maxInOrderShortPrice = price
+                    }
+
+                    var currPriceIn = maxInOrderShortPrice!!
+
+                    while (currPriceIn >= currentPrice) {
+
+                        if (orders[currPriceIn.toPrice()] != null)
+                            log?.trace("{} Order already exist: {}", botSettings.name, orders[currPriceIn.toPrice()])
+                        else
+                            orders[currPriceIn.toPrice()] = order(currPriceIn, currentDirection, params)
+
+                        val step = calcInPriceStep(currPriceIn, params, true)
+                        val price = (currPriceIn - step).round()
+
+                        currPriceIn = price
+                    }
+                }
+            }
         } else
             log?.trace(
                 "{} Price {}, not in range: {}",
@@ -416,11 +433,9 @@ class AlgorithmTrader(
                             ordersListForExecute[currentDirection to k] = v
                         }
                     } else {
-                        log?.warn(
-                            "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
-                            botSettings.name,
-                            v
-                        )
+                        if (v.side == SIDE.BUY && currentPrice < k.toBigDecimal()) {
+                            ordersListForExecute[currentDirection to k] = v
+                        }
                     }
                 }
             }
@@ -465,11 +480,9 @@ class AlgorithmTrader(
                             ordersListForExecute[currentDirection to k] = v
                         }
                     } else {
-                        log?.warn(
-                            "{} No param 'trailingInOrderDistance' in settings for order:\n{}",
-                            botSettings.name,
-                            v
-                        )
+                        if (v.side == SIDE.SELL && currentPrice > k.toBigDecimal()) {
+                            ordersListForExecute[currentDirection to k] = v
+                        }
                     }
                 }
             }
@@ -546,46 +559,10 @@ class AlgorithmTrader(
     ) {
         orders.readFromFile()
 
-        var price = params.minRange()
-        val openOrders = client.getOpenOrders(botSettings.pair)
-        while (price <= params.maxRange()) {
-            val priceIn = price.toPrice()
-            openOrders.find { it.price == priceIn.toBigDecimal() }?.let { openOrder ->
-                orders[priceIn] ?: run {
-
-                    val qty = calcAmount(params.orderQuantity(), price).percent(10.toBigDecimal())
-
-                    if (currentDirection == DIRECTION.LONG && openOrder.side == SIDE.BUY) {
-                        if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
-                            orders[price.toPrice()] = openOrder
-                            log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
-                        }
-                    } else if (currentDirection == DIRECTION.SHORT && openOrder.side == SIDE.SELL) {
-                        if (openOrder.origQty in (openOrder.origQty - qty)..(openOrder.origQty + qty)) {
-                            orders[price.toPrice()] = openOrder
-                            log?.info("${botSettings.name} Synchronized Order:\n$openOrder")
-                        }
-                    }
-                }
-            }
-            price += params.orderDistance()
-        }
-
-        orders.forEach { (k, v) ->
-            if (v.type != TYPE.MARKET && v.price?.run { this in params.minRange()..params.maxRange() } == true)
-                openOrders
-                    .find { v.orderId == it.orderId }
-                    ?: run {
-                        ordersListForExecute[currentDirection to k] = v
-                        log?.info("${botSettings.name} File order not found in exchange, file Order removed:\n$v")
-                    }
-        }
-
-        ordersListForExecute.forEach { (k, _) -> orders.remove(k.second) }
         ordersListForExecute.clear()
 
-        if (params.setCloseOrders) {
-            price = params.minRange()
+        if (params.setCloseOrders && params.inOrderDistance.usePercent.not()) {
+            var price = params.minRange()
             while (price <= params.maxRange()) {
                 val priceIn = price.toPrice()
 
@@ -609,9 +586,23 @@ class AlgorithmTrader(
                     )
                 }
 
-                price += params.orderDistance()
+                price += params.orderDistance().distance
             }
         }
+    }
+
+    private fun calcInPriceStep(
+        prevPrice: BigDecimal,
+        params: BotSettingsTrader.TradeParameters.Parameters,
+        isStepDown: Boolean = false
+    ): BigDecimal {
+        val step = if (params.orderDistance().usePercent) {
+            if (isStepDown) params.orderDistance().distance.let { prevPrice / (BigDecimal(100) + it) * it }
+            else prevPrice / BigDecimal(100) * params.orderDistance().distance
+
+        } else params.orderDistance().distance
+
+        return step.round()
     }
 
     override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal =
@@ -624,4 +615,22 @@ class AlgorithmTrader(
     fun getTrend(): TrendCalculator.Trend? = trendCalculator?.getTrend()
 
     fun orders() = Triple(botSettings, ordersLong, ordersShort)
+
+    private fun order(
+        price: BigDecimal,
+        direction: DIRECTION,
+        params: BotSettingsTrader.TradeParameters.Parameters
+    ) = Order(
+        orderId = "",
+        pair = botSettings.pair,
+        price = price,
+        origQty = calcAmount(params.orderQuantity(), price),
+        executedQty = BigDecimal(0),
+        side = if (direction == DIRECTION.LONG) SIDE.BUY
+        else SIDE.SELL,
+        type = TYPE.MARKET,
+        status = STATUS.NEW,
+        lastBorderPrice = price,
+        stopPrice = null
+    )
 }

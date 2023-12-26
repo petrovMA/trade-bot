@@ -197,7 +197,7 @@ abstract class Algorithm(
     fun isUnknown(order: Order?): Boolean =
         order == null || order.status == STATUS.UNSUPPORTED || order.side == SIDE.UNSUPPORTED
 
-    fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
+    fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this.round())
 
     fun saveBotSettings(botSettings: BotSettings, settingsPath: String = this.settingsPath) {
         if (isEmulate.not()) {
