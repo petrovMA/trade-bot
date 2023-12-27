@@ -329,8 +329,8 @@ class AlgorithmTraderTest {
     }
 
     @Test
-    fun testInOrdersWithPercentInOrderDistance() {
-        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersWithPercentOrderDistanceSettings.json")
+    fun testInOrdersShortWithPercentInOrderDistance() {
+        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersShortWithPercentOrderDistanceSettings.json")
 
         algorithmTrader.handle(Trade(1500.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1499.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
@@ -361,6 +361,43 @@ class AlgorithmTraderTest {
 
         algorithmTrader.handle(Trade(1586.toBigDecimal(), 1.toBigDecimal(), 6).toKline())
 
-        assertOrders("testExecuteInOrdersWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third)
+        assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third)
+    }
+
+    @Test
+    fun testInOrdersLongWithPercentInOrderDistance() {
+//        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersBothWithPercentOrderDistanceSettings.json")
+//
+//        2023-12-26 14:52:02 - {"openTime":1703598600000,"closeTime":1703598899999,"open":2248.26,"high":2251.42,"low":2248.09,"close":2251.14,"volume":860.7}
+//        2023-12-26 14:52:03 - {"openTime":1703598600000,"closeTime":1703598899999,"open":2248.26,"high":2251.42,"low":2248.09,"close":2251.15,"volume":866.99}
+//        2023-12-26 14:52:04 - {"openTime":1703598600000,"closeTime":1703598899999,"open":2248.26,"high":2251.42,"low":2248.09,"close":2251.15,"volume":867.22}
+//        2023-12-26 14:52:07 - {"openTime":1703598600000,"closeTime":1703598899999,"open":2248.26,"high":2251.42,"low":2248.09,"close":2251.13,"volume":868.83}
+//        2023-12-26 14:52:08 - {"openTime":1703598600000,"closeTime":1703598899999,"open":2248.26,"high":2251.42,"low":2248.09,"close":2250.97,"volume":880.59}
+//
+//        val input = "testExecuteInOrdersBothWithPercentOrderDistanceInput.txt".file().readLines().map { Mapper.asObject<Candlestick>(it) }
+//
+//        input.forEach { algorithmTrader.handle(it) }
+
+//        assertOrders(listOf(), exchange.orders)
+//
+//        assertOrders(
+//            listOf(
+//                Order(
+//                    orderId = "",
+//                    pair = TradePair("ETH", "USDT"),
+//                    price = "1587.00".toBigDecimal(),
+//                    origQty = 0.007.toBigDecimal(),
+//                    executedQty = 0.toBigDecimal(),
+//                    side = SIDE.SELL,
+//                    type = TYPE.MARKET,
+//                    status = STATUS.NEW
+//                )
+//            ),
+//            exchange.orders
+//        )
+//
+//        algorithmTrader.handle(Trade(1586.toBigDecimal(), 1.toBigDecimal(), 6).toKline())
+//
+//        assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third)
     }
 }

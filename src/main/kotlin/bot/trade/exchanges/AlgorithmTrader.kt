@@ -310,13 +310,6 @@ class AlgorithmTrader(
             when (currentDirection) {
                 DIRECTION.LONG -> {
 
-                    if (orders.isEmpty()) {
-                        val step = calcInPriceStep(currentPrice, params, true)
-                        val price = (currentPrice - step).round()
-                        orders[price.toPrice()] = order(price, currentDirection, params)
-                        minInOrderLongPrice = price
-                    }
-
                     while (currentPrice < minInOrderLongPrice!!) {
 
                         val step = calcInPriceStep(minInOrderLongPrice!!, params, true)
@@ -347,13 +340,6 @@ class AlgorithmTrader(
                 }
 
                 DIRECTION.SHORT -> {
-
-                    if (orders.isEmpty()) {
-                        val step = calcInPriceStep(currentPrice, params, false)
-                        val price = (currentPrice + step).round()
-                        orders[price.toPrice()] = order(price, currentDirection, params)
-                        maxInOrderShortPrice = price
-                    }
 
                     while (currentPrice > maxInOrderShortPrice!!) {
 
@@ -597,8 +583,12 @@ class AlgorithmTrader(
         isStepDown: Boolean = false
     ): BigDecimal {
         val step = if (params.orderDistance().usePercent) {
-            if (isStepDown) params.orderDistance().distance.let { prevPrice / (BigDecimal(100) + it) * it }
-            else prevPrice / BigDecimal(100) * params.orderDistance().distance
+            if (isStepDown)
+                params.orderDistance().distance.let {
+                    prevPrice.round() / (BigDecimal(100).round() + it.round()) * it.round()
+                }
+            else
+                prevPrice.round() / BigDecimal(100).round() * params.orderDistance().distance.round()
 
         } else params.orderDistance().distance
 
