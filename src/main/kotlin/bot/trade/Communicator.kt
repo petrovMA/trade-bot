@@ -542,6 +542,13 @@ class Communicator(
             null
     }
 
+    fun getHedgeModule(botName: String) = tradeBots[botName]?.let {
+        if (it is AlgorithmTrader)
+            it.calcHedgeModule()
+        else
+            null
+    }
+
     fun getTrend(botName: String): TrendCalculator.Trend? = tradeBots[botName]?.let { bot ->
         if (bot is AlgorithmTrader) bot.getTrend()
         else null

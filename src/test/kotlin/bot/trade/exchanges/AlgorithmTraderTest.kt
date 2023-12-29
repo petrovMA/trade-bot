@@ -51,7 +51,7 @@ class AlgorithmTraderTest {
                     orderId = "",
                     pair = TradePair("ETH", "USDT"),
                     price = "1510.00".toBigDecimal(),
-                    origQty = 0.016.toBigDecimal(),
+                    origQty = 0.015.toBigDecimal(),
                     executedQty = 0.toBigDecimal(),
                     side = SIDE.BUY,
                     type = TYPE.MARKET,
@@ -72,7 +72,7 @@ class AlgorithmTraderTest {
             orderId = "",
             pair = TradePair("ETH", "USDT"),
             price = "1502.00".toBigDecimal(),
-            origQty = 0.14.toBigDecimal(),
+            origQty = 0.13.toBigDecimal(),
             executedQty = 0.toBigDecimal(),
             side = SIDE.BUY,
             type = TYPE.MARKET,
@@ -153,7 +153,7 @@ class AlgorithmTraderTest {
             orderId = "",
             pair = TradePair("ETH", "USDT"),
             price = "1533.50".toBigDecimal(),
-            origQty = 0.16.toBigDecimal(),
+            origQty = 0.14.toBigDecimal(),
             executedQty = 0.toBigDecimal(),
             side = SIDE.SELL,
             type = TYPE.MARKET,
@@ -364,8 +364,8 @@ class AlgorithmTraderTest {
         assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third)
     }
 
-    @Test
-    fun testInOrdersLongWithPercentInOrderDistance() {
+//    @Test
+//    fun testInOrdersLongWithPercentInOrderDistance() {
 //        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersBothWithPercentOrderDistanceSettings.json")
 //
 //        2023-12-26 14:52:02 - {"openTime":1703598600000,"closeTime":1703598899999,"open":2248.26,"high":2251.42,"low":2248.09,"close":2251.14,"volume":860.7}
@@ -377,7 +377,7 @@ class AlgorithmTraderTest {
 //        val input = "testExecuteInOrdersBothWithPercentOrderDistanceInput.txt".file().readLines().map { Mapper.asObject<Candlestick>(it) }
 //
 //        input.forEach { algorithmTrader.handle(it) }
-
+//
 //        assertOrders(listOf(), exchange.orders)
 //
 //        assertOrders(
@@ -399,5 +399,5 @@ class AlgorithmTraderTest {
 //        algorithmTrader.handle(Trade(1586.toBigDecimal(), 1.toBigDecimal(), 6).toKline())
 //
 //        assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third)
-    }
+//    }
 }

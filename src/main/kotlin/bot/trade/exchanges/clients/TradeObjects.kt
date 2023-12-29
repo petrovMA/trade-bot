@@ -359,7 +359,8 @@ class BotSettingsTrader(
     @SerializedName("min_order_amount") val minOrderAmount: MinOrderAmount? = null,
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
-    @SerializedName("strategy_type_comment") val strategyTypeComment: String
+    @SerializedName("strategy_type_comment") val strategyTypeComment: String,
+    @SerializedName("auto_balance") val autoBalance: Boolean = false
 ) : BotSettings(
     name = name,
     pair = pair,

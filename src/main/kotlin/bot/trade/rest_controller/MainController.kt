@@ -114,6 +114,7 @@ class MainController(orderService: OrderService) {
         """.trimIndent()
 
         val infoResponse = bot.communicator.getOrders(botName)
+        val hedge = bot.communicator.getHedgeModule(botName)
         val trend = bot.communicator.getTrend(botName)
         log.info("Response for /orders = $infoResponse")
 
@@ -175,7 +176,7 @@ class MainController(orderService: OrderService) {
                     .readText()
                     .replace("${'$'}longTable", tableHeader + longTableContent)
                     .replace("${'$'}shortTable", tableHeader + shortTableContent)
-                    .replace("${'$'}trend", trend.toString())
+                    .replace("${'$'}trend", trend.toString() + (hedge ?: ""))
                     .replace("${'$'}buttons", botsList)
             )
     }

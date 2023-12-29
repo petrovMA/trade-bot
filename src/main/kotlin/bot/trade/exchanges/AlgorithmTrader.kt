@@ -54,17 +54,12 @@ class AlgorithmTrader(
     private val ordersListForExecute: MutableMap<Pair<DIRECTION, String>, Order> = mutableMapOf()
 
     private var isInOrdersInitialized: Boolean = false
-    private var minInOrderLongPrice: BigDecimal? = null
-    private var maxInOrderShortPrice: BigDecimal? = null
+    private var maxPriceInOrderLong: BigDecimal? = null
+    private var minPriceInOrderLong: BigDecimal? = null
+    private var maxPriceInOrderShort: BigDecimal? = null
+    private var minPriceInOrderShort: BigDecimal? = null
 
-    private val ordersShort: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
-        filePath = "$path/orders_short".also {
-            if (isEmulate.not() && File(it).isDirectory.not()) Files.createDirectories(Paths.get(it))
-        },
-        keyToFileName = { key -> key.replace('.', '_') + ".json" },
-        fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
-    ).also { maxInOrderShortPrice = it.keys.maxOrNull()?.toBigDecimal() }
-    else mutableMapOf()
+    private var hedgeModule: HedgeModule? = null
 
     private val ordersLong: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
         filePath = "$path/orders_long".also {
@@ -72,7 +67,36 @@ class AlgorithmTrader(
         },
         keyToFileName = { key -> key.replace('.', '_') + ".json" },
         fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
-    ).also { minInOrderLongPrice = it.keys.minOrNull()?.toBigDecimal() }
+    ).also {
+        maxPriceInOrderLong = it.values
+            .mapNotNull { o -> o.price?.toDouble() }
+            .maxOrNull()
+            ?.toBigDecimal()
+
+        minPriceInOrderLong = it.values
+            .mapNotNull { o -> o.price?.toDouble() }
+            .minOrNull()
+            ?.toBigDecimal()
+    }
+    else mutableMapOf()
+
+    private val ordersShort: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
+        filePath = "$path/orders_short".also {
+            if (isEmulate.not() && File(it).isDirectory.not()) Files.createDirectories(Paths.get(it))
+        },
+        keyToFileName = { key -> key.replace('.', '_') + ".json" },
+        fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
+    ).also {
+        maxPriceInOrderShort = it.values
+            .mapNotNull { o -> o.price?.toDouble() }
+            .maxOrNull()
+            ?.toBigDecimal()
+
+        minPriceInOrderShort = it.values
+            .mapNotNull { o -> o.price?.toDouble() }
+            .minOrNull()
+            ?.toBigDecimal()
+    }
     else mutableMapOf()
 
     var from: Long = Long.MAX_VALUE
@@ -109,8 +133,10 @@ class AlgorithmTrader(
 
                 currentPrice = msg.close
 
-                minInOrderLongPrice = minInOrderLongPrice ?: currentPrice
-                maxInOrderShortPrice = maxInOrderShortPrice ?: currentPrice
+                maxPriceInOrderLong = maxPriceInOrderLong ?: currentPrice
+                minPriceInOrderLong = minPriceInOrderLong ?: currentPrice
+                maxPriceInOrderShort = maxPriceInOrderShort ?: currentPrice
+                minPriceInOrderShort = minPriceInOrderShort ?: currentPrice
 
                 from = if (from > msg.closeTime) msg.closeTime else from
                 to = if (to < msg.closeTime) msg.closeTime else to
@@ -144,6 +170,29 @@ class AlgorithmTrader(
                     }
 
                     else -> {
+                        val newHedgeModule = calcHedgeModule()
+
+                        if (hedgeModule != newHedgeModule) {
+                            log("Changed hedge module: oldModule = $hedgeModule, newModule = $newHedgeModule")
+
+                            ordersShort.entries.removeIf { (_, v) -> v.side == SIDE.SELL }
+                            ordersLong.entries.removeIf { (_, v) -> v.side == SIDE.BUY }
+
+                            minPriceInOrderLong = ordersLong.values
+                                .mapNotNull { it.price?.toDouble() }
+                                .minOrNull()
+                                ?.toBigDecimal()
+                                ?: currentPrice
+
+                            maxPriceInOrderShort = ordersShort.values
+                                .mapNotNull { it.price?.toDouble() }
+                                .maxOrNull()
+                                ?.toBigDecimal()
+                                ?: currentPrice
+
+                            hedgeModule = newHedgeModule
+                        }
+
                         long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
                         short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
                     }
@@ -160,7 +209,10 @@ class AlgorithmTrader(
                     }
                 }
 
-                if (buySumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                if (
+                    buySumAmount > calcAmount(minOrderAmount, currentPrice, DIRECTION.LONG, hedgeModule)
+                    || buySumAmount > calcAmount(minOrderAmount, currentPrice, DIRECTION.SHORT, hedgeModule)
+                ) {
                     log(
                         "LONG Orders before execute:\n${json(ordersLong, false)}",
                         File("logging/$path/long_orders.txt")
@@ -183,7 +235,10 @@ class AlgorithmTrader(
                     )
                 }
 
-                if (sellSumAmount > calcAmount(minOrderAmount, currentPrice)) {
+                if (
+                    sellSumAmount > calcAmount(minOrderAmount, currentPrice, DIRECTION.LONG, hedgeModule)
+                    || sellSumAmount > calcAmount(minOrderAmount, currentPrice, DIRECTION.SHORT, hedgeModule)
+                ) {
                     log(
                         "LONG Orders before execute:\n${json(ordersLong, false)}",
                         File("logging/$path/long_orders.txt")
@@ -310,63 +365,73 @@ class AlgorithmTrader(
             when (currentDirection) {
                 DIRECTION.LONG -> {
 
-                    while (currentPrice < minInOrderLongPrice!!) {
+                    while (currentPrice <= minPriceInOrderLong!!) {
 
-                        val step = calcInPriceStep(minInOrderLongPrice!!, params, true)
-                        val price = (minInOrderLongPrice!! - step).round()
+                        val step = calcInPriceStep(minPriceInOrderLong!!, params, hedgeModule, currentDirection, true)
+                        val price = (minPriceInOrderLong!! - step).round()
 
                         if (orders[price.toPrice()] != null)
                             log?.trace("{} Order already exist: {}", botSettings.name, orders[price.toPrice()])
                         else
                             orders[price.toPrice()] = order(price, currentDirection, params)
 
-                        minInOrderLongPrice = price
+                        minPriceInOrderLong = price
                     }
 
-                    var currPriceIn = minInOrderLongPrice!!
+                    maxPriceInOrderLong = ordersLong.keys.maxOrNull()?.toBigDecimal() ?: minPriceInOrderLong
 
-                    while (currPriceIn <= currentPrice) {
+                    var step = calcInPriceStep(maxPriceInOrderLong!!, params, hedgeModule, currentDirection, false)
 
-                        if (orders[currPriceIn.toPrice()] != null)
-                            log?.trace("{} Order already exist: {}", botSettings.name, orders[currPriceIn.toPrice()])
+                    while (currentPrice > maxPriceInOrderLong!! + step) {
+                        maxPriceInOrderLong = maxPriceInOrderLong!! + step
+
+                        if (orders[maxPriceInOrderLong!!.toPrice()] != null)
+                            log?.trace(
+                                "{} Order already exist: {}",
+                                botSettings.name,
+                                orders[maxPriceInOrderLong!!.toPrice()]
+                            )
                         else
-                            orders[currPriceIn.toPrice()] = order(currPriceIn, currentDirection, params)
+                            orders[maxPriceInOrderLong!!.toPrice()] =
+                                order(maxPriceInOrderLong!!, currentDirection, params)
 
-                        val step = calcInPriceStep(currPriceIn, params, false)
-                        val price = (currPriceIn + step).round()
-
-                        currPriceIn = price
+                        step = calcInPriceStep(maxPriceInOrderLong!!, params, hedgeModule, currentDirection, false)
                     }
                 }
 
                 DIRECTION.SHORT -> {
 
-                    while (currentPrice > maxInOrderShortPrice!!) {
+                    while (currentPrice >= maxPriceInOrderShort!!) {
 
-                        val step = calcInPriceStep(maxInOrderShortPrice!!, params, false)
-                        val price = (maxInOrderShortPrice!! + step).round()
+                        val step = calcInPriceStep(maxPriceInOrderShort!!, params, hedgeModule, currentDirection, false)
+                        val price = (maxPriceInOrderShort!! + step).round()
 
                         if (orders[price.toPrice()] != null)
                             log?.trace("{} Order already exist: {}", botSettings.name, orders[price.toPrice()])
                         else
                             orders[price.toPrice()] = order(price, currentDirection, params)
 
-                        maxInOrderShortPrice = price
+                        maxPriceInOrderShort = price
                     }
 
-                    var currPriceIn = maxInOrderShortPrice!!
+                    minPriceInOrderShort = ordersShort.keys.minOrNull()?.toBigDecimal() ?: maxPriceInOrderShort
 
-                    while (currPriceIn >= currentPrice) {
+                    var step = calcInPriceStep(minPriceInOrderShort!!, params, hedgeModule, currentDirection, true)
 
-                        if (orders[currPriceIn.toPrice()] != null)
-                            log?.trace("{} Order already exist: {}", botSettings.name, orders[currPriceIn.toPrice()])
+                    while (currentPrice < minPriceInOrderShort!! - step) {
+                        minPriceInOrderShort = minPriceInOrderShort!! - step
+
+                        if (orders[minPriceInOrderShort!!.toPrice()] != null)
+                            log?.trace(
+                                "{} Order already exist: {}",
+                                botSettings.name,
+                                orders[minPriceInOrderShort!!.toPrice()]
+                            )
                         else
-                            orders[currPriceIn.toPrice()] = order(currPriceIn, currentDirection, params)
+                            orders[minPriceInOrderShort!!.toPrice()] =
+                                order(minPriceInOrderShort!!, currentDirection, params)
 
-                        val step = calcInPriceStep(currPriceIn, params, true)
-                        val price = (currPriceIn - step).round()
-
-                        currPriceIn = price
+                        step = calcInPriceStep(minPriceInOrderShort!!, params, hedgeModule, currentDirection, true)
                     }
                 }
             }
@@ -377,6 +442,12 @@ class AlgorithmTrader(
                 format(currentPrice),
                 params.minRange() to params.maxRange()
             )
+
+        val triggerDistance =
+            if (currentDirection == hedgeModule?.direction)
+                (params.triggerDistance() * hedgeModule!!.module).round()
+            else
+                params.triggerDistance().round()
 
         when (currentDirection) {
             DIRECTION.LONG -> {
@@ -391,7 +462,7 @@ class AlgorithmTrader(
                                 if (it < currentPrice - params.maxTpDistance())
                                     v.stopPrice = currentPrice - params.maxTpDistance()
                             } ?: run {
-                                if (k.toBigDecimal() <= (currentPrice - params.triggerDistance()))
+                                if (k.toBigDecimal() <= (currentPrice - triggerDistance))
                                     v.stopPrice = currentPrice - params.minTpDistance()
                             }
 
@@ -438,7 +509,7 @@ class AlgorithmTrader(
                                 if (it > currentPrice + params.maxTpDistance())
                                     v.stopPrice = currentPrice + params.maxTpDistance()
                             } ?: run {
-                                if (k.toBigDecimal() >= (currentPrice + params.triggerDistance()))
+                                if (k.toBigDecimal() >= (currentPrice + triggerDistance))
                                     v.stopPrice = currentPrice + params.minTpDistance()
                             }
 
@@ -479,51 +550,47 @@ class AlgorithmTrader(
         ordersListForExecute.forEach { (k, v) ->
             when (k.first) {
                 DIRECTION.LONG -> {
-                    if (long?.trailingInOrderDistance != null) {
-                        when (v.side) {
-                            SIDE.BUY -> {
-                                ordersLong[k.second] = Order(
-                                    orderId = "",
-                                    pair = botSettings.pair,
-                                    price = BigDecimal(k.second),
-                                    origQty = calcAmount(long.orderQuantity(), BigDecimal(k.second)),
-                                    executedQty = BigDecimal(0),
-                                    side = SIDE.SELL,
-                                    type = TYPE.MARKET,
-                                    status = STATUS.NEW,
-                                    lastBorderPrice = null,
-                                    stopPrice = null
-                                )
-                            }
-
-                            SIDE.SELL -> ordersLong.remove(k.second)
-                            else -> log?.error("${botSettings.name} Unknown side: ${v.side}")
+                    when (v.side) {
+                        SIDE.BUY -> {
+                            ordersLong[k.second] = Order(
+                                orderId = "",
+                                pair = botSettings.pair,
+                                price = BigDecimal(k.second),
+                                origQty = v.origQty,
+                                executedQty = BigDecimal(0),
+                                side = SIDE.SELL,
+                                type = TYPE.MARKET,
+                                status = STATUS.NEW,
+                                lastBorderPrice = null,
+                                stopPrice = null
+                            )
                         }
-                    } else ordersLong.remove(k.second)
+
+                        SIDE.SELL -> ordersLong.remove(k.second)
+                        else -> log?.error("${botSettings.name} Unknown side: ${v.side}")
+                    }
                 }
 
                 DIRECTION.SHORT -> {
-                    if (short?.trailingInOrderDistance() != null) {
-                        when (v.side) {
-                            SIDE.SELL -> {
-                                ordersShort[k.second] = Order(
-                                    orderId = "",
-                                    pair = botSettings.pair,
-                                    price = BigDecimal(k.second),
-                                    origQty = calcAmount(short.orderQuantity(), BigDecimal(k.second)),
-                                    executedQty = BigDecimal(0),
-                                    side = SIDE.BUY,
-                                    type = TYPE.MARKET,
-                                    status = STATUS.NEW,
-                                    lastBorderPrice = null,
-                                    stopPrice = null
-                                )
-                            }
-
-                            SIDE.BUY -> ordersShort.remove(k.second)
-                            else -> log?.error("${botSettings.name} Unknown side: ${v.side}")
+                    when (v.side) {
+                        SIDE.SELL -> {
+                            ordersShort[k.second] = Order(
+                                orderId = "",
+                                pair = botSettings.pair,
+                                price = BigDecimal(k.second),
+                                origQty = v.origQty,
+                                executedQty = BigDecimal(0),
+                                side = SIDE.BUY,
+                                type = TYPE.MARKET,
+                                status = STATUS.NEW,
+                                lastBorderPrice = null,
+                                stopPrice = null
+                            )
                         }
-                    } else ordersShort.remove(k.second)
+
+                        SIDE.BUY -> ordersShort.remove(k.second)
+                        else -> log?.error("${botSettings.name} Unknown side: ${v.side}")
+                    }
                 }
             }
         }
@@ -563,7 +630,7 @@ class AlgorithmTrader(
                         orderId = "",
                         pair = botSettings.pair,
                         price = priceIn.toBigDecimal(),
-                        origQty = calcAmount(params.orderQuantity(), price),
+                        origQty = calcAmount(params.orderQuantity(), price, currentDirection, hedgeModule),
                         executedQty = BigDecimal(0),
                         side = if (currentDirection == DIRECTION.LONG) SIDE.SELL else SIDE.BUY,
                         type = TYPE.MARKET,
@@ -580,6 +647,8 @@ class AlgorithmTrader(
     private fun calcInPriceStep(
         prevPrice: BigDecimal,
         params: BotSettingsTrader.TradeParameters.Parameters,
+        hedgeModule: HedgeModule?,
+        currentDirection: DIRECTION?,
         isStepDown: Boolean = false
     ): BigDecimal {
         val step = if (params.orderDistance().usePercent) {
@@ -592,19 +661,63 @@ class AlgorithmTrader(
 
         } else params.orderDistance().distance
 
-        return step.round()
+        return if (hedgeModule == null || hedgeModule.direction == currentDirection)
+            step.round()
+        else
+            (step * hedgeModule.module).round()
     }
 
-    override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal =
-        if (firstBalanceForOrderAmount) settings.minOrderAmount?.countOfDigitsAfterDotForAmount
-            ?.let { amount.round(it) }
-            ?: amount.round(botSettings.countOfDigitsAfterDotForAmount)
-        else settings.minOrderAmount?.countOfDigitsAfterDotForAmount?.let { amount.div8(price).round(it) }
-            ?: amount.div8(price).round(botSettings.countOfDigitsAfterDotForAmount)
+    private fun calcAmount(
+        amount: BigDecimal,
+        price: BigDecimal,
+        direction: DIRECTION,
+        hedgeModule: HedgeModule?
+    ): BigDecimal {
+
+        val orderAmount =
+            if (direction == hedgeModule?.direction)
+                amount * hedgeModule.module
+            else amount
+
+        return if (firstBalanceForOrderAmount) settings.minOrderAmount?.countOfDigitsAfterDotForAmount
+            ?.let { orderAmount.round(it) }
+            ?: orderAmount.round(botSettings.countOfDigitsAfterDotForAmount)
+        else settings.minOrderAmount?.countOfDigitsAfterDotForAmount?.let { orderAmount.div8(price).round(it) }
+            ?: orderAmount.div8(price).round(botSettings.countOfDigitsAfterDotForAmount)
+    }
 
     fun getTrend(): TrendCalculator.Trend? = trendCalculator?.getTrend()
 
     fun orders() = Triple(botSettings, ordersLong, ordersShort)
+
+    fun calcHedgeModule(): HedgeModule? = if (settings.autoBalance.not() || trend?.trend !in listOf(
+            TrendCalculator.Trend.TREND.HEDGE,
+            TrendCalculator.Trend.TREND.FLAT
+        )
+    ) null
+    else {
+        val openLongPosition: BigDecimal = ordersLong
+            .filter { it.value.side == SIDE.SELL }
+            .map { it.value }
+            .sumOf { it.origQty }
+
+        val openShortPosition: BigDecimal = ordersShort
+            .filter { it.value.side == SIDE.BUY }
+            .map { it.value }
+            .sumOf { it.origQty }
+
+        if (openLongPosition > openShortPosition) {
+            if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
+                HedgeModule((BigDecimal(2) - (openShortPosition / openLongPosition)).round(), DIRECTION.SHORT)
+            else
+                HedgeModule(BigDecimal(2), DIRECTION.SHORT)
+        } else {
+            if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
+                HedgeModule((BigDecimal(2) - (openLongPosition / openShortPosition)).round(), DIRECTION.LONG)
+            else
+                HedgeModule(BigDecimal(2), DIRECTION.LONG)
+        }
+    }
 
     private fun order(
         price: BigDecimal,
@@ -614,7 +727,7 @@ class AlgorithmTrader(
         orderId = "",
         pair = botSettings.pair,
         price = price,
-        origQty = calcAmount(params.orderQuantity(), price),
+        origQty = calcAmount(params.orderQuantity(), price, direction, hedgeModule),
         executedQty = BigDecimal(0),
         side = if (direction == DIRECTION.LONG) SIDE.BUY
         else SIDE.SELL,
@@ -623,4 +736,8 @@ class AlgorithmTrader(
         lastBorderPrice = price,
         stopPrice = null
     )
+
+    data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
+
+    override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal = TODO("Not yet implemented")
 }
