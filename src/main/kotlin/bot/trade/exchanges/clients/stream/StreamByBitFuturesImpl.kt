@@ -34,12 +34,12 @@ class StreamByBitFuturesImpl(
                 WebSocketMsg("subscribe", listOf("kline.5.${pair.first}${pair.second}"))
             )
 
-            publicStream.setKlineCallback {
+            /*publicStream.setKlineCallback {
                 it.data
                     .map { kline -> Candlestick(kline) }
                     .sortedBy { kline -> kline.closeTime }
                     .forEach { kline -> queue.add(kline) }
-            }
+            }*/
             /*publicStream.setTradeCallback {
                 queue.addAll(it.data.map { trade ->
                     Trade(
@@ -58,10 +58,14 @@ class StreamByBitFuturesImpl(
                     timeout = timeout,
                     keepConnection = true,
                     pingTimeInterval = 30.s(),
-                    WebSocketMsg("subscribe", listOf("order"))
+                    WebSocketMsg("subscribe", listOf(/*"order", */"position"))
                 )
 
                 privateStream.setOrderCallback { queue.addAll(it.data.map { order -> Order(order) }) }
+                privateStream.setPositionCallback {
+                    println("PositionCallback: $it")
+                    queue.addAll(it.data.map { position -> Position(position) })
+                }
 
 //                privateStream
 //                    .streamingTradeService

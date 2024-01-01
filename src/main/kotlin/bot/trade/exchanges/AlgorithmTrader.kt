@@ -54,12 +54,14 @@ class AlgorithmTrader(
     private val ordersListForExecute: MutableMap<Pair<DIRECTION, String>, Order> = mutableMapOf()
 
     private var isInOrdersInitialized: Boolean = false
+
     private var maxPriceInOrderLong: BigDecimal? = null
     private var minPriceInOrderLong: BigDecimal? = null
     private var maxPriceInOrderShort: BigDecimal? = null
     private var minPriceInOrderShort: BigDecimal? = null
 
     private var hedgeModule: HedgeModule? = null
+    private var position: Position? = null
 
     private val ordersLong: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
         filePath = "$path/orders_long".also {
@@ -260,6 +262,11 @@ class AlgorithmTrader(
                         File("logging/$path/short_orders.txt")
                     )
                 }
+            }
+
+            is Position -> {
+                log("Current position:\n${json(msg, false)}")
+                position = msg
             }
 
             is Order -> {
@@ -648,10 +655,10 @@ class AlgorithmTrader(
         prevPrice: BigDecimal,
         params: BotSettingsTrader.TradeParameters.Parameters,
         hedgeModule: HedgeModule?,
-        currentDirection: DIRECTION?,
+        currentDirection: DIRECTION,
         isStepDown: Boolean = false
     ): BigDecimal {
-        val step = if (params.orderDistance().usePercent) {
+        val distance = if (params.orderDistance().usePercent) {
             if (isStepDown)
                 params.orderDistance().distance.let {
                     prevPrice.round() / (BigDecimal(100).round() + it.round()) * it.round()
@@ -661,10 +668,28 @@ class AlgorithmTrader(
 
         } else params.orderDistance().distance
 
-        return if (hedgeModule == null || hedgeModule.direction == currentDirection)
-            step.round()
+        val step = if (hedgeModule == null || hedgeModule.direction == currentDirection)
+            distance
         else
-            (step * hedgeModule.module).round()
+            (distance * hedgeModule.module)
+
+        return params.counterDistance?.let { counterDistance ->
+            when (currentDirection) {
+                DIRECTION.LONG -> {
+                    if (position != null && position!!.side == "Buy" && position!!.unrealisedPnl < BigDecimal(0))
+                        (step * counterDistance).round()
+                    else
+                        step.round()
+                }
+
+                DIRECTION.SHORT -> {
+                    if (position != null && position!!.side == "Sell" && position!!.unrealisedPnl < BigDecimal(0))
+                        (step * counterDistance).round()
+                    else
+                        step.round()
+                }
+            }
+        } ?: step.round()
     }
 
     private fun calcAmount(

@@ -33,6 +33,7 @@ class ByBitApiWebSocketListener {
     private val instrumentInfoPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"instrument_info")
     private val klinePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"kline\\.\\d+")
     private val liquidationPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"liquidation")
+    private val positionPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"position")
     private val pongPattern = Regex(".+\"ret_msg\"\\s*:\\s*\"pong\".+\"op\"\\s*:\\s*\"ping\".+")
 
     /**
@@ -45,6 +46,7 @@ class ByBitApiWebSocketListener {
     private var klineCallback: ((Kline) -> Unit)? = null
     private var liquidationCallback: ((Liquidation) -> Unit)? = null
     private var orderCallback: ((Order) -> Unit)? = null
+    private var positionCallback: ((Position) -> Unit)? = null
 
     private var schedulerReconnect = Executors.newScheduledThreadPool(1)
     private val url: String
@@ -202,6 +204,7 @@ class ByBitApiWebSocketListener {
                 message.matches(pongPattern) -> log.debug("Pong message received!")
                 tradePattern.containsMatchIn(message) -> tradeCallback?.invoke(asObject(message))
                 orderPattern.containsMatchIn(message) -> orderCallback?.invoke(asObject(message))
+                positionPattern.containsMatchIn(message) -> positionCallback?.invoke(asObject(message))
                 orderBookPattern.containsMatchIn(message) ->
                     if (orderBookSnapshotPattern.containsMatchIn(message)) {
                         asObject<OrderBookSnapshot>(message).run {
@@ -252,6 +255,8 @@ class ByBitApiWebSocketListener {
         apply { this.liquidationCallback = liquidationCallback }
 
     fun setOrderCallback(orderCallback: (Order) -> Unit) = apply { this.orderCallback = orderCallback }
+
+    fun setPositionCallback(positionCallback: (Position) -> Unit) = apply { this.positionCallback = positionCallback }
 
     companion object {
         /**

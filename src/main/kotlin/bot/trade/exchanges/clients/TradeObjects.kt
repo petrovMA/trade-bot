@@ -142,6 +142,26 @@ data class Order(
         (a == b || (a != null && b != null && a.compareTo(b) == 0))
 }
 
+data class Position(
+    val pair: TradePair,
+    val marketPrice: BigDecimal,
+    val unrealisedPnl: BigDecimal,
+    val realisedPnl: BigDecimal,
+    val entryPrice: BigDecimal,
+    val leverage: BigDecimal,
+    val side: String
+) : CommonExchangeData {
+    constructor(data: io.bybit.api.websocket.messages.response.Position.Data) : this(
+        pair = data.symbol.run { TradePair(take(3), drop(3)) },
+        marketPrice = data.markPrice.toBigDecimal(),
+        unrealisedPnl = data.unrealisedPnl.toBigDecimal(),
+        realisedPnl = data.cumRealisedPnl.toBigDecimal(),
+        entryPrice = data.entryPrice.toBigDecimal(),
+        leverage = data.leverage.toBigDecimal(),
+        side = data.side
+    )
+}
+
 data class TradePair(val first: String, val second: String) {
 
     constructor(pair: String) : this(
@@ -410,7 +430,8 @@ class BotSettingsTrader(
             @SerializedName("min_tp_distance") val minTpDistance: MinTpDistance,
             @SerializedName("max_tp_distance") val maxTpDistance: MaxTpDistance,
             @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
-            @SerializedName("set_close_orders") val setCloseOrders: Boolean = true // set close position orders when bot starts
+            @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts
+            @SerializedName("counter_distance") val counterDistance: BigDecimal? = null
         ) {
             class TradingRange(
                 @SerializedName("lower_bound") val lowerBound: BigDecimal,
