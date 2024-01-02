@@ -160,6 +160,15 @@ data class Position(
         leverage = data.leverage.toBigDecimal(),
         side = data.side
     )
+    constructor(data: io.bybit.api.rest.response.PositionResponse.Result.Position) : this(
+        pair = data.symbol.run { TradePair(take(3), drop(3)) },
+        marketPrice = data.markPrice.toBigDecimal(),
+        unrealisedPnl = data.unrealisedPnl.toBigDecimal(),
+        realisedPnl = data.cumRealisedPnl.toBigDecimal(),
+        entryPrice = data.avgPrice.toBigDecimal(),
+        leverage = data.leverage.toBigDecimal(),
+        side = data.side
+    )
 }
 
 data class TradePair(val first: String, val second: String) {
@@ -380,7 +389,8 @@ class BotSettingsTrader(
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
     @SerializedName("strategy_type_comment") val strategyTypeComment: String,
-    @SerializedName("auto_balance") val autoBalance: Boolean = false
+    @SerializedName("auto_balance") val autoBalance: Boolean = false,
+    @SerializedName("entire_tp") val entireTp: EntireTp?
 ) : BotSettings(
     name = name,
     pair = pair,
@@ -391,8 +401,14 @@ class BotSettingsTrader(
 ) {
 
     class MinOrderAmount(
-        @SerializedName("distance") val amount: BigDecimal,
+        @SerializedName("amount") val amount: BigDecimal,
         @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
+    )
+
+    class EntireTp(
+        @SerializedName("max_trigger_amount") val maxTriggerAmount: Int,
+        @SerializedName("distance") val distance: BigDecimal,
+        @SerializedName("use_percent") val usePercent: Boolean = false
     )
 
     enum class StrategyType { LONG, SHORT, BOTH }

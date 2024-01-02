@@ -2,9 +2,10 @@ package bot.trade.exchanges.clients
 
 import bot.trade.exchanges.clients.stream.Stream
 import bot.trade.exchanges.clients.stream.StreamThreadStub
+import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
-class ClientTestExchange : Client {
+class ClientTestExchange : ClientFutures {
 
     val orders: MutableList<Order> = mutableListOf()
     private val candlesticksData: MutableList<Candlestick> = mutableListOf()
@@ -62,6 +63,20 @@ class ClientTestExchange : Client {
 
     override fun close() {
         TODO("Not yet implemented")
+    }
+
+    override fun getPositions(pair: TradePair): List<Position> {
+        return listOf(
+            Position(
+                pair = pair,
+                marketPrice = BigDecimal(0),
+                unrealisedPnl = BigDecimal(0),
+                realisedPnl = BigDecimal(0),
+                entryPrice = BigDecimal(0),
+                leverage = BigDecimal(0),
+                side = "None"
+            )
+        )
     }
 
     fun addKlineData(candlesticks: List<Candlestick>) = candlesticksData.addAll(candlesticks)

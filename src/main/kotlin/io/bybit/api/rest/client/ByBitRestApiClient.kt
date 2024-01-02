@@ -208,6 +208,37 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         return executeRequest<CancelResponse>(Request.Builder().url(builder).post(body(requestParams)).build()).result
     }
 
+    fun getPositionsList(
+        category: String = "linear",
+        symbol: String,
+        baseCoin: String? = null,
+        settleCoin: String? = null,
+        limit: Int? = null,
+        cursor: String? = null
+    ): PositionResponse.Result {
+
+        val params = TreeMap<String, String>().apply {
+            put("category", category)
+            symbol?.let { put("symbol", it) }
+            baseCoin?.let { put("baseCoin", it) }
+            settleCoin?.let { put("settleCoin", it) }
+            limit?.let { put("limit", it.toString()) }
+            cursor?.let { put("cursor", it) }
+        }
+
+        val builder = builder().apply {
+            addPathSegment("position")
+            addPathSegment("list")
+            params.forEach(::addQueryParameter)
+        }.build()
+
+        val request: Request = Request.Builder().url(builder)
+            .apply { headers(params).forEach(::addHeader) }
+            .build()
+
+        return executeRequest<PositionResponse>(request).result
+    }
+
     private inline fun <reified T : Response> executeRequest(request: Request): T = try {
         log.trace {
             try {

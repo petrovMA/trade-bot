@@ -11,7 +11,7 @@ import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 
-class ClientByBit(private val api: String? = null, private val sec: String? = null) : Client {
+class ClientByBit(private val api: String? = null, private val sec: String? = null) : ClientFutures {
 
     val client = if (api != null && sec != null) ByBitRestApiClient(api, sec)
     else throw IllegalArgumentException("api and sec must be not null")
@@ -262,6 +262,11 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
         )
 
     override fun close() {}
+
+    override fun getPositions(pair: TradePair) = client.getPositionsList(symbol = pair.first + pair.second)
+        .list
+        .map { Position(it) }
+
 
     private fun asKlineInterval(interval: INTERVAL): KlineInterval = when (interval) {
         INTERVAL.ONE_MINUTE -> KlineInterval.m1

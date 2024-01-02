@@ -42,12 +42,14 @@ class AlgorithmTrader(
     sendMessage = sendMessage
 ) {
     private val settings: BotSettingsTrader = super.botSettings as BotSettingsTrader
+    private var futuresClient = super.client as ClientFutures
     private val ordersType = settings.ordersType
     private val strategy = settings.strategy
     private val notAutoCalcTrend = settings.trendDetector?.notAutoCalcTrend ?: true
     private val minOrderAmount = settings.minOrderAmount?.amount ?: BigDecimal.ZERO
     private val long = settings.parameters.longParameters
     private val short = settings.parameters.shortParameters
+    private val entireTp = settings.entireTp
     private var trendCalculator: TrendCalculator? = null
     private var trend: TrendCalculator.Trend? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
@@ -105,6 +107,8 @@ class AlgorithmTrader(
     var to: Long = Long.MIN_VALUE
 
     override fun setup() {
+        position = futuresClient.getPositions(botSettings.pair).firstOrNull()
+
         trendCalculator = settings.trendDetector?.run {
             TrendCalculator(
                 client = client,
@@ -150,6 +154,32 @@ class AlgorithmTrader(
                             send("#${botSettings.name} #Trend :\n```json\n${json(it)}\n```", true)
                         }
                     }
+                }
+
+                entireTp?.let { entireTp ->
+
+                    val triggerCount = ordersLong.filter { it.value.side == SIDE.SELL }.count() +
+                            ordersShort.filter { it.value.side == SIDE.BUY }.count()
+
+                    if (position != null && triggerCount > entireTp.maxTriggerAmount) {
+                        val currentTpDistance = (position!!.entryPrice - currentPrice).abs()
+
+                        val entireTpDistance = if (entireTp.usePercent) currentPrice.percent(entireTp.distance)
+                        else entireTp.distance
+
+                        if (currentTpDistance > entireTpDistance) {
+                            ordersShort.filter { (_, v) -> v.side == SIDE.BUY }
+                                .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v }
+                            ordersShort.clear()
+
+                            ordersLong.filter { (_, v) -> v.side == SIDE.SELL }
+                                .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v }
+                            ordersLong.clear()
+
+                        }
+                    }
+
+                    // TODO ALSO Add close all position if loss/profit percent higher than entireTp.profit_percent
                 }
 
                 when (trend?.trend) {
@@ -210,6 +240,9 @@ class AlgorithmTrader(
                         else -> {}
                     }
                 }
+
+                if (buySumAmount > sellSumAmount) buySumAmount -= sellSumAmount
+                else sellSumAmount -= buySumAmount
 
                 if (
                     buySumAmount > calcAmount(minOrderAmount, currentPrice, DIRECTION.LONG, hedgeModule)
