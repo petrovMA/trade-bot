@@ -160,6 +160,7 @@ data class Position(
         leverage = data.leverage.toBigDecimal(),
         side = data.side
     )
+
     constructor(data: io.bybit.api.rest.response.PositionResponse.Result.Position) : this(
         pair = data.symbol.run { TradePair(take(3), drop(3)) },
         marketPrice = data.markPrice.toBigDecimal(),
@@ -407,9 +408,15 @@ class BotSettingsTrader(
 
     class EntireTp(
         @SerializedName("max_trigger_amount") val maxTriggerAmount: Int,
-        @SerializedName("distance") val distance: BigDecimal,
-        @SerializedName("use_percent") val usePercent: Boolean = false
-    )
+        @SerializedName("max_profit_percent") val maxProfitPercent: BigDecimal,
+        @SerializedName("max_loss_percent") val maxLossPercent: BigDecimal,
+        @SerializedName("tp_distance") val tpDistance: TpDistance
+    ) {
+        class TpDistance(
+            @SerializedName("distance") val distance: BigDecimal,
+            @SerializedName("use_percent") val usePercent: Boolean = false
+        )
+    }
 
     enum class StrategyType { LONG, SHORT, BOTH }
 

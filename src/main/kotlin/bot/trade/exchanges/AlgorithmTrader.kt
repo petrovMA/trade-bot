@@ -162,42 +162,33 @@ class AlgorithmTrader(
                             ordersShort.filter { it.value.side == SIDE.BUY }.count()
 
                     if (position != null && triggerCount > entireTp.maxTriggerAmount) {
-                        val currentTpDistance = (position!!.entryPrice - currentPrice).abs()
 
-                        val entireTpDistance = if (entireTp.usePercent) currentPrice.percent(entireTp.distance)
-                        else entireTp.distance
+                        val (profitPercent, currentTpDistance) = calcProfit(position!!, currentPrice)
 
-                        if (currentTpDistance > entireTpDistance) {
-                            ordersShort.filter { (_, v) -> v.side == SIDE.BUY }
-                                .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v }
-                            ordersShort.clear()
+                        val entireTpDistance = if (entireTp.tpDistance.usePercent)
+                            currentPrice.percent(entireTp.tpDistance.distance)
+                        else
+                            entireTp.tpDistance.distance
 
-                            ordersLong.filter { (_, v) -> v.side == SIDE.SELL }
-                                .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v }
-                            ordersLong.clear()
-
+                        if (
+                            currentTpDistance > entireTpDistance
+                            || profitPercent > entireTp.maxProfitPercent
+                            || profitPercent < entireTp.maxLossPercent
+                        ) {
+                            resetLong()
+                            resetShort()
                         }
                     }
-
-                    // TODO ALSO Add close all position if loss/profit percent higher than entireTp.profit_percent
                 }
 
                 when (trend?.trend) {
                     TrendCalculator.Trend.TREND.LONG -> {
-                        ordersShort
-                            .filter { (_, v) -> v.side == SIDE.BUY }
-                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v }
-                        ordersShort.clear()
-
+                        resetShort()
                         long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
                     }
 
                     TrendCalculator.Trend.TREND.SHORT -> {
-                        ordersLong
-                            .filter { (_, v) -> v.side == SIDE.SELL }
-                            .forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v }
-                        ordersLong.clear()
-
+                        resetLong()
                         short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
                     }
 
@@ -709,14 +700,22 @@ class AlgorithmTrader(
         return params.counterDistance?.let { counterDistance ->
             when (currentDirection) {
                 DIRECTION.LONG -> {
-                    if (position != null && position!!.side == "Buy" && position!!.unrealisedPnl < BigDecimal(0))
+                    if (
+                        position != null
+                        && position!!.side == "Buy"
+                        && calcProfit(position!!, currentPrice).first < BigDecimal(0)
+                    )
                         (step * counterDistance).round()
                     else
                         step.round()
                 }
 
                 DIRECTION.SHORT -> {
-                    if (position != null && position!!.side == "Sell" && position!!.unrealisedPnl < BigDecimal(0))
+                    if (
+                        position != null
+                        && position!!.side == "Sell"
+                        && calcProfit(position!!, currentPrice).first < BigDecimal(0)
+                    )
                         (step * counterDistance).round()
                     else
                         step.round()
@@ -777,6 +776,18 @@ class AlgorithmTrader(
         }
     }
 
+    private fun resetLong() = ordersLong.run {
+        filter { (_, v) -> v.side == SIDE.SELL }.forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v }
+
+        clear()
+    }
+
+    private fun resetShort() = ordersShort.run {
+        filter { (_, v) -> v.side == SIDE.BUY }.forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v }
+
+        clear()
+    }
+
     private fun order(
         price: BigDecimal,
         direction: DIRECTION,
@@ -794,6 +805,14 @@ class AlgorithmTrader(
         lastBorderPrice = price,
         stopPrice = null
     )
+
+    private fun calcProfit(position: Position, currPrice: BigDecimal): Pair<BigDecimal, BigDecimal> {
+        val profitAbsolute = position.entryPrice - currPrice
+
+        val profitPercent = (position.entryPrice / BigDecimal(100)) * profitAbsolute
+
+        return profitPercent to profitAbsolute.abs()
+    }
 
     data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
 
