@@ -15,7 +15,7 @@
         "use_percent": false
       },
       "in_order_quantity": {
-        "value": 1.5,
+        "value": 0.001,
         "use_percent": false
       },
       "in_order_distance": {
@@ -49,7 +49,6 @@
   "market_type": "USDT Perpetual",
   "market_type_comment": "USDT Perpetual, Inverse Perpetual, Spot",
   "strategy_type_comment": "Long, Short, Spot",
-  "orderBalanceType": "second",
   "countOfDigitsAfterDotForAmount": 3,
   "countOfDigitsAfterDotForPrice": 2
 }

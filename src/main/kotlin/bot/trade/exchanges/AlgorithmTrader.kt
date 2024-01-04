@@ -120,9 +120,6 @@ class AlgorithmTrader(
                 rsi2 = rsi2.timeFrame.toDuration() to rsi2.rsiPeriod,
                 endTime = endTimeForTrendCalculator
             )
-        } ?: run {
-            send("Not found trendDetector settings")
-            throw RuntimeException("Not found trendDetector settings")
         }
     }
 
@@ -702,7 +699,7 @@ class AlgorithmTrader(
                 DIRECTION.LONG -> {
                     if (
                         position != null
-                        && position!!.side == "Buy"
+                        && position!!.side.equals("BUY", true)
                         && calcProfit(position!!, currentPrice).first < BigDecimal(0)
                     )
                         (step * counterDistance).round()
@@ -713,7 +710,7 @@ class AlgorithmTrader(
                 DIRECTION.SHORT -> {
                     if (
                         position != null
-                        && position!!.side == "Sell"
+                        && position!!.side.equals("SELL", true)
                         && calcProfit(position!!, currentPrice).first < BigDecimal(0)
                     )
                         (step * counterDistance).round()
@@ -807,9 +804,12 @@ class AlgorithmTrader(
     )
 
     private fun calcProfit(position: Position, currPrice: BigDecimal): Pair<BigDecimal, BigDecimal> {
-        val profitAbsolute = position.entryPrice - currPrice
+        val profitAbsolute = if (position.side.equals("sell", true))
+            position.entryPrice - currPrice
+        else
+            currPrice - position.entryPrice
 
-        val profitPercent = (position.entryPrice / BigDecimal(100)) * profitAbsolute
+        val profitPercent = profitAbsolute.div8(position.entryPrice.div8(BigDecimal(100)))
 
         return profitPercent to profitAbsolute.abs()
     }

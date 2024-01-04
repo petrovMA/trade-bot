@@ -8,6 +8,15 @@ import java.util.concurrent.BlockingQueue
 class ClientTestExchange : ClientFutures {
 
     val orders: MutableList<Order> = mutableListOf()
+    private var position: Position = Position(
+        pair = TradePair("BTC_USDT"),
+        marketPrice = BigDecimal(20000),
+        unrealisedPnl = BigDecimal(0),
+        realisedPnl = BigDecimal(0),
+        entryPrice = BigDecimal(20000),
+        leverage = BigDecimal(1),
+        side = "None"
+    )
     private val candlesticksData: MutableList<Candlestick> = mutableListOf()
 
     override fun getAllPairs(): List<TradePair> {
@@ -65,19 +74,10 @@ class ClientTestExchange : ClientFutures {
         TODO("Not yet implemented")
     }
 
-    override fun getPositions(pair: TradePair): List<Position> {
-        return listOf(
-            Position(
-                pair = pair,
-                marketPrice = BigDecimal(0),
-                unrealisedPnl = BigDecimal(0),
-                realisedPnl = BigDecimal(0),
-                entryPrice = BigDecimal(0),
-                leverage = BigDecimal(0),
-                side = "None"
-            )
-        )
-    }
+    override fun getPositions(pair: TradePair): List<Position> = listOf(position)
 
     fun addKlineData(candlesticks: List<Candlestick>) = candlesticksData.addAll(candlesticks)
+    fun setPosition(position: Position) {
+        this.position = position
+    }
 }

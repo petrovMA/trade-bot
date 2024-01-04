@@ -9,16 +9,6 @@ import java.math.BigDecimal
 
 class AlgorithmTraderTest {
 
-    private fun Trade.toKline() = Candlestick(
-        openTime = time,
-        closeTime = time + 1000000,
-        open = 0.toBigDecimal(),
-        high = 0.toBigDecimal(),
-        low = 0.toBigDecimal(),
-        close = price,
-        volume = 0.toBigDecimal()
-    )
-
     @Test
     fun testExecuteInOrdersWithMinOrderAmount() {
         val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersWithMinOrderAmountSettings.json")

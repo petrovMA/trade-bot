@@ -40,7 +40,7 @@ abstract class Algorithm(
     val formatAmount = "%.${botSettings.countOfDigitsAfterDotForAmount}f"
     val formatPrice = "%.${botSettings.countOfDigitsAfterDotForPrice}f"
 
-    val firstBalanceForOrderAmount = botSettings.orderBalanceType == "first"
+    val firstBalanceForOrderAmount = botSettings.orderBalanceType.equals("second", true).not()
 
     private val retryGetOrderCount = conf.getInt("retry.get_order_count")
     private val retrySentOrderCount: Int = conf.getInt("retry.sent_order_count")

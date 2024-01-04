@@ -57,6 +57,16 @@ fun testExchange(settingsFile: String, endTime: Long? = null) = ClientTestExchan
     ) { _, _ -> } to exchange
 }
 
+fun Trade.toKline() = Candlestick(
+    openTime = time,
+    closeTime = time + 1000000,
+    open = 0.toBigDecimal(),
+    high = 0.toBigDecimal(),
+    low = 0.toBigDecimal(),
+    close = price,
+    volume = 0.toBigDecimal()
+)
+
 fun String.file() = resourceFile<AlgorithmTraderTest>(this)
 
 infix fun Int.startExclusive(other: Int): IntRange = IntRange(this + 1, other)
