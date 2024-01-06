@@ -158,19 +158,19 @@ class AlgorithmTrader(
                     val triggerCount = ordersLong.filter { it.value.side == SIDE.SELL }.count() +
                             ordersShort.filter { it.value.side == SIDE.BUY }.count()
 
-                    if (position != null && triggerCount > entireTp.maxTriggerAmount) {
+                    if (position != null && triggerCount >= entireTp.maxTriggerAmount) {
 
                         val (profitPercent, currentTpDistance) = calcProfit(position!!, currentPrice)
 
                         val entireTpDistance = if (entireTp.tpDistance.usePercent)
-                            currentPrice.percent(entireTp.tpDistance.distance)
+                            position!!.entryPrice.percent(entireTp.tpDistance.distance)
                         else
                             entireTp.tpDistance.distance
 
                         if (
                             currentTpDistance > entireTpDistance
                             || profitPercent > entireTp.maxProfitPercent
-                            || profitPercent < entireTp.maxLossPercent
+                            || profitPercent < (entireTp.maxLossPercent.negate())
                         ) {
                             resetLong()
                             resetShort()
@@ -229,8 +229,14 @@ class AlgorithmTrader(
                     }
                 }
 
-                if (buySumAmount > sellSumAmount) buySumAmount -= sellSumAmount
-                else sellSumAmount -= buySumAmount
+                if (buySumAmount > sellSumAmount) {
+                    buySumAmount -= sellSumAmount
+                    sellSumAmount = BigDecimal.ZERO
+                }
+                else {
+                    sellSumAmount -= buySumAmount
+                    buySumAmount = BigDecimal.ZERO
+                }
 
                 if (
                     buySumAmount > calcAmount(minOrderAmount, currentPrice, DIRECTION.LONG, hedgeModule)

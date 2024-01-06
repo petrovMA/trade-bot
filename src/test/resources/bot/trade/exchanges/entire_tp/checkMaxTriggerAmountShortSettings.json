@@ -1,27 +1,26 @@
 {
-  "flow_name": "ETHUSDT_LONG_COUNTER_DISTANCE",
+  "flow_name": "ETHUSDT_SHORT_ENTIRE_TP",
   "symbol": {
     "first": "ETH",
     "second": "USDT"
   },
   "exchange_type": "Bybit",
-  "strategy_type": "LONG",
+  "strategy_type": "SHORT",
   "order_type": "MARKET",
   "entire_tp": {
-    "max_trigger_amount": 150,
+    "max_trigger_amount": 12,
     "max_profit_percent": 20,
     "max_loss_percent": 20,
     "tp_distance": {
-      "distance": 20,
-      "use_percent": true
+      "distance": 55,
+      "use_percent": false
     }
   },
   "parameters": {
-    "long_parameters": {
-      "counter_distance": 1.25,
+    "short_parameters": {
       "trading_range": {
-        "lower_bound": 1900,
-        "upper_bound": 2100,
+        "lower_bound": 1800,
+        "upper_bound": 2200,
         "use_percent": false
       },
       "in_order_quantity": {
@@ -29,7 +28,7 @@
         "use_percent": false
       },
       "in_order_distance": {
-        "distance": 2.0,
+        "distance": 10.0,
         "use_percent": false
       },
       "trailing_in_order_distance": {

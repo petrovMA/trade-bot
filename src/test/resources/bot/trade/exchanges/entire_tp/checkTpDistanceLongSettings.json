@@ -8,17 +8,16 @@
   "strategy_type": "LONG",
   "order_type": "MARKET",
   "entire_tp": {
-    "max_trigger_amount": 150,
+    "max_trigger_amount": 4,
     "max_profit_percent": 20,
     "max_loss_percent": 20,
     "tp_distance": {
-      "distance": 20,
+      "distance": 5,
       "use_percent": true
     }
   },
   "parameters": {
     "long_parameters": {
-      "counter_distance": 1.25,
       "trading_range": {
         "lower_bound": 1900,
         "upper_bound": 2100,
@@ -29,7 +28,7 @@
         "use_percent": false
       },
       "in_order_distance": {
-        "distance": 2.0,
+        "distance": 15.0,
         "use_percent": false
       },
       "trailing_in_order_distance": {

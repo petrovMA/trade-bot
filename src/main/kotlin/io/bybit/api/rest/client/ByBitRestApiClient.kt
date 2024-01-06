@@ -219,7 +219,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
 
         val params = TreeMap<String, String>().apply {
             put("category", category)
-            symbol?.let { put("symbol", it) }
+            put("symbol", symbol)
             baseCoin?.let { put("baseCoin", it) }
             settleCoin?.let { put("settleCoin", it) }
             limit?.let { put("limit", it.toString()) }
