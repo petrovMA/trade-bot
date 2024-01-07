@@ -4,6 +4,7 @@ import bot.trade.exchanges.clients.*
 import bot.trade.libs.json
 import bot.trade.libs.readConf
 import com.google.gson.reflect.TypeToken
+import org.junit.jupiter.api.Assertions
 import utils.mapper.Mapper
 import utils.resourceFile
 import java.io.File
@@ -40,6 +41,22 @@ fun assertOrders(expectedFile: File?, actual: Map<String, Order>, messagePredica
 }
 
 
+fun assertCandlesticks(expected: List<Candlestick>, actual: List<Candlestick>, messagePredicate: String = "") {
+
+    val expectedSorted = expected.sortedBy { it.openTime }
+    val actualSorted = actual.sortedBy { it.openTime }
+
+    assert(expected.size == actual.size) {
+        "${messagePredicate}expected.size != actual.size, (${expected.size} != ${actual.size})"
+    }
+
+    expectedSorted.forEachIndexed { index, candlestick ->
+        assert(candlestick == actualSorted[index]) {
+            "${messagePredicate}[$index] not equals,\nExpected:\n${json(candlestick)}\n\nActual:\n${json(actualSorted[index])}"
+        }
+    }
+}
+
 
 fun testExchange(settingsFile: String, endTime: Long? = null) = ClientTestExchange().let { exchange ->
     AlgorithmTrader(
@@ -66,6 +83,10 @@ fun Trade.toKline() = Candlestick(
     close = price,
     volume = 0.toBigDecimal()
 )
+
+fun assertIndicator(expected: BigDecimal, actual: BigDecimal, module: BigDecimal) {
+    Assertions.assertTrue((expected - actual).abs() < module, "expected: $expected, actual: $actual")
+}
 
 fun String.file() = resourceFile<AlgorithmTraderTest>(this)
 

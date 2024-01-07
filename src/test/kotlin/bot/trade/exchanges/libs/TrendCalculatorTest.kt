@@ -1,12 +1,12 @@
 package bot.trade.exchanges.libs
 
+import bot.trade.exchanges.assertIndicator
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.exchanges.clients.ClientTestExchange
 import bot.trade.exchanges.clients.TradePair
 import bot.trade.libs.*
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import utils.mapper.Mapper
 import utils.resourceFile
@@ -51,9 +51,5 @@ class TrendCalculatorTest {
             assertIndicator(BigDecimal(56.56).round(2), rsi1, BigDecimal(1))
             assertIndicator(BigDecimal(61.12).round(2), rsi2, BigDecimal(1))
         }
-    }
-
-    private fun assertIndicator(expected: BigDecimal, actual: BigDecimal, module: BigDecimal) {
-        assertTrue((expected - actual).abs() < module, "expected: $expected, actual: $actual")
     }
 }

@@ -63,12 +63,20 @@ class KlineConverter(
                                 throw Exception("inputCandlesticks has a gap in sequence:\n${currentCandlestick}\n${k}")
                         }
 
-                        if (
-                            (currentCandlestick!!.closeTime + 1) % outputKlineInterval.toMillis() == 0L
-                            || currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L
-                        ) {
+                        if (currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L) {
                             closeCurrentCandlestick()
                             isNewKline = true
+                        } else if ((currentCandlestick!!.closeTime + 1) % outputKlineInterval.toMillis() == 0L) {
+                            currentCandlestick = Candlestick(
+                                openTime = currentCandlestick!!.openTime,
+                                closeTime = currentCandlestick!!.closeTime + 1L,
+                                open = currentCandlestick!!.open,
+                                high = currentCandlestick!!.high,
+                                low = currentCandlestick!!.low,
+                                close = currentCandlestick!!.close,
+                                volume = currentCandlestick!!.volume
+                            )
+                            closeCurrentCandlestick()
                         }
                     }
                 }

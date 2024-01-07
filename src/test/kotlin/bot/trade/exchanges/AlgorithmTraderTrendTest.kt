@@ -1,8 +1,11 @@
 package bot.trade.exchanges
 
 import bot.trade.exchanges.clients.Candlestick
+import bot.trade.exchanges.libs.TrendCalculator
 import org.junit.jupiter.api.Test
 import utils.mapper.Mapper.asObject
+import java.math.BigDecimal
+
 
 class AlgorithmTraderTrendTest {
 
@@ -26,6 +29,19 @@ class AlgorithmTraderTrendTest {
 
         streamData.forEach { algorithmTrader.handle(it) }
 
-        println(algorithmTrader.getTrend())
+        algorithmTrader.getTrend()!!.run {
+            assertIndicator(BigDecimal(0.51), hma1, BigDecimal(0.1))
+            assertIndicator(BigDecimal(0.51), hma2, BigDecimal(0.1))
+            assertIndicator(BigDecimal(0.50), hma3, BigDecimal(0.1))
+            assertIndicator(BigDecimal(68.13), rsi1, BigDecimal(0.1))
+            assertIndicator(BigDecimal(64.84), rsi2, BigDecimal(0.1))
+        }
+
+        val field = AlgorithmTrader::class.java.getDeclaredField("trendCalculator")
+        field.isAccessible = true
+
+        val trendCalculator = field.get(algorithmTrader) as TrendCalculator
+
+        assertCandlesticks(expectedCandlestick, trendCalculator.hma3Converter.getCandlesticks())
     }
 }
