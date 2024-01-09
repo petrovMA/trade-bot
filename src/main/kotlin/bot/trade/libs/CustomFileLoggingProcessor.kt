@@ -33,6 +33,8 @@ class CustomFileLoggingProcessor(private val logMessageQueue: BlockingQueue<Mess
         if (message.outputFile.exists().not())
             message.outputFile.createNewFile()
 
+        log.trace(message.text)
+
         message.outputFile.appendText("\n${now().format(formatter)} - ${message.text}")
     }
 

@@ -71,17 +71,7 @@ class AlgorithmTrader(
         },
         keyToFileName = { key -> key.replace('.', '_') + ".json" },
         fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
-    ).also {
-        maxPriceInOrderLong = it.values
-            .mapNotNull { o -> o.price?.toDouble() }
-            .maxOrNull()
-            ?.toBigDecimal()
-
-        minPriceInOrderLong = it.values
-            .mapNotNull { o -> o.price?.toDouble() }
-            .minOrNull()
-            ?.toBigDecimal()
-    }
+    )
     else mutableMapOf()
 
     private val ordersShort: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
@@ -90,17 +80,7 @@ class AlgorithmTrader(
         },
         keyToFileName = { key -> key.replace('.', '_') + ".json" },
         fileNameToKey = { key -> key.replace('_', '.').replace(".json", "") }
-    ).also {
-        maxPriceInOrderShort = it.values
-            .mapNotNull { o -> o.price?.toDouble() }
-            .maxOrNull()
-            ?.toBigDecimal()
-
-        minPriceInOrderShort = it.values
-            .mapNotNull { o -> o.price?.toDouble() }
-            .minOrNull()
-            ?.toBigDecimal()
-    }
+    )
     else mutableMapOf()
 
     var from: Long = Long.MAX_VALUE
@@ -232,8 +212,7 @@ class AlgorithmTrader(
                 if (buySumAmount > sellSumAmount) {
                     buySumAmount -= sellSumAmount
                     sellSumAmount = BigDecimal.ZERO
-                }
-                else {
+                } else {
                     sellSumAmount -= buySumAmount
                     buySumAmount = BigDecimal.ZERO
                 }
@@ -635,8 +614,32 @@ class AlgorithmTrader(
     }
 
     override fun synchronizeOrders() {
-        if (ordersLong is ObservableHashMap) long?.let { syncOrders(it, ordersLong, DIRECTION.LONG) }
-        if (ordersShort is ObservableHashMap) short?.let { syncOrders(it, ordersShort, DIRECTION.SHORT) }
+        if (ordersLong is ObservableHashMap) long?.let {
+            syncOrders(it, ordersLong, DIRECTION.LONG)
+
+            maxPriceInOrderLong = ordersLong.values
+                .mapNotNull { o -> o.price?.toDouble() }
+                .maxOrNull()
+                ?.toBigDecimal()
+
+            minPriceInOrderLong = ordersLong.values
+                .mapNotNull { o -> o.price?.toDouble() }
+                .minOrNull()
+                ?.toBigDecimal()
+        }
+        if (ordersShort is ObservableHashMap) short?.let {
+            syncOrders(it, ordersShort, DIRECTION.SHORT)
+
+            maxPriceInOrderShort = ordersShort.values
+                .mapNotNull { o -> o.price?.toDouble() }
+                .maxOrNull()
+                ?.toBigDecimal()
+
+            minPriceInOrderShort = ordersShort.values
+                .mapNotNull { o -> o.price?.toDouble() }
+                .minOrNull()
+                ?.toBigDecimal()
+        }
     }
 
     private fun syncOrders(
@@ -766,7 +769,9 @@ class AlgorithmTrader(
             .map { it.value }
             .sumOf { it.origQty }
 
-        if (openLongPosition > openShortPosition) {
+        if (openLongPosition == openShortPosition)
+            null
+        else if (openLongPosition > openShortPosition) {
             if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
                 HedgeModule((BigDecimal(2) - (openShortPosition / openLongPosition)).round(), DIRECTION.SHORT)
             else

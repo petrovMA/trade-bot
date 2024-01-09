@@ -59,7 +59,6 @@ abstract class Algorithm(
 
     override fun run() {
         setup()
-        saveBotSettings(botSettings)
         stopThread = false
         try {
             synchronizeOrders()
