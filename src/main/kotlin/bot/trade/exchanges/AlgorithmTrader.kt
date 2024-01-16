@@ -388,10 +388,16 @@ class AlgorithmTrader(
                         else
                             orders[price.toPrice()] = order(price, currentDirection, params)
 
-                        minPriceInOrderLong = price
+                        minPriceInOrderLong = orders.entries
+                            .mapNotNull { it.value.price }
+                            .minByOrNull { it.toDouble() }
+                            ?: maxPriceInOrderLong
                     }
 
-                    maxPriceInOrderLong = ordersLong.keys.maxOrNull()?.toBigDecimal() ?: minPriceInOrderLong
+                    maxPriceInOrderLong = orders.entries
+                        .mapNotNull { it.value.price }
+                        .maxByOrNull { it.toDouble() }
+                        ?: minPriceInOrderLong
 
                     var step = calcInPriceStep(maxPriceInOrderLong!!, params, hedgeModule, currentDirection, false)
 
@@ -424,10 +430,16 @@ class AlgorithmTrader(
                         else
                             orders[price.toPrice()] = order(price, currentDirection, params)
 
-                        maxPriceInOrderShort = price
+                        maxPriceInOrderShort = orders.entries
+                            .mapNotNull { it.value.price }
+                            .maxByOrNull { it.toDouble() }
+                            ?: minPriceInOrderShort
                     }
 
-                    minPriceInOrderShort = ordersShort.keys.minOrNull()?.toBigDecimal() ?: maxPriceInOrderShort
+                    minPriceInOrderShort = orders.entries
+                        .mapNotNull { it.value.price }
+                        .minByOrNull { it.toDouble() }
+                        ?: maxPriceInOrderShort
 
                     var step = calcInPriceStep(minPriceInOrderShort!!, params, hedgeModule, currentDirection, true)
 
@@ -820,7 +832,10 @@ class AlgorithmTrader(
         else
             currPrice - position.entryPrice
 
-        val profitPercent = profitAbsolute.div8(position.entryPrice.div8(BigDecimal(100)))
+        val profitPercent = if (position.entryPrice != BigDecimal(0))
+            profitAbsolute.div8(position.entryPrice.div8(BigDecimal(100)))
+        else
+            BigDecimal(0)
 
         return profitPercent to profitAbsolute.abs()
     }
