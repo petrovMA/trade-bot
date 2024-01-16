@@ -69,10 +69,10 @@ abstract class Algorithm(
             else queue.poll(waitTime)
 
             do {
-                if (stopThread) return
                 try {
-
                     handle(msg)
+
+                    if (stopThread) break
 
                     msg = if (isEmulate) client.nextEvent() /* only for test */
                     else queue.poll(waitTime)
@@ -80,27 +80,27 @@ abstract class Algorithm(
                 } catch (e: InterruptedException) {
                     log?.error("${botSettings.name} ${e.message}", e)
                     send("#Error_${botSettings.name}: \n${printTrace(e)}")
-                    if (stopThread) return
+                    if (stopThread) break
                 }
-            } while (true)
+            } while (stopThread.not())
 
         } catch (e: Exception) {
             log?.error("${botSettings.name} MAIN ERROR:\n", e)
             send("#Error_${botSettings.name}: \n${printTrace(e)}")
         } finally {
-            interruptThis()
+            stopThis()
         }
     }
 
     abstract fun handle(msg: CommonExchangeData?)
 
-    fun interruptThis(msg: String? = null) {
+    fun stopThis(msg: String? = null) {
         stream.interrupt()
         var msgErr = "#Interrupt #${botSettings.name} Thread, socket.status = ${stream.state}"
         var logErr = "Thread for ${botSettings.name} Interrupt, socket.status = ${stream.state}"
         msg?.let { msgErr = "$msgErr\nMessage: $it"; logErr = "$logErr\nMessage: $it"; }
         send(msgErr)
-        log?.warn(logErr)
+        log?.info(logErr)
         stopThread = true
     }
 
@@ -167,7 +167,7 @@ abstract class Algorithm(
             }
 
         } while (isUnknown(order) && retryCount > 0)
-        interruptThis("Error: Can't send order.")
+        stopThis("Error: Can't send order.")
         throw Exception("${botSettings.name} Error: Can't send order.")
     }
 

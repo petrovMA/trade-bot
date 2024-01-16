@@ -3,14 +3,12 @@ package bot.trade
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
-import bot.trade.exchanges.emulate.Emulate
 import bot.trade.exchanges.libs.TrendCalculator
 import bot.trade.libs.*
 import bot.trade.rest_controller.Notification
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
-import java.math.BigDecimal
 import java.time.Duration
 import java.time.LocalDate
 import java.util.*
@@ -26,7 +24,7 @@ class Communicator(
     timeDifference: Duration?,
     candlestickDataCommandStr: String?,
     private val candlestickDataPath: Map<ExchangeEnum, String>,
-    val taskQueue: BlockingQueue<Thread>,
+    val taskQueue: BlockingQueue<Thread>?,
     private val cmd: Commands = Commands(),
     private val defaultCommands: Map<Regex, String> = mapOf(
         cmd.commandAllBalance to "commandAllBalance BTC ETH BNB",
@@ -56,35 +54,14 @@ class Communicator(
 
     init {
         log.info("Bot starts!")
-        repeatEvery({
+//        repeatEvery({
 //            taskQueue.put(CollectCandlestickData(candlestickDataCommand, startData, ExchangeEnum.BINANCE, sendMessage))
 //            taskQueue.put(CollectCandlestickData(candlestickDataCommand, startData, ExchangeEnum.BITMAX, sendMessage))
 //            taskQueue.put(CollectCandlestickData(candlestickDataCommand, startData, ExchangeEnum.HUOBI, sendMessage))
 //            taskQueue.put(CollectCandlestickData(candlestickDataCommand, startData, ExchangeEnum.GATE, sendMessage))
-        }, this.intervalCandlestickUpdate, this.timeDifference)
+//        }, this.intervalCandlestickUpdate, this.timeDifference)
 //        repeatEvery({ getStatistics() }, this.intervalStatistic, this.timeDifference)
 
-        // todo ETH_USDT just for test:
-//        tradePairs["test_ETH_USDT"] = AlgorithmBobblesIndicator(
-//            botSettings = BotSettingsTrader(
-//                name = "test_ETH_USDT",
-//                pair = TradePair("ETH_USDT"),
-//                exchange = "BINANCE",
-//                direction = DIRECTION.SHORT,
-//                ordersType = TYPE.LIMIT,
-//                tradingRange = 0.0.toBigDecimal() to 0.0.toBigDecimal(),
-//                orderSize = 0.toBigDecimal(), // Order Quantity:: order size
-//                orderBalanceType = "first",
-//                orderDistance = 0.toBigDecimal(),
-//                triggerDistance = 0.toBigDecimal(),
-//                orderMaxQuantity = 0,
-//                countOfDigitsAfterDotForAmount = 4,
-//                countOfDigitsAfterDotForPrice = 2
-//            ),
-//            sendMessage = sendMessage,
-//        )
-//
-//        tradePairs["test_ETH_USDT"]?.start()
     }
 
     fun onUpdate(message: String) {
@@ -238,7 +215,7 @@ class Communicator(
 
             cmd.commandDeleteOldCandlestickData.matches(message) -> {
                 val params = message.split("\\s+".toRegex())
-                taskQueue.put(
+                taskQueue?.put(
                     DeleteOldCandlestickData(
                         ExchangeEnum.valueOf(params[1].uppercase()),
                         sendMessage,
@@ -250,7 +227,7 @@ class Communicator(
 
             cmd.commandCollect.matches(message) -> {
                 val params = message.split("\\s+".toRegex())
-                taskQueue.put(
+                taskQueue?.put(
                     CollectCandlestickData(
                         Command.valueOf(params[2].uppercase()),
                         startData,
@@ -407,24 +384,10 @@ class Communicator(
                     cmd.commandStopAll.matches(message) -> {
                         filter { it.value.isAlive }
                             .forEach {
-                                it.value.interruptThis()
+                                it.value.stopThis()
                                 msg += it.key
                             }
                         msg = "stopped pairs:\n$msg"
-                        log.info(msg)
-                    }
-
-                    cmd.commandAllOrders.matches(message) -> {
-                        val pairs = map { it.key }.joinToString(",")
-
-                        map { it.value }
-                            .find { it.isAlive }
-                            ?.apply {
-                                if (!queue.add(BotEvent(pairs, BotEvent.Type.GET_ALL_OPEN_ORDERS))) {
-                                    log.warn("Command not added to queue $this")
-                                    msg = "Command not added to queue $this"
-                                }
-                            } ?: run { msg = "Working pairs not found!!!" }
                         log.info(msg)
                     }
 
@@ -444,6 +407,20 @@ class Communicator(
                             msg = "command 'stop' must have one param"
                             log.info("command 'stop' must have one param. Msg = $message")
                         }
+                    }
+
+                    cmd.commandAllOrders.matches(message) -> {
+                        val pairs = map { it.key }.joinToString(",")
+
+                        map { it.value }
+                            .find { it.isAlive }
+                            ?.apply {
+                                if (!queue.add(BotEvent(pairs, BotEvent.Type.GET_ALL_OPEN_ORDERS))) {
+                                    log.warn("Command not added to queue $this")
+                                    msg = "Command not added to queue $this"
+                                }
+                            } ?: run { msg = "Working pairs not found!!!" }
+                        log.info(msg)
                     }
 
                     cmd.commandDelete.matches(message) -> {

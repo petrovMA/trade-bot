@@ -345,7 +345,7 @@ class AlgorithmTrader(
                     }
 
                     BotEvent.Type.INTERRUPT -> {
-                        stream.interrupt()
+                        stopThis()
                         return
                     }
 
