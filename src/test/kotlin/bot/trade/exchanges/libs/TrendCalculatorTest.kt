@@ -34,7 +34,8 @@ class TrendCalculatorTest {
             5.m() to 200,
             2.h() to 14,
             4.h() to 14,
-            endTime = 1701849900000
+            endTime = 1701849900000,
+            tempUrlCalcHma = "http://95.217.0.250"
         )
 
         Mapper.asListObjects<Candlestick>(

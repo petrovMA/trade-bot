@@ -70,6 +70,7 @@ fun testExchange(settingsFile: String, endTime: Long? = null) = ClientTestExchan
         client = exchange,
         isLog = false,
         isEmulate = true,
+        tempUrlCalcHma = "http://95.217.0.250",
         endTimeForTrendCalculator = endTime,
     ) { _, _ -> } to exchange
 }

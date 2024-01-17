@@ -32,6 +32,7 @@ class Communicator(
     ),
     private val logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
     private val sendFile: (File) -> Unit,
+    val tempUrlCalcHma: String,
     val sendMessage: (String, Boolean) -> Unit
 ) {
     private val log = KotlinLogging.logger {}
@@ -95,6 +96,7 @@ class Communicator(
                             if (tradeBots[botSettings.name] == null) {
                                 tradeBots[botSettings.name] = AlgorithmTrader(
                                     botSettings,
+                                    tempUrlCalcHma = tempUrlCalcHma,
                                     exchangeBotsFiles = exchangeBotsFiles,
                                     sendMessage = sendMessage
                                 )
@@ -172,6 +174,7 @@ class Communicator(
                     else -> AlgorithmTrader(
                         tradeBotSettings,
                         exchangeBotsFiles,
+                        tempUrlCalcHma = tempUrlCalcHma,
                         logMessageQueue = logMessageQueue,
                         sendMessage = sendMessage
                     )

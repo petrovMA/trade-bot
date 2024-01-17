@@ -26,6 +26,7 @@ class TrendCalculator(
     private val rsi1: Pair<Duration, Int>,
     private val rsi2: Pair<Duration, Int>,
     private val inputKlineInterval: Pair<Duration, INTERVAL> = 5.m() to INTERVAL.FIVE_MINUTES,
+    private val tempUrlCalcHma: String,
     endTime: Long? = System.currentTimeMillis()
 ) {
     private val log = KotlinLogging.logger {}
@@ -141,7 +142,7 @@ class TrendCalculator(
             put("hma_period", period)
         }
 
-        val request = Request.Builder().url("http://95.217.0.250:5000/hma").post(body(params)).build()
+        val request = Request.Builder().url("$tempUrlCalcHma:5000/hma").post(body(params)).build()
 
         var resp: okhttp3.Response? = null
 
@@ -184,7 +185,7 @@ class TrendCalculator(
             put("rsi_period", period)
         }
 
-        val request = Request.Builder().url("http://95.217.0.250:5000/rsi").post(body(params)).build()
+        val request = Request.Builder().url("$tempUrlCalcHma:5000/rsi").post(body(params)).build()
 
         val respBody = client.newCall(request).execute().body!!.string()
 
