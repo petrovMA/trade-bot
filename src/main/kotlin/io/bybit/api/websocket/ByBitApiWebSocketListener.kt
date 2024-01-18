@@ -35,6 +35,8 @@ class ByBitApiWebSocketListener {
     private val liquidationPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"liquidation")
     private val positionPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"position")
     private val pongPattern = Regex(".+\"ret_msg\"\\s*:\\s*\"pong\".+\"op\"\\s*:\\s*\"ping\".+")
+    private val subscribePattern = Regex(".+\"success\"\\s*:\\s*true.+\"ret_msg\"\\s*:\\s*\"\".+\"op\"\\s*:\\s*\"subscribe\".+")
+    private val authPattern = Regex(".+\"success\"\\s*:\\s*true.+\"ret_msg\"\\s*:\\s*\"\".+\"op\"\\s*:\\s*\"auth\".+")
 
     /**
      * callBacks or every message type
@@ -78,7 +80,7 @@ class ByBitApiWebSocketListener {
         )
 
         schedulerReconnect.scheduleAtFixedRate({
-            log.info("Reconnecting...")
+            log.debug("Reconnecting...")
             webSocket?.disconnect()
             webSocket = connect(
                 api = api,
@@ -115,7 +117,7 @@ class ByBitApiWebSocketListener {
         schedulerReconnect.scheduleAtFixedRate({
             log.debug("Check connection")
             if (System.currentTimeMillis() - lastMessageTime > reconnectIfNoMessagesDuring.toMillis()) {
-                log.info("Reconnecting...")
+                log.debug("Reconnecting...")
                 webSocket?.disconnect()
                 webSocket = connect(
                     url = url,
@@ -164,13 +166,13 @@ class ByBitApiWebSocketListener {
                         websocket: WebSocket, serverCloseFrame: WebSocketFrame,
                         clientCloseFrame: WebSocketFrame, closedByServer: Boolean
                     ) {
-                        log.info("Socket Disconnected!")
+                        log.debug("Socket Disconnected!")
                     }
                 })
                 .addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
 
             pingTimeInterval?.let { webSocket.pingInterval = it.toMillis() }
-            log.info("Connecting to $url")
+            log.debug("Connecting to $url")
             webSocket.connect()
             authMsg?.let {
                 val text = asString(it)
@@ -202,6 +204,8 @@ class ByBitApiWebSocketListener {
         try {
             when {
                 message.matches(pongPattern) -> log.debug("Pong message received!")
+                message.matches(authPattern) -> log.debug("Auth success message received!")
+                message.matches(subscribePattern) -> log.debug("Subscribe success message received!")
                 tradePattern.containsMatchIn(message) -> tradeCallback?.invoke(asObject(message))
                 orderPattern.containsMatchIn(message) -> orderCallback?.invoke(asObject(message))
                 positionPattern.containsMatchIn(message) -> positionCallback?.invoke(asObject(message))

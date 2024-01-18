@@ -48,7 +48,7 @@ class MainController(orderService: OrderService) {
                 logMessageQueue = logMessageQueue,
                 taskQueue = taskExecutor.getQueue(),
                 exchangeFiles = exchangeFile,
-                tempUrlCalcHma = propConf.getString("hma_address_calc")
+                tempUrlCalcHma = propConf.getString("bot_properties.hma_address_calc")
             ).also { TelegramBotsApi(DefaultBotSession::class.java).registerBot(it) }
         } catch (e: Exception) {
             e.printStackTrace()

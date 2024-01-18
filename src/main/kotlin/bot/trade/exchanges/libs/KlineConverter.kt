@@ -77,6 +77,7 @@ class KlineConverter(
                                 volume = currentCandlestick!!.volume
                             )
                             closeCurrentCandlestick()
+                            isNewKline = true
                         }
                     }
                 }
