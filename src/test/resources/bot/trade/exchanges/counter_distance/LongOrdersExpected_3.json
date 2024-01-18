@@ -69,13 +69,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2000.00000000": {
+  "2000.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2000.00000000,
+    "price": 2000.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -83,13 +83,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2002.00000000": {
+  "2002.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2002.00000000,
+    "price": 2002.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -97,13 +97,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2004.00000000": {
+  "2004.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2004.00000000,
+    "price": 2004.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -111,13 +111,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2006.00000000": {
+  "2006.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2006.00000000,
+    "price": 2006.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -125,13 +125,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2008.00000000": {
+  "2008.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2008.00000000,
+    "price": 2008.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -139,13 +139,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2010.00000000": {
+  "2010.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2010.00000000,
+    "price": 2010.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -153,13 +153,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2012.00000000": {
+  "2012.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2012.00000000,
+    "price": 2012.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -167,13 +167,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2014.00000000": {
+  "2014.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2014.00000000,
+    "price": 2014.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -181,13 +181,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2016.00000000": {
+  "2016.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2016.00000000,
+    "price": 2016.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -195,13 +195,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2018.00000000": {
+  "2018.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2018.00000000,
+    "price": 2018.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",
@@ -209,13 +209,13 @@
     "status": "NEW",
     "lastBorderPrice": 1992
   },
-  "2020.00000000": {
+  "2020.50000000": {
     "orderId": "",
     "pair": {
       "first": "ETH",
       "second": "USDT"
     },
-    "price": 2020.00000000,
+    "price": 2020.50000000,
     "origQty": 0.1,
     "executedQty": 0,
     "side": "SELL",

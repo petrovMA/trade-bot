@@ -129,6 +129,9 @@ class AlgorithmTraderTest {
         assertOrders(listOf(expectedOrder1, expectedOrder2, expectedOrder3), exchange.orders)
 
         algorithmTrader.handle(Trade(1510.toBigDecimal(), 1.toBigDecimal(), 19).toKline())
+        algorithmTrader.handle(Trade(1509.toBigDecimal(), 1.toBigDecimal(), 20).toKline())
+        algorithmTrader.handle(Trade(1508.toBigDecimal(), 1.toBigDecimal(), 21).toKline())
+        algorithmTrader.handle(Trade(1507.toBigDecimal(), 1.toBigDecimal(), 22).toKline())
 
         assertOrders(listOf(expectedOrder1, expectedOrder2, expectedOrder3), exchange.orders)
 

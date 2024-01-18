@@ -55,6 +55,49 @@
     "status": "NEW",
     "lastBorderPrice": 1500
   },
+  "1508.00000000": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 1508.00000000,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 1507
+  },
+  "1509.00000000": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 1509.00000000,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 1507
+  },
+  "1510.00000000": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 1510.00000000,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "MARKET",
+    "status": "NEW",
+    "stopPrice": 1509,
+    "lastBorderPrice": 1507
+  },
   "1511.00000000": {
     "orderId": "",
     "pair": {

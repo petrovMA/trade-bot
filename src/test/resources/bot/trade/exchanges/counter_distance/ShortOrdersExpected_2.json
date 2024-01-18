@@ -55,20 +55,6 @@
     "status": "NEW",
     "lastBorderPrice": 1998
   },
-  "2000.00000000": {
-    "orderId": "",
-    "pair": {
-      "first": "ETH",
-      "second": "USDT"
-    },
-    "price": 2000.00000000,
-    "origQty": 0.1,
-    "executedQty": 0,
-    "side": "SELL",
-    "type": "MARKET",
-    "status": "NEW",
-    "lastBorderPrice": 2000
-  },
   "2002.00000000": {
     "orderId": "",
     "pair": {

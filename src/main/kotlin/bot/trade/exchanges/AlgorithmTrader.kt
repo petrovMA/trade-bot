@@ -181,12 +181,14 @@ class AlgorithmTrader(
                             ordersLong.entries.removeIf { (_, v) -> v.side == SIDE.BUY }
 
                             minPriceInOrderLong = ordersLong.values
+                                .filter { it.side == SIDE.BUY }
                                 .mapNotNull { it.price?.toDouble() }
                                 .minOrNull()
                                 ?.toBigDecimal()
                                 ?: currentPrice
 
                             maxPriceInOrderShort = ordersShort.values
+                                .filter { it.side == SIDE.SELL }
                                 .mapNotNull { it.price?.toDouble() }
                                 .maxOrNull()
                                 ?.toBigDecimal()
@@ -391,12 +393,14 @@ class AlgorithmTrader(
                             orders[price.toPrice()] = order(price, currentDirection, params)
 
                         minPriceInOrderLong = orders.entries
+                            .filter { it.value.side == SIDE.BUY }
                             .mapNotNull { it.value.price }
                             .minByOrNull { it.toDouble() }
                             ?: maxPriceInOrderLong
                     }
 
                     maxPriceInOrderLong = orders.entries
+                        .filter { it.value.side == SIDE.BUY }
                         .mapNotNull { it.value.price }
                         .maxByOrNull { it.toDouble() }
                         ?: minPriceInOrderLong
@@ -404,17 +408,26 @@ class AlgorithmTrader(
                     var step = calcInPriceStep(maxPriceInOrderLong!!, params, hedgeModule, currentDirection, false)
 
                     while (currentPrice > maxPriceInOrderLong!! + step) {
+
+                        val ordersInGap = getOrdersBetween(
+                            orders = orders,
+                            minPrice = maxPriceInOrderLong!!,
+                            maxPrice = maxPriceInOrderLong!! + (step * BigDecimal(2))
+                        )
+
                         maxPriceInOrderLong = maxPriceInOrderLong!! + step
 
-                        if (orders[maxPriceInOrderLong!!.toPrice()] != null)
-                            log?.trace(
-                                "{} Order already exist: {}",
-                                botSettings.name,
-                                orders[maxPriceInOrderLong!!.toPrice()]
-                            )
-                        else
-                            orders[maxPriceInOrderLong!!.toPrice()] =
-                                order(maxPriceInOrderLong!!, currentDirection, params)
+                        if (ordersInGap.isEmpty()) {
+                            if (orders[maxPriceInOrderLong!!.toPrice()] != null)
+                                log?.trace(
+                                    "{} Order already exist: {}",
+                                    botSettings.name,
+                                    orders[maxPriceInOrderLong!!.toPrice()]
+                                )
+                            else
+                                orders[maxPriceInOrderLong!!.toPrice()] =
+                                    order(maxPriceInOrderLong!!, currentDirection, params)
+                        }
 
                         step = calcInPriceStep(maxPriceInOrderLong!!, params, hedgeModule, currentDirection, false)
                     }
@@ -433,12 +446,14 @@ class AlgorithmTrader(
                             orders[price.toPrice()] = order(price, currentDirection, params)
 
                         maxPriceInOrderShort = orders.entries
+                            .filter { it.value.side == SIDE.SELL }
                             .mapNotNull { it.value.price }
                             .maxByOrNull { it.toDouble() }
                             ?: minPriceInOrderShort
                     }
 
                     minPriceInOrderShort = orders.entries
+                        .filter { it.value.side == SIDE.SELL }
                         .mapNotNull { it.value.price }
                         .minByOrNull { it.toDouble() }
                         ?: maxPriceInOrderShort
@@ -446,17 +461,26 @@ class AlgorithmTrader(
                     var step = calcInPriceStep(minPriceInOrderShort!!, params, hedgeModule, currentDirection, true)
 
                     while (currentPrice < minPriceInOrderShort!! - step) {
+
+                        val ordersInGap = getOrdersBetween(
+                            orders = orders,
+                            minPrice = minPriceInOrderShort!! - (step * BigDecimal(2)),
+                            maxPrice = minPriceInOrderShort!!
+                        )
+
                         minPriceInOrderShort = minPriceInOrderShort!! - step
 
-                        if (orders[minPriceInOrderShort!!.toPrice()] != null)
-                            log?.trace(
-                                "{} Order already exist: {}",
-                                botSettings.name,
-                                orders[minPriceInOrderShort!!.toPrice()]
-                            )
-                        else
-                            orders[minPriceInOrderShort!!.toPrice()] =
-                                order(minPriceInOrderShort!!, currentDirection, params)
+                        if (ordersInGap.isEmpty()) {
+                            if (orders[minPriceInOrderShort!!.toPrice()] != null)
+                                log?.trace(
+                                    "{} Order already exist: {}",
+                                    botSettings.name,
+                                    orders[minPriceInOrderShort!!.toPrice()]
+                                )
+                            else
+                                orders[minPriceInOrderShort!!.toPrice()] =
+                                    order(minPriceInOrderShort!!, currentDirection, params)
+                        }
 
                         step = calcInPriceStep(minPriceInOrderShort!!, params, hedgeModule, currentDirection, true)
                     }
@@ -723,7 +747,7 @@ class AlgorithmTrader(
                     if (
                         position != null
                         && position!!.side.equals("BUY", true)
-                        && calcProfit(position!!, currentPrice).first < BigDecimal(0)
+                        && calcProfit(position!!, prevPrice).first < BigDecimal(0)
                     )
                         (step * counterDistance).round()
                     else
@@ -734,7 +758,7 @@ class AlgorithmTrader(
                     if (
                         position != null
                         && position!!.side.equals("SELL", true)
-                        && calcProfit(position!!, currentPrice).first < BigDecimal(0)
+                        && calcProfit(position!!, prevPrice).first < BigDecimal(0)
                     )
                         (step * counterDistance).round()
                     else
@@ -843,6 +867,9 @@ class AlgorithmTrader(
     }
 
     data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
+
+    private fun getOrdersBetween(orders: MutableMap<String, Order>, minPrice: BigDecimal, maxPrice: BigDecimal) =
+        orders.entries.filter { minPrice < it.value.price!! && it.value.price!! < maxPrice }
 
     override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal = TODO("Not yet implemented")
 }
