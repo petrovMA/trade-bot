@@ -116,7 +116,7 @@ class TrendCalculator(
                 end = null
             )
                 .sortedBy { it.closeTime }
-                .also { startTime = it.first().closeTime }
+                .also { startTime = it.last().closeTime }
                 .forEach {
                     hma1Converter.addCandlesticks(it)
                     hma2Converter.addCandlesticks(it)
