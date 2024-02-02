@@ -195,7 +195,14 @@ open class ClientBinance(
         }.first()
     }
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
+    override fun newOrder(
+        order: Order,
+        isStaticUpdate: Boolean,
+        qty: String,
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
+    ): Order {
         val typeX = order.side.toType()
         val currPair = CurrencyPair(order.pair.first, order.pair.second)
         val orderId = when (order.type) {

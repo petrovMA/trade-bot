@@ -114,7 +114,9 @@ class TestClient(
         order: Order,
         isStaticUpdate: Boolean,
         qty: String,
-        price: String
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
     ): Order {
         when (order.type) {
             TYPE.MARKET -> {

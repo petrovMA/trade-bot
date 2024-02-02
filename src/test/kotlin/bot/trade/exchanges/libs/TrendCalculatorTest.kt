@@ -15,7 +15,7 @@ import java.math.BigDecimal
 
 class TrendCalculatorTest {
 
-    @Test // TODO:: this test works only with server: http://95.217.0.250:5000/
+    //@Test // TODO:: this test works only with server: http://95.217.0.250:5000/
     fun getTrend() {
         val client = ClientTestExchange()
 

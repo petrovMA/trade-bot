@@ -132,10 +132,11 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         triggerBy: String? = null,
         orderIv: String? = null,
         timeInForce: String? = null,
-        positionIdx: Int? = null
+        positionIdx: Int? = null,
+        reduceOnly: Boolean? = null
     ): CreateOrderResponse.Result {
 
-        val params = createMapParams(TreeMap<String, String>().apply {
+        val params = createMapParams(TreeMap<String, Any>().apply {
             put("side", side)
             put("symbol", symbol)
             put("category", category)
@@ -149,7 +150,8 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             triggerBy?.let { put("triggerBy", it) }
             orderIv?.let { put("orderIv", it) }
             timeInForce?.let { put("timeInForce", it) }
-            positionIdx?.let { put("positionIdx", it.toString()) }
+            positionIdx?.let { put("positionIdx", it) }
+            reduceOnly?.let { put("reduceOnly", it) }
         })
 
         val builder = builder().apply {
@@ -168,7 +170,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         orderFilter: String? = null
     ): CancelAllResponse.Result {
 
-        val params = createMapParams(TreeMap<String, String>().apply {
+        val params = createMapParams(TreeMap<String, Any>().apply {
             put("category", category)
             symbol?.let { put("symbol", it) }
             baseCoin?.let { put("baseCoin", it) }
@@ -192,7 +194,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         orderFilter: String? = null
     ): CancelResponse.Result {
 
-        val requestParams = createMapParams(TreeMap<String, String>().apply {
+        val requestParams = createMapParams(TreeMap<String, Any>().apply {
             put("category", category)
             put("symbol", symbol)
             orderId?.let { put("orderId", it) }
@@ -239,6 +241,30 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         return executeRequest<PositionResponse>(request).result
     }
 
+    fun switchMode(category: String, mode: Int, symbol: String? = null, coin: String? = null): Response {
+
+        if (symbol == null && coin == null) throw RuntimeException("Either 'symbol' or 'coin' is required.")
+
+        val params = TreeMap<String, String>().apply {
+            put("category", category)
+            put("mode", mode.toString())
+            symbol?.let { put("symbol", it) }
+            coin?.let { put("coin", it) }
+        }
+
+        val builder = builder().apply {
+            addPathSegment("position")
+            addPathSegment("switch-mode")
+            params.forEach(::addQueryParameter)
+        }.build()
+
+        val request: Request = Request.Builder().url(builder)
+            .apply { headers(params).forEach(::addHeader) }
+            .build()
+
+        return executeRequest<Response>(request)
+    }
+
     private inline fun <reified T : Response> executeRequest(request: Request): T = try {
         log.trace {
             try {
@@ -266,7 +292,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
     private fun body(obj: Any) =
         objectMapper.writeValueAsString(obj).toRequestBody("application/json".toMediaTypeOrNull()!!)
 
-    private fun createMapParams(params: TreeMap<String, String> = TreeMap()): TreeMap<String, String> = params.apply {
+    private fun createMapParams(params: TreeMap<String, Any> = TreeMap()): TreeMap<String, Any> = params.apply {
         put("api_key", apikey)
         put("timestamp", System.currentTimeMillis().toString())
         put("sign", Authorization.signForRest(this, secret))

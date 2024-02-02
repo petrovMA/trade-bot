@@ -40,7 +40,7 @@ object Authorization {
         return sb
     }
 
-    fun signForRest(params: TreeMap<String, String>, secret: String): String {
+    fun signForRest(params: TreeMap<String, Any>, secret: String): String {
         val keySet: Set<String> = params.keys
         val iter = keySet.iterator()
         val sb = StringBuilder()

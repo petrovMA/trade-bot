@@ -58,7 +58,14 @@ class ClientTestExchange : ClientFutures {
         end: Long?
     ): List<Candlestick> = candlesticksData
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
+    override fun newOrder(
+        order: Order,
+        isStaticUpdate: Boolean,
+        qty: String,
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
+    ): Order {
         orders.add(order)
         return order
     }
@@ -73,6 +80,8 @@ class ClientTestExchange : ClientFutures {
     override fun close() {
         TODO("Not yet implemented")
     }
+
+    override fun switchMode(category: String, mode: Int, pair: TradePair?, coin: String?) {}
 
     override fun getPositions(pair: TradePair): List<Position> = listOf(position)
 

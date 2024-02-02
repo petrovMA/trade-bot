@@ -2,7 +2,6 @@ package bot.trade.exchanges.entire_tp
 
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
-import bot.trade.libs.div8
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Test
 import utils.mapper.Mapper
@@ -231,16 +230,6 @@ class EntireTpTest {
                     origQty = 0.1.toBigDecimal(),
                     executedQty = 0.toBigDecimal(),
                     side = SIDE.SELL,
-                    type = TYPE.MARKET,
-                    status = STATUS.NEW
-                ),
-                Order(
-                    orderId = "",
-                    pair = TradePair("ETH", "USDT"),
-                    price = 2060.toBigDecimal(),
-                    origQty = 0.8.toBigDecimal(),
-                    executedQty = 0.toBigDecimal(),
-                    side = SIDE.BUY,
                     type = TYPE.MARKET,
                     status = STATUS.NEW
                 )

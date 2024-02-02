@@ -9,7 +9,7 @@ import java.math.BigDecimal
 
 class AlgorithmTraderTrendTest {
 
-    @Test // TODO:: this test works only with server: http://95.217.0.250:5000/
+    //@Test // TODO:: this test works only with server: http://95.217.0.250:5000/
     fun test() {
         // last kline time: GMT: Sunday, 17 December 2023 г., 5:00:00
         // hma1 = 0.5099, hma2 = 0.5059, hma3 = 0.5038 rsi30m = 62.4481 rsi1h = 63.5574 rsi2h = 56.876

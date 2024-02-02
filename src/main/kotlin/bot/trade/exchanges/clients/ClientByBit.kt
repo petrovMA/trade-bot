@@ -197,7 +197,9 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
         order: Order,
         isStaticUpdate: Boolean,
         qty: String,
-        price: String
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
     ): Order {
         val resp = client.newOrder(
             symbol = order.pair.first + order.pair.second,
@@ -214,10 +216,12 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
             },
             qty = qty,
             price = price,
-
-            // todo:: Add auto fix this using: "/v5/position/switch-mode"
-            // todo:: for fix: ByBitRestException: position idx not match position mode
-            positionIdx = 0
+            positionIdx = when(positionSide) {
+                DIRECTION.LONG -> 1
+                DIRECTION.SHORT -> 2
+                else -> 0
+            },
+            reduceOnly = isReduceOnly
         )
         return Order(
             resp.orderId,
@@ -262,6 +266,10 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
         )
 
     override fun close() {}
+
+    override fun switchMode(category: String, mode: Int, pair: TradePair?, coin: String?) {
+        client.switchMode(category, mode, pair?.run { first + second }, coin)
+    }
 
     override fun getPositions(pair: TradePair) = client.getPositionsList(symbol = pair.first + pair.second)
         .list

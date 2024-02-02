@@ -202,7 +202,9 @@ class ClientBinanceFutures(
         order: Order,
         isStaticUpdate: Boolean,
         qty: String,
-        price: String
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
     ): Order {
         val typeX = order.side.toType()
         val instrument = FuturesContract(order.pair.toCurrencyPair(), "PERPETUAL")

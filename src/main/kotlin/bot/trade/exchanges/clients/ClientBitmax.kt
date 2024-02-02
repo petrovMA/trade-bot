@@ -122,7 +122,14 @@ class ClientBitmax(
 //        }
 //    }
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
+    override fun newOrder(
+        order: Order,
+        isStaticUpdate: Boolean,
+        qty: String,
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
+    ): Order {
 
         val formattedCount = java.lang.String.format(qty, order.origQty).replace(",", ".")
         val formattedPrice = java.lang.String.format(price, order.price).replace(",", ".")

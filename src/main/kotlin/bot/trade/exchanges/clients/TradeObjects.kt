@@ -390,8 +390,7 @@ class BotSettingsTrader(
     @SerializedName("market_type") val marketType: String,
     @SerializedName("market_type_comment") val marketTypeComment: String,
     @SerializedName("strategy_type_comment") val strategyTypeComment: String,
-    @SerializedName("auto_balance") val autoBalance: Boolean = false,
-    @SerializedName("entire_tp") val entireTp: EntireTp?
+    @SerializedName("auto_balance") val autoBalance: Boolean = false
 ) : BotSettings(
     name = name,
     pair = pair,
@@ -405,18 +404,6 @@ class BotSettingsTrader(
         @SerializedName("amount") val amount: BigDecimal,
         @SerializedName("countOfDigitsAfterDotForAmount") val countOfDigitsAfterDotForAmount: Int = 0
     )
-
-    class EntireTp(
-        @SerializedName("max_trigger_amount") val maxTriggerAmount: Int,
-        @SerializedName("max_profit_percent") val maxProfitPercent: BigDecimal,
-        @SerializedName("max_loss_percent") val maxLossPercent: BigDecimal,
-        @SerializedName("tp_distance") val tpDistance: TpDistance
-    ) {
-        class TpDistance(
-            @SerializedName("distance") val distance: BigDecimal,
-            @SerializedName("use_percent") val usePercent: Boolean = false
-        )
-    }
 
     enum class StrategyType { LONG, SHORT, BOTH }
 
@@ -454,7 +441,8 @@ class BotSettingsTrader(
             @SerializedName("max_tp_distance") val maxTpDistance: MaxTpDistance,
             @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
             @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts
-            @SerializedName("counter_distance") val counterDistance: BigDecimal? = null
+            @SerializedName("counter_distance") val counterDistance: BigDecimal? = null,
+            @SerializedName("entire_tp") val entireTp: EntireTp?
         ) {
             class TradingRange(
                 @SerializedName("lower_bound") val lowerBound: BigDecimal,
@@ -496,6 +484,21 @@ class BotSettingsTrader(
                 @SerializedName("distance") val distance: BigDecimal,
                 @SerializedName("use_percent") val usePercent: Boolean = false
             )
+
+            class EntireTp(
+                @SerializedName("max_trigger_amount") val maxTriggerAmount: Int,
+                @SerializedName("max_profit_percent") val maxProfitPercent: BigDecimal,
+                @SerializedName("max_loss_percent") val maxLossPercent: BigDecimal,
+                @SerializedName("enabled_in_hedge") val enabledInHedge: Boolean,
+                @SerializedName("enabled") val enabled: Boolean,
+                @SerializedName("tp_distance") val tpDistance: TpDistance
+            ) {
+                class TpDistance(
+                    @SerializedName("distance") val distance: BigDecimal,
+                    @SerializedName("use_percent") val usePercent: Boolean = false
+                )
+            }
+
 
             fun minRange() = tradingRange.lowerBound
             fun maxRange() = tradingRange.upperBound
