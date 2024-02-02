@@ -263,6 +263,10 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
 
     override fun close() {}
 
+    override fun switchMode(category: String, mode: Int, pair: TradePair?, coin: String?) {
+        client.switchMode(category, mode, pair?.run { first + second }, coin)
+    }
+
     override fun getPositions(pair: TradePair) = client.getPositionsList(symbol = pair.first + pair.second)
         .list
         .map { Position(it) }

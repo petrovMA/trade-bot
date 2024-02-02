@@ -239,6 +239,30 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         return executeRequest<PositionResponse>(request).result
     }
 
+    fun switchMode(category: String, mode: Int, symbol: String? = null, coin: String? = null): Response {
+
+        if (symbol == null && coin == null) throw RuntimeException("Either 'symbol' or 'coin' is required.")
+
+        val params = TreeMap<String, String>().apply {
+            put("category", category)
+            put("mode", mode.toString())
+            symbol?.let { put("symbol", it) }
+            coin?.let { put("coin", it) }
+        }
+
+        val builder = builder().apply {
+            addPathSegment("position")
+            addPathSegment("switch-mode")
+            params.forEach(::addQueryParameter)
+        }.build()
+
+        val request: Request = Request.Builder().url(builder)
+            .apply { headers(params).forEach(::addHeader) }
+            .build()
+
+        return executeRequest<Response>(request)
+    }
+
     private inline fun <reified T : Response> executeRequest(request: Request): T = try {
         log.trace {
             try {

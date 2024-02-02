@@ -88,6 +88,7 @@ class AlgorithmTrader(
     var to: Long = Long.MIN_VALUE
 
     override fun setup() {
+        futuresClient.switchMode("linear", 3, botSettings.pair, null)
         position = futuresClient.getPositions(botSettings.pair).firstOrNull()
 
         trendCalculator = settings.trendDetector?.run {

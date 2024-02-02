@@ -74,6 +74,8 @@ class ClientTestExchange : ClientFutures {
         TODO("Not yet implemented")
     }
 
+    override fun switchMode(category: String, mode: Int, symbol: String?, coin: String?) {}
+
     override fun getPositions(pair: TradePair): List<Position> = listOf(position)
 
     fun addKlineData(candlesticks: List<Candlestick>) = candlesticksData.addAll(candlesticks)
