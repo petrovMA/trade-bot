@@ -109,7 +109,9 @@ abstract class Algorithm(
         amount: BigDecimal,
         orderSide: SIDE,
         orderType: TYPE,
-        isStaticUpdate: Boolean = false
+        isStaticUpdate: Boolean = false,
+        positionSide: DIRECTION? = null,
+        isReduceOnly: Boolean = false
     ): Order {
 
         var retryCount = retrySentOrderCount

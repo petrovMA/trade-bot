@@ -7,17 +7,18 @@
   "exchange_type": "Bybit",
   "strategy_type": "SHORT",
   "order_type": "MARKET",
-  "entire_tp": {
-    "max_trigger_amount": 12,
-    "max_profit_percent": 20,
-    "max_loss_percent": 20,
-    "tp_distance": {
-      "distance": 55,
-      "use_percent": false
-    }
-  },
   "parameters": {
     "short_parameters": {
+      "entire_tp": {
+        "max_trigger_amount": 12,
+        "max_profit_percent": 20,
+        "max_loss_percent": 20,
+        "enabled": true,
+        "tp_distance": {
+          "distance": 55,
+          "use_percent": false
+        }
+      },
       "trading_range": {
         "lower_bound": 1800,
         "upper_bound": 2200,

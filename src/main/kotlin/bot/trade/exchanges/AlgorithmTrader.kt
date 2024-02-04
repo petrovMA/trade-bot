@@ -3,6 +3,7 @@ package bot.trade.exchanges
 import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.libs.TrendCalculator
+import bot.trade.exchanges.libs.TrendCalculator.Trend.TREND
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
@@ -50,7 +51,6 @@ class AlgorithmTrader(
     private val minOrderAmount = settings.minOrderAmount?.amount ?: BigDecimal.ZERO
     private val long = settings.parameters.longParameters
     private val short = settings.parameters.shortParameters
-    private val entireTp = settings.entireTp
     private var trendCalculator: TrendCalculator? = null
     private var trend: TrendCalculator.Trend? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
@@ -64,7 +64,8 @@ class AlgorithmTrader(
     private var minPriceInOrderShort: BigDecimal? = null
 
     private var hedgeModule: HedgeModule? = null
-    private var position: Position? = null
+    private var positionLong: Position? = null
+    private var positionShort: Position? = null
 
     private val ordersLong: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
         filePath = "$path/orders_long".also {
@@ -89,7 +90,9 @@ class AlgorithmTrader(
 
     override fun setup() {
         futuresClient.switchMode("linear", 3, botSettings.pair, null)
-        position = futuresClient.getPositions(botSettings.pair).firstOrNull()
+
+        positionLong = futuresClient.getPositions(botSettings.pair).find { it.side.equals("BUY", true) }
+        positionShort = futuresClient.getPositions(botSettings.pair).find { it.side.equals("SELL", true) }
 
         trendCalculator = settings.trendDetector?.run {
             TrendCalculator(
@@ -136,38 +139,67 @@ class AlgorithmTrader(
                     }
                 }
 
-                entireTp?.let { entireTp ->
+                settings.parameters.longParameters?.entireTp?.let { entireTp ->
+                    if (
+                        entireTp.enabled &&
+                        (trend?.trend in listOf(TREND.LONG, TREND.SHORT, null) || entireTp.enabledInHedge)
+                    ) {
 
-                    val triggerCount = ordersLong.filter { it.value.side == SIDE.SELL }.count() +
-                            ordersShort.filter { it.value.side == SIDE.BUY }.count()
+                        val triggerCount = ordersLong.filter { it.value.side == SIDE.SELL }.count()
 
-                    if (position != null && triggerCount >= entireTp.maxTriggerAmount) {
+                        if (positionLong != null && triggerCount >= entireTp.maxTriggerAmount) {
 
-                        val (profitPercent, currentTpDistance) = calcProfit(position!!, currentPrice)
+                            val (profitPercent, currentTpDistance) = calcProfit(positionLong!!, currentPrice)
 
-                        val entireTpDistance = if (entireTp.tpDistance.usePercent)
-                            position!!.entryPrice.percent(entireTp.tpDistance.distance)
-                        else
-                            entireTp.tpDistance.distance
+                            val entireTpDistance = if (entireTp.tpDistance.usePercent)
+                                positionLong!!.entryPrice.percent(entireTp.tpDistance.distance)
+                            else
+                                entireTp.tpDistance.distance
 
-                        if (
-                            currentTpDistance > entireTpDistance
-                            || profitPercent > entireTp.maxProfitPercent
-                            || profitPercent < (entireTp.maxLossPercent.negate())
-                        ) {
-                            resetLong()
-                            resetShort()
+                            if (
+                                currentTpDistance > entireTpDistance
+                                || profitPercent > entireTp.maxProfitPercent
+                                || profitPercent < (entireTp.maxLossPercent.negate())
+                            )
+                                resetLong()
+                        }
+                    }
+                }
+
+                settings.parameters.shortParameters?.entireTp?.let { entireTp ->
+                    if (
+                        entireTp.enabled &&
+                        (trend?.trend in listOf(TREND.LONG, TREND.SHORT, null) || entireTp.enabledInHedge)
+                    ) {
+
+                        val triggerCount = ordersShort.filter { it.value.side == SIDE.SELL }.count()
+
+                        if (positionShort != null && triggerCount >= entireTp.maxTriggerAmount) {
+
+                            val (profitPercent, currentTpDistance) = calcProfit(positionShort!!, currentPrice)
+
+                            val entireTpDistance = if (entireTp.tpDistance.usePercent)
+                                positionShort!!.entryPrice.percent(entireTp.tpDistance.distance)
+                            else
+                                entireTp.tpDistance.distance
+
+                            if (
+                                currentTpDistance > entireTpDistance
+                                || profitPercent > entireTp.maxProfitPercent
+                                || profitPercent < (entireTp.maxLossPercent.negate())
+                            )
+                                resetShort()
                         }
                     }
                 }
 
                 when (trend?.trend) {
-                    TrendCalculator.Trend.TREND.LONG -> {
+                    TREND.LONG -> {
                         resetShort()
                         long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
                     }
 
-                    TrendCalculator.Trend.TREND.SHORT -> {
+                    TREND.SHORT -> {
                         resetLong()
                         short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
                     }
@@ -277,7 +309,11 @@ class AlgorithmTrader(
 
             is Position -> {
                 log("Current position:\n${json(msg, false)}")
-                position = msg
+
+                if (msg.side.equals("BUY", true))
+                    positionLong = msg
+                else if (msg.side.equals("SELL", true))
+                    positionShort = msg
             }
 
             is Order -> {
@@ -745,22 +781,14 @@ class AlgorithmTrader(
         return params.counterDistance?.let { counterDistance ->
             when (currentDirection) {
                 DIRECTION.LONG -> {
-                    if (
-                        position != null
-                        && position!!.side.equals("BUY", true)
-                        && calcProfit(position!!, prevPrice).first < BigDecimal(0)
-                    )
+                    if (positionLong != null && calcProfit(positionLong!!, prevPrice).first < BigDecimal(0))
                         (step * counterDistance).round()
                     else
                         step.round()
                 }
 
                 DIRECTION.SHORT -> {
-                    if (
-                        position != null
-                        && position!!.side.equals("SELL", true)
-                        && calcProfit(position!!, prevPrice).first < BigDecimal(0)
-                    )
+                    if (positionShort != null && calcProfit(positionShort!!, prevPrice).first < BigDecimal(0))
                         (step * counterDistance).round()
                     else
                         step.round()
@@ -824,12 +852,14 @@ class AlgorithmTrader(
     }
 
     private fun resetLong() = ordersLong.run {
+        log("Closing long position")
         filter { (_, v) -> v.side == SIDE.SELL }.forEach { (k, v) -> ordersListForExecute[DIRECTION.LONG to k] = v }
 
         clear()
     }
 
     private fun resetShort() = ordersShort.run {
+        log("Closing short position")
         filter { (_, v) -> v.side == SIDE.BUY }.forEach { (k, v) -> ordersListForExecute[DIRECTION.SHORT to k] = v }
 
         clear()
