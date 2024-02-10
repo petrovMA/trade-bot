@@ -193,7 +193,9 @@ class ClientGate(
         order: Order,
         isStaticUpdate: Boolean,
         qty: String,
-        price: String
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
     ): Order {
         TODO("09.04.2021 IMPLEMENT IT")
 //        val typeX = order.side.toType()

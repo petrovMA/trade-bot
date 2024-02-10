@@ -136,7 +136,7 @@ abstract class Algorithm(
                 val before = System.currentTimeMillis()
                 val qtyStr = String.format(formatAmount, order.origQty).replace(",", ".")
                 val priceStr = String.format(formatPrice, order.price).replace(",", ".")
-                order = client.newOrder(order, isStaticUpdate, qtyStr, priceStr)
+                order = client.newOrder(order, isStaticUpdate, qtyStr, priceStr, positionSide, isReduceOnly)
                 val after = System.currentTimeMillis()
                 log?.info("{}, request time = {}ms, Order sent: {}", botSettings.name, after - before, order)
                 return order

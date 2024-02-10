@@ -58,7 +58,14 @@ class ClientTestExchange : ClientFutures {
         end: Long?
     ): List<Candlestick> = candlesticksData
 
-    override fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order {
+    override fun newOrder(
+        order: Order,
+        isStaticUpdate: Boolean,
+        qty: String,
+        price: String,
+        positionSide: DIRECTION?,
+        isReduceOnly: Boolean
+    ): Order {
         orders.add(order)
         return order
     }

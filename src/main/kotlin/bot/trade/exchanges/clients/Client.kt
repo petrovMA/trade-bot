@@ -21,7 +21,15 @@ interface Client {
         end: Long?
     ): List<Candlestick>
 
-    fun newOrder(order: Order, isStaticUpdate: Boolean, qty: String, price: String): Order
+    fun newOrder(
+        order: Order,
+        isStaticUpdate: Boolean,
+        qty: String,
+        price: String,
+        positionSide: DIRECTION? = null,
+        isReduceOnly: Boolean = false
+    ): Order
+
     fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean
 
     /**
