@@ -55,7 +55,6 @@ class AlgorithmTrader(
     private var trend: TrendCalculator.Trend? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val longOrdersForExecute: MutableMap<Pair<DIRECTION, String>, Order> = mutableMapOf()
-    private val shortOrdersForExecute: MutableMap<Pair<DIRECTION, String>, Order> = mutableMapOf()
 
     private var isInOrdersInitialized: Boolean = false
 
@@ -248,8 +247,8 @@ class AlgorithmTrader(
                         }
 
                         DIRECTION.SHORT -> when (v.side) {
-                            SIDE.BUY -> shortAmount += v.origQty
-                            SIDE.SELL -> shortAmount -= v.origQty
+                            SIDE.BUY -> shortAmount -= v.origQty
+                            SIDE.SELL -> shortAmount += v.origQty
                             else -> {}
                         }
                     }
@@ -806,36 +805,33 @@ class AlgorithmTrader(
 
     fun orders() = Triple(botSettings, ordersLong, ordersShort)
 
-    fun calcHedgeModule(): HedgeModule? = if (settings.autoBalance.not() || trend?.trend !in listOf(
-            TrendCalculator.Trend.TREND.HEDGE,
-            TrendCalculator.Trend.TREND.FLAT
-        )
-    ) null
-    else {
-        val openLongPosition: BigDecimal = ordersLong
-            .filter { it.value.side == SIDE.SELL }
-            .map { it.value }
-            .sumOf { it.origQty }
+    fun calcHedgeModule(): HedgeModule? =
+        if (settings.autoBalance.not() || trend?.trend !in listOf(TREND.HEDGE, TREND.FLAT)) null
+        else {
+            val openLongPosition: BigDecimal = ordersLong
+                .filter { it.value.side == SIDE.SELL }
+                .map { it.value }
+                .sumOf { it.origQty }
 
-        val openShortPosition: BigDecimal = ordersShort
-            .filter { it.value.side == SIDE.BUY }
-            .map { it.value }
-            .sumOf { it.origQty }
+            val openShortPosition: BigDecimal = ordersShort
+                .filter { it.value.side == SIDE.BUY }
+                .map { it.value }
+                .sumOf { it.origQty }
 
-        if (openLongPosition == openShortPosition)
-            null
-        else if (openLongPosition > openShortPosition) {
-            if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
-                HedgeModule((BigDecimal(2) - (openShortPosition / openLongPosition)).round(), DIRECTION.SHORT)
-            else
-                HedgeModule(BigDecimal(2), DIRECTION.SHORT)
-        } else {
-            if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
-                HedgeModule((BigDecimal(2) - (openLongPosition / openShortPosition)).round(), DIRECTION.LONG)
-            else
-                HedgeModule(BigDecimal(2), DIRECTION.LONG)
+            if (openLongPosition == openShortPosition)
+                null
+            else if (openLongPosition > openShortPosition) {
+                if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
+                    HedgeModule((BigDecimal(2) - (openShortPosition / openLongPosition)).round(), DIRECTION.SHORT)
+                else
+                    HedgeModule(BigDecimal(2), DIRECTION.SHORT)
+            } else {
+                if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
+                    HedgeModule((BigDecimal(2) - (openLongPosition / openShortPosition)).round(), DIRECTION.LONG)
+                else
+                    HedgeModule(BigDecimal(2), DIRECTION.LONG)
+            }
         }
-    }
 
     private fun resetLong() = ordersLong.run {
         log("Closing long position")
