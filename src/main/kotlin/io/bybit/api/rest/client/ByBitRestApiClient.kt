@@ -36,7 +36,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
                 .addQueryParameter("category", category)
                 .build()
         ).build()
-    ).result
+    )!!.result
 
 
     fun getOpenOrders(
@@ -66,7 +66,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             .apply { headers(params).forEach(::addHeader) }
             .build()
 
-        return executeRequest<OpenOrders>(request).result
+        return executeRequest<OpenOrders>(request)!!.result
     }
 
     fun getKline(
@@ -89,7 +89,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         }.build()
 
         val request: Request = Request.Builder().url(builder).build()
-        return executeRequest<KlineResponse>(request).result
+        return executeRequest<KlineResponse>(request)!!.result
     }
 
     fun getBalance(
@@ -115,7 +115,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             .apply { headers(params).forEach(::addHeader) }
             .build()
 
-        return executeRequest<BalanceResponse>(request).result
+        return executeRequest<BalanceResponse>(request)!!.result
     }
 
     fun newOrder(
@@ -159,7 +159,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             addPathSegment("create")
         }.build()
 
-        return executeRequest<CreateOrderResponse>(Request.Builder().url(builder).post(body(params)).build()).result
+        return executeRequest<CreateOrderResponse>(Request.Builder().url(builder).post(body(params)).build())!!.result
     }
 
     fun orderCancelAll(
@@ -183,7 +183,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             addPathSegment("cancel-all")
         }.build()
 
-        return executeRequest<CancelAllResponse>(Request.Builder().url(builder).post(body(params)).build()).result
+        return executeRequest<CancelAllResponse>(Request.Builder().url(builder).post(body(params)).build())!!.result
     }
 
     fun orderCancel(
@@ -207,7 +207,7 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             addPathSegment("cancel")
         }.build()
 
-        return executeRequest<CancelResponse>(Request.Builder().url(builder).post(body(requestParams)).build()).result
+        return executeRequest<CancelResponse>(Request.Builder().url(builder).post(body(requestParams)).build())!!.result
     }
 
     fun getPositionsList(
@@ -238,34 +238,29 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             .apply { headers(params).forEach(::addHeader) }
             .build()
 
-        return executeRequest<PositionResponse>(request).result
+        return executeRequest<PositionResponse>(request)!!.result
     }
 
-    fun switchMode(category: String, mode: Int, symbol: String? = null, coin: String? = null): Response {
+    fun switchMode(category: String, mode: Int, symbol: String? = null, coin: String? = null) {
 
         if (symbol == null && coin == null) throw RuntimeException("Either 'symbol' or 'coin' is required.")
 
-        val params = TreeMap<String, String>().apply {
+        val requestParams = createMapParams(TreeMap<String, Any>().apply {
             put("category", category)
             put("mode", mode.toString())
             symbol?.let { put("symbol", it) }
             coin?.let { put("coin", it) }
-        }
+        })
 
         val builder = builder().apply {
             addPathSegment("position")
             addPathSegment("switch-mode")
-            params.forEach(::addQueryParameter)
         }.build()
 
-        val request: Request = Request.Builder().url(builder)
-            .apply { headers(params).forEach(::addHeader) }
-            .build()
-
-        return executeRequest<Response>(request)
+        executeRequest<CancelResponse>(Request.Builder().url(builder).post(body(requestParams)).build())!!.result
     }
 
-    private inline fun <reified T : Response> executeRequest(request: Request): T = try {
+    private inline fun <reified T : Response> executeRequest(request: Request): T? = try {
         log.trace {
             try {
                 val buffer = Buffer()
@@ -278,11 +273,12 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             }
         }
 
-        val respBody = client.newCall(request).execute().body!!.string()
-        log.trace("Response:\n$respBody")
-        val resp = Mapper.asObject<T>(respBody)
-        if ((resp.retCode == 0L || resp.retCode == null) && (resp.ret_code == 0L || resp.ret_code == null)) resp
-        else throw ByBitRestException(resp.retMsg ?: resp.ret_msg!!, resp.retCode ?: resp.ret_code!!)
+        client.newCall(request).execute().body?.string()?.let { respBody ->
+            log.trace("Response:\n$respBody")
+            val resp = Mapper.asObject<T>(respBody)
+            if ((resp.retCode == 0L || resp.retCode == null) && (resp.ret_code == 0L || resp.ret_code == null)) resp
+            else throw ByBitRestException(resp.retMsg ?: resp.ret_msg!!, resp.retCode ?: resp.ret_code!!)
+        }
     } catch (t: Throwable) {
         t.printStackTrace()
         log.error("Error while executing request: $request", t)

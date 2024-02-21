@@ -140,6 +140,8 @@ data class Order(
 
     private fun compareBigDecimal(a: BigDecimal?, b: BigDecimal?): Boolean =
         (a == b || (a != null && b != null && a.compareTo(b) == 0))
+
+    override fun hashCode(): Int = super.hashCode()
 }
 
 data class Position(

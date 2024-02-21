@@ -17,6 +17,7 @@ import java.util.concurrent.LinkedBlockingDeque
 class AlgorithmTrader(
     botSettings: BotSettings,
     exchangeBotsFiles: String,
+//    activeOrdersService: ActiveOrdersService,
     queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
     exchangeEnum: ExchangeEnum = ExchangeEnum.valueOf(botSettings.exchange.uppercase(Locale.getDefault())),
     conf: Config = getConfigByExchange(exchangeEnum)!!,
@@ -54,7 +55,7 @@ class AlgorithmTrader(
     private var trendCalculator: TrendCalculator? = null
     private var trend: TrendCalculator.Trend? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
-    private val longOrdersForExecute: MutableMap<Pair<DIRECTION, String>, Order> = mutableMapOf()
+    private val ordersForExecute: MutableMap<Pair<DIRECTION, String>, Order> = mutableMapOf()
 
     private var isInOrdersInitialized: Boolean = false
 
@@ -89,7 +90,7 @@ class AlgorithmTrader(
     var to: Long = Long.MIN_VALUE
 
     override fun setup() {
-        futuresClient.switchMode("linear", 3, botSettings.pair, null)
+//        futuresClient.switchMode("linear", 3, botSettings.pair, null)
 
         positionLong = futuresClient.getPositions(botSettings.pair).find { it.side.equals("BUY", true) }
         positionShort = futuresClient.getPositions(botSettings.pair).find { it.side.equals("SELL", true) }
@@ -238,7 +239,7 @@ class AlgorithmTrader(
                 var longAmount = BigDecimal.ZERO
                 var shortAmount = BigDecimal.ZERO
 
-                longOrdersForExecute.forEach { (k, v) ->
+                ordersForExecute.forEach { (k, v) ->
                     when (k.first) {
                         DIRECTION.LONG -> when (v.side) {
                             SIDE.BUY -> longAmount += v.origQty
@@ -271,7 +272,7 @@ class AlgorithmTrader(
                     log("LONG Orders after execute:\n${json(ordersLong, false)}", File("logging/$path/long_orders.txt"))
                 }
 
-                if (shortAmount.abs() > calcAmount(minOrderAmount, currentPrice, DIRECTION.LONG, hedgeModule)) {
+                if (shortAmount.abs() > calcAmount(minOrderAmount, currentPrice, DIRECTION.SHORT, hedgeModule)) {
                     log(
                         "SHORT Orders before execute:\n${json(ordersShort, false)}",
                         File("logging/$path/short_orders.txt")
@@ -543,7 +544,7 @@ class AlgorithmTrader(
                         }
                         if (v.stopPrice?.run { this >= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, v)
-                            longOrdersForExecute[currentDirection to k] = v
+                            ordersForExecute[currentDirection to k] = v
                         }
                     } else if (params.trailingInOrderDistance() != null && params.triggerInOrderDistance() != null) {
                         if (v.lastBorderPrice == null || v.lastBorderPrice!! > currentPrice) {
@@ -560,11 +561,11 @@ class AlgorithmTrader(
                         }
                         if (v.stopPrice?.run { this <= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, v)
-                            longOrdersForExecute[currentDirection to k] = v
+                            ordersForExecute[currentDirection to k] = v
                         }
                     } else {
                         if (v.side == SIDE.BUY && currentPrice < k.toBigDecimal()) {
-                            longOrdersForExecute[currentDirection to k] = v
+                            ordersForExecute[currentDirection to k] = v
                         }
                     }
                 }
@@ -590,7 +591,7 @@ class AlgorithmTrader(
                         }
                         if (v.stopPrice?.run { this <= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, v)
-                            longOrdersForExecute[currentDirection to k] = v
+                            ordersForExecute[currentDirection to k] = v
                         }
                     } else if (params.trailingInOrderDistance() != null && params.triggerInOrderDistance() != null) {
                         if (v.lastBorderPrice == null || v.lastBorderPrice!! < currentPrice) {
@@ -607,11 +608,11 @@ class AlgorithmTrader(
                         }
                         if (v.stopPrice?.run { this >= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, v)
-                            longOrdersForExecute[currentDirection to k] = v
+                            ordersForExecute[currentDirection to k] = v
                         }
                     } else {
                         if (v.side == SIDE.SELL && currentPrice > k.toBigDecimal()) {
-                            longOrdersForExecute[currentDirection to k] = v
+                            ordersForExecute[currentDirection to k] = v
                         }
                     }
                 }
@@ -620,7 +621,7 @@ class AlgorithmTrader(
     }
 
     private fun checkOrders() {
-        longOrdersForExecute.forEach { (k, v) ->
+        ordersForExecute.forEach { (k, v) ->
             when (k.first) {
                 DIRECTION.LONG -> {
                     when (v.side) {
@@ -668,9 +669,9 @@ class AlgorithmTrader(
             }
         }
 
-        log("Price = '${currentPrice.toPrice()}' Orders for execute:\n${json(longOrdersForExecute)}")
+        log("Price = '${currentPrice.toPrice()}' Orders for execute:\n${json(ordersForExecute)}")
 
-        longOrdersForExecute.clear()
+        ordersForExecute.clear()
     }
 
     override fun synchronizeOrders() {
@@ -709,7 +710,7 @@ class AlgorithmTrader(
     ) {
         orders.readFromFile()
 
-        longOrdersForExecute.clear()
+        ordersForExecute.clear()
 
         if (params.setCloseOrders && params.inOrderDistance.usePercent.not()) {
             var price = params.minRange()
@@ -835,14 +836,14 @@ class AlgorithmTrader(
 
     private fun resetLong() = ordersLong.run {
         log("Closing long position")
-        filter { (_, v) -> v.side == SIDE.SELL }.forEach { (k, v) -> longOrdersForExecute[DIRECTION.LONG to k] = v }
+        filter { (_, v) -> v.side == SIDE.SELL }.forEach { (k, v) -> ordersForExecute[DIRECTION.LONG to k] = v }
 
         clear()
     }
 
     private fun resetShort() = ordersShort.run {
         log("Closing short position")
-        filter { (_, v) -> v.side == SIDE.BUY }.forEach { (k, v) -> longOrdersForExecute[DIRECTION.SHORT to k] = v }
+        filter { (_, v) -> v.side == SIDE.BUY }.forEach { (k, v) -> ordersForExecute[DIRECTION.SHORT to k] = v }
 
         clear()
     }

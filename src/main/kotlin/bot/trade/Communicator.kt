@@ -19,6 +19,7 @@ class Communicator(
     private val exchangeFiles: File,
     private val exchangeBotsFiles: String,
     private val orderService: OrderService? = null,
+//    private val activeOrdersService: ActiveOrdersService,
     intervalCandlestick: Duration?,
     intervalStatistic: Duration?,
     timeDifference: Duration?,
@@ -96,6 +97,7 @@ class Communicator(
                             if (tradeBots[botSettings.name] == null) {
                                 tradeBots[botSettings.name] = AlgorithmTrader(
                                     botSettings,
+//                                    activeOrderService = activeOrdersService,
                                     tempUrlCalcHma = tempUrlCalcHma,
                                     exchangeBotsFiles = exchangeBotsFiles,
                                     sendMessage = sendMessage
@@ -174,6 +176,7 @@ class Communicator(
                     else -> AlgorithmTrader(
                         tradeBotSettings,
                         exchangeBotsFiles,
+//                        activeOrdersService,
                         tempUrlCalcHma = tempUrlCalcHma,
                         logMessageQueue = logMessageQueue,
                         sendMessage = sendMessage
