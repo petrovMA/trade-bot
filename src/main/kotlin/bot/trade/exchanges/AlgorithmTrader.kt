@@ -59,10 +59,10 @@ class AlgorithmTrader(
 
     private var isInOrdersInitialized: Boolean = false
 
-    private var maxPriceInOrderLong: BigDecimal? = null
-    private var minPriceInOrderLong: BigDecimal? = null
-    private var maxPriceInOrderShort: BigDecimal? = null
-    private var minPriceInOrderShort: BigDecimal? = null
+    private var maxPriceInOrderLong: BigDecimal? = null // todo:: Display this variable on frontend
+    private var minPriceInOrderLong: BigDecimal? = null // todo:: Display this variable on frontend
+    private var maxPriceInOrderShort: BigDecimal? = null // todo:: Display this variable on frontend
+    private var minPriceInOrderShort: BigDecimal? = null // todo:: Display this variable on frontend
 
     private var hedgeModule: HedgeModule? = null
     private var positionLong: Position? = null
@@ -161,8 +161,12 @@ class AlgorithmTrader(
                                 currentTpDistance > entireTpDistance
                                 || profitPercent > entireTp.maxProfitPercent
                                 || profitPercent < (entireTp.maxLossPercent.negate())
-                            )
+                            ) {
                                 resetLong()
+
+                                maxPriceInOrderLong = null
+                                minPriceInOrderLong = null
+                            }
                         }
                     }
                 }
@@ -188,8 +192,12 @@ class AlgorithmTrader(
                                 currentTpDistance > entireTpDistance
                                 || profitPercent > entireTp.maxProfitPercent
                                 || profitPercent < (entireTp.maxLossPercent.negate())
-                            )
+                            ) {
                                 resetShort()
+
+                                maxPriceInOrderShort = null
+                                minPriceInOrderShort = null
+                            }
                         }
                     }
                 }
@@ -197,11 +205,19 @@ class AlgorithmTrader(
                 when (trend?.trend) {
                     TREND.LONG -> {
                         resetShort()
+
+                        maxPriceInOrderShort = null
+                        minPriceInOrderShort = null
+
                         long?.let { params -> createOrdersForExecute(DIRECTION.LONG, params) }
                     }
 
                     TREND.SHORT -> {
                         resetLong()
+
+                        maxPriceInOrderLong = null
+                        minPriceInOrderLong = null
+
                         short?.let { params -> createOrdersForExecute(DIRECTION.SHORT, params) }
                     }
 
@@ -834,18 +850,20 @@ class AlgorithmTrader(
             }
         }
 
-    private fun resetLong() = ordersLong.run {
-        log("Closing long position")
-        filter { (_, v) -> v.side == SIDE.SELL }.forEach { (k, v) -> ordersForExecute[DIRECTION.LONG to k] = v }
+    private fun resetLong() {
+        ordersLong
+            .filter { (_, v) -> v.side == SIDE.SELL }
+            .forEach { (k, v) -> ordersForExecute[DIRECTION.LONG to k] = v }
 
-        clear()
+        ordersLong.clear()
     }
 
-    private fun resetShort() = ordersShort.run {
-        log("Closing short position")
-        filter { (_, v) -> v.side == SIDE.BUY }.forEach { (k, v) -> ordersForExecute[DIRECTION.SHORT to k] = v }
+    private fun resetShort() {
+        ordersShort
+            .filter { (_, v) -> v.side == SIDE.BUY }
+            .forEach { (k, v) -> ordersForExecute[DIRECTION.SHORT to k] = v }
 
-        clear()
+        ordersShort.clear()
     }
 
     private fun order(
