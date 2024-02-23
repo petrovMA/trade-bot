@@ -17,7 +17,10 @@ class AlgorithmTraderTrendTest {
         // Trend(hma1=0.51, hma2=0.51, hma3=0.50, rsi1=68.13, rsi2=64.84, trend=LONG)
         // Trend(hma1=0.51, hma2=0.51, hma3=0.50, rsi1=68.93, rsi2=65.59, trend=LONG)
 
-        val candlestickData = "klines_data.txt".file().readLines().map { asObject<Candlestick>(it) }
+        val candlestickData = "klines_data.txt".file().readLines()
+            .map { asObject<Candlestick>(it) }
+            .subList(0, 300)
+
         val expectedCandlestick = "expected_klines.txt".file().readLines().map { asObject<Candlestick>(it) }
         val streamData = "klines_stream.txt".file().readLines().map { asObject<Candlestick>(it) }
 

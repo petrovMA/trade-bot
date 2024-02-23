@@ -44,7 +44,16 @@ class TrendCalculator(
     val rsi2Converter = KlineConverter(inputKlineInterval.first, rsi2.first, (rsi2.second + 1))
 
     init {
-        initKlineForIndicator(client, pair, setOf(hma1, hma2, hma3, rsi1, rsi2), endTime ?: System.currentTimeMillis())
+        initKlineForIndicator(
+            client = client,
+            pair = pair,
+            klineConverterParams = listOf(
+                hma1.first to (hma1.second * 1.5).toInt(),
+                hma2.first to (hma2.second * 1.3).toInt(),
+                hma3.first to (hma3.second * 1.2).toInt()
+            ),
+            endIndicatorTime = endTime ?: System.currentTimeMillis()
+        )
     }
 
     fun addCandlesticks(vararg candlesticks: Candlestick) {
@@ -98,7 +107,7 @@ class TrendCalculator(
     private fun initKlineForIndicator(
         client: Client,
         pair: TradePair,
-        klineConverterParams: Set<Pair<Duration, Int>>,
+        klineConverterParams: List<Pair<Duration, Int>>,
         endIndicatorTime: Long
     ) {
 
