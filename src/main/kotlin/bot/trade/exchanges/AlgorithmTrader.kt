@@ -65,8 +65,8 @@ class AlgorithmTrader(
     private var minPriceInOrderShort: BigDecimal? = null // todo:: Display this variable on frontend
 
     private var hedgeModule: HedgeModule? = null
-    private var positionLong: Position? = null
-    private var positionShort: Position? = null
+    private var positionLong: Position? = null // todo:: Add more variables (size, liqPrice etc)
+    private var positionShort: Position? = null // todo:: Add more variables (size, liqPrice etc)
 
     private val ordersLong: MutableMap<String, Order> = if (isEmulate.not()) ObservableHashMap(
         filePath = "$path/orders_long".also {
@@ -252,61 +252,7 @@ class AlgorithmTrader(
                     }
                 }
 
-                var longAmount = BigDecimal.ZERO
-                var shortAmount = BigDecimal.ZERO
-
-                ordersForExecute.forEach { (k, v) ->
-                    when (k.first) {
-                        DIRECTION.LONG -> when (v.side) {
-                            SIDE.BUY -> longAmount += v.origQty
-                            SIDE.SELL -> longAmount -= v.origQty
-                            else -> {}
-                        }
-
-                        DIRECTION.SHORT -> when (v.side) {
-                            SIDE.BUY -> shortAmount -= v.origQty
-                            SIDE.SELL -> shortAmount += v.origQty
-                            else -> {}
-                        }
-                    }
-                }
-
-                if (longAmount.abs() > calcAmount(minOrderAmount, currentPrice, DIRECTION.LONG, hedgeModule)) {
-                    log(
-                        "LONG Orders before execute:\n${json(ordersLong, false)}",
-                        File("logging/$path/long_orders.txt")
-                    )
-                    checkOrders()
-                    sentOrder(
-                        amount = longAmount.abs(),
-                        orderSide = if (longAmount > BigDecimal.ZERO) SIDE.BUY else SIDE.SELL,
-                        price = currentPrice,
-                        orderType = TYPE.MARKET,
-                        positionSide = DIRECTION.LONG,
-                        isReduceOnly = longAmount < BigDecimal.ZERO
-                    )
-                    log("LONG Orders after execute:\n${json(ordersLong, false)}", File("logging/$path/long_orders.txt"))
-                }
-
-                if (shortAmount.abs() > calcAmount(minOrderAmount, currentPrice, DIRECTION.SHORT, hedgeModule)) {
-                    log(
-                        "SHORT Orders before execute:\n${json(ordersShort, false)}",
-                        File("logging/$path/short_orders.txt")
-                    )
-                    checkOrders()
-                    sentOrder(
-                        amount = shortAmount.abs(),
-                        orderSide = if (shortAmount > BigDecimal.ZERO) SIDE.SELL else SIDE.BUY,
-                        price = currentPrice,
-                        orderType = TYPE.MARKET,
-                        positionSide = DIRECTION.SHORT,
-                        isReduceOnly = shortAmount < BigDecimal.ZERO
-                    )
-                    log(
-                        "SHORT Orders after execute:\n${json(ordersShort, false)}",
-                        File("logging/$path/short_orders.txt")
-                    )
-                }
+                executeOrders()
             }
 
             is Position -> {
@@ -388,7 +334,14 @@ class AlgorithmTrader(
                     }
 
                     BotEvent.Type.INTERRUPT -> {
+
+                        resetLong()
+                        resetShort()
+
+                        executeOrders()
+
                         stopThis()
+
                         return
                     }
 
@@ -896,6 +849,65 @@ class AlgorithmTrader(
             BigDecimal(0)
 
         return profitPercent to profitAbsolute.abs()
+    }
+
+    private fun executeOrders() {
+
+        var longAmount = BigDecimal.ZERO
+        var shortAmount = BigDecimal.ZERO
+
+        ordersForExecute.forEach { (k, v) ->
+            when (k.first) {
+                DIRECTION.LONG -> when (v.side) {
+                    SIDE.BUY -> longAmount += v.origQty
+                    SIDE.SELL -> longAmount -= v.origQty
+                    else -> {}
+                }
+
+                DIRECTION.SHORT -> when (v.side) {
+                    SIDE.BUY -> shortAmount -= v.origQty
+                    SIDE.SELL -> shortAmount += v.origQty
+                    else -> {}
+                }
+            }
+        }
+
+        if (longAmount.abs() > calcAmount(minOrderAmount, currentPrice, DIRECTION.LONG, hedgeModule)) {
+            log(
+                "LONG Orders before execute:\n${json(ordersLong, false)}",
+                File("logging/$path/long_orders.txt")
+            )
+            checkOrders()
+            sentOrder(
+                amount = longAmount.abs(),
+                orderSide = if (longAmount > BigDecimal.ZERO) SIDE.BUY else SIDE.SELL,
+                price = currentPrice,
+                orderType = TYPE.MARKET,
+                positionSide = DIRECTION.LONG,
+                isReduceOnly = longAmount < BigDecimal.ZERO
+            )
+            log("LONG Orders after execute:\n${json(ordersLong, false)}", File("logging/$path/long_orders.txt"))
+        }
+
+        if (shortAmount.abs() > calcAmount(minOrderAmount, currentPrice, DIRECTION.SHORT, hedgeModule)) {
+            log(
+                "SHORT Orders before execute:\n${json(ordersShort, false)}",
+                File("logging/$path/short_orders.txt")
+            )
+            checkOrders()
+            sentOrder(
+                amount = shortAmount.abs(),
+                orderSide = if (shortAmount > BigDecimal.ZERO) SIDE.SELL else SIDE.BUY,
+                price = currentPrice,
+                orderType = TYPE.MARKET,
+                positionSide = DIRECTION.SHORT,
+                isReduceOnly = shortAmount < BigDecimal.ZERO
+            )
+            log(
+                "SHORT Orders after execute:\n${json(ordersShort, false)}",
+                File("logging/$path/short_orders.txt")
+            )
+        }
     }
 
     data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
