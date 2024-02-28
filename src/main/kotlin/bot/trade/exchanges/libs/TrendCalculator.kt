@@ -50,7 +50,9 @@ class TrendCalculator(
             klineConverterParams = listOf(
                 hma1.first to (hma1.second * 1.5).toInt(),
                 hma2.first to (hma2.second * 1.3).toInt(),
-                hma3.first to (hma3.second * 1.2).toInt()
+                hma3.first to (hma3.second * 1.2).toInt(),
+                rsi1.first to (rsi1.second + 1),
+                rsi2.first to (rsi2.second + 1)
             ),
             endIndicatorTime = endTime ?: System.currentTimeMillis()
         )

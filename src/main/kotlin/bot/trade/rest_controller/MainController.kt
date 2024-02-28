@@ -117,6 +117,13 @@ class MainController(orderService: OrderService) {
         val infoResponse = bot.communicator.getOrders(botName)
         val hedge = bot.communicator.getHedgeModule(botName)
         val trend = bot.communicator.getTrend(botName)
+        val (maxPriceInOrderLong, minPriceInOrderLong, maxPriceInOrderShort, minPriceInOrderShort, currentPrice)
+                = bot.communicator.orderBorders(botName) ?: listOf(null, null, null, null, null)
+
+        val strPrices = "maxPriceInOrderLong = $maxPriceInOrderLong, minPriceInOrderLong = $minPriceInOrderLong, " +
+                "maxPriceInOrderShort = $maxPriceInOrderShort, minPriceInOrderShort = $minPriceInOrderShort, " +
+                "currentPrice = $currentPrice"
+
         log.info("Response for /orders = $infoResponse")
 
         val botsList = bot.communicator
@@ -153,6 +160,8 @@ class MainController(orderService: OrderService) {
                 """.trimIndent()
             }
 
+        rowNum = 1
+
         val shortTableContent = infoResponse
             .third
             .map { it.value }
@@ -178,6 +187,7 @@ class MainController(orderService: OrderService) {
                     .replace("${'$'}longTable", tableHeader + longTableContent)
                     .replace("${'$'}shortTable", tableHeader + shortTableContent)
                     .replace("${'$'}trend", trend.toString() + (hedge ?: ""))
+                    .replace("${'$'}prices", strPrices)
                     .replace("${'$'}buttons", botsList)
             )
     }

@@ -9,6 +9,7 @@ import bot.trade.rest_controller.Notification
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
+import java.math.BigDecimal
 import java.time.Duration
 import java.time.LocalDate
 import java.util.*
@@ -534,6 +535,11 @@ class Communicator(
 
     fun getTrend(botName: String): TrendCalculator.Trend? = tradeBots[botName]?.let { bot ->
         if (bot is AlgorithmTrader) bot.getTrend()
+        else null
+    }
+
+    fun orderBorders(botName: String): List<BigDecimal?>? = tradeBots[botName]?.let { bot ->
+        if (bot is AlgorithmTrader) bot.orderBorders()
         else null
     }
 

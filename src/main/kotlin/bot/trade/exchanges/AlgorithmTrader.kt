@@ -59,10 +59,10 @@ class AlgorithmTrader(
 
     private var isInOrdersInitialized: Boolean = false
 
-    private var maxPriceInOrderLong: BigDecimal? = null // todo:: Display this variable on frontend
-    private var minPriceInOrderLong: BigDecimal? = null // todo:: Display this variable on frontend
-    private var maxPriceInOrderShort: BigDecimal? = null // todo:: Display this variable on frontend
-    private var minPriceInOrderShort: BigDecimal? = null // todo:: Display this variable on frontend
+    private var maxPriceInOrderLong: BigDecimal? = null
+    private var minPriceInOrderLong: BigDecimal? = null
+    private var maxPriceInOrderShort: BigDecimal? = null
+    private var minPriceInOrderShort: BigDecimal? = null
 
     private var hedgeModule: HedgeModule? = null
     private var positionLong: Position? = null // todo:: Add more variables (size, liqPrice etc)
@@ -909,6 +909,9 @@ class AlgorithmTrader(
             )
         }
     }
+
+    fun orderBorders() =
+        listOf(maxPriceInOrderLong, minPriceInOrderLong, maxPriceInOrderShort, minPriceInOrderShort, currentPrice)
 
     data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
 
