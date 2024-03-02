@@ -1,6 +1,8 @@
 package bot.trade.database.data.entities
 
+import bot.trade.exchanges.clients.DIRECTION
 import bot.trade.exchanges.clients.SIDE
+import bot.trade.libs.round
 import jakarta.persistence.*
 import java.math.BigDecimal
 
@@ -20,24 +22,27 @@ data class ActiveOrder(
 
     @Column(name = "AMOUNT", precision = 20, scale = 8) val amount: BigDecimal? = null,
 
-    @Column(name = "SIDE") val orderSide: SIDE? = null,
+    @Enumerated(EnumType.STRING) val orderSide: SIDE? = null,
 
     @Column(name = "PRICE", precision = 20, scale = 8) val price: BigDecimal? = null,
 
     @Column(name = "STOP_PRICE", precision = 20, scale = 8) val stopPrice: BigDecimal? = null,
 
-    @Column(name = "LAST_BORDER_PRICE", precision = 20, scale = 8) val lastBorderPrice: BigDecimal? = null
+    @Column(name = "LAST_BORDER_PRICE", precision = 20, scale = 8) val lastBorderPrice: BigDecimal? = null,
+
+    @Enumerated(EnumType.STRING) val direction: DIRECTION? = null
 ) {
     override fun equals(other: Any?): Boolean = other is ActiveOrder &&
             other.id == this.id &&
             other.botName == this.botName &&
-            other.amount == this.amount &&
-            other.price == this.price &&
+            other.amount?.round() == this.amount?.round() &&
+            other.price?.round() == this.price?.round() &&
             other.orderId == this.orderId &&
             other.tradePair == this.tradePair &&
             other.orderSide == this.orderSide &&
-            other.stopPrice == this.stopPrice &&
-            other.lastBorderPrice == this.lastBorderPrice
+            other.stopPrice?.round() == this.stopPrice?.round() &&
+            other.lastBorderPrice?.round() == this.lastBorderPrice?.round() &&
+            other.direction == this.direction
 
     override fun hashCode(): Int = javaClass.hashCode()
 

@@ -59,6 +59,9 @@ dependencies {
     // logging
     implementation("org.slf4j:slf4j-log4j12:2.0.5")
     implementation("org.apache.logging.log4j:log4j-to-slf4j:2.20.0")
+
+//    testImplementation("org.springframework.boot:spring-boot-starter-test:3.2.3")
+//    testImplementation("com.h2database:h2:2.2.224")
 }
 
 tasks.test {

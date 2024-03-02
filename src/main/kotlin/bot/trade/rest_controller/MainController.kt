@@ -5,6 +5,8 @@ import bot.trade.database.service.OrderService
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.readConf
 import bot.telegram.TelegramBot
+import bot.trade.database.service.ActiveOrdersService
+import bot.trade.database.service.ActiveOrdersServiceTest
 import bot.trade.libs.CustomFileLoggingProcessor
 import mu.KLogger
 import mu.KotlinLogging
@@ -16,11 +18,12 @@ import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 
 @RestController
-class MainController(orderService: OrderService) {
+class MainController(orderService: OrderService, activeOrdersService: ActiveOrdersService) {
     final val log: KLogger = KotlinLogging.logger {}
     final val bot: TelegramBot
 
     init {
+//        ActiveOrdersServiceTest().test(activeOrdersService) // TODO :: tests before run
         val exchangeFile = File("exchange")
         val exchangeBotsFiles = "exchangeBots"
         val taskExecutor = TaskExecutor(LinkedBlockingDeque())
