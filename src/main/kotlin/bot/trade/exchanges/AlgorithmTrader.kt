@@ -391,6 +391,12 @@ class AlgorithmTrader(
                             ?: maxPriceInOrderLong
                     }
 
+                    minPriceInOrderLong = orders.entries
+                        .filter { it.value.side == SIDE.BUY }
+                        .mapNotNull { it.value.price }
+                        .minByOrNull { it.toDouble() }
+                        ?: maxPriceInOrderLong
+
                     maxPriceInOrderLong = orders.entries
                         .filter { it.value.side == SIDE.BUY }
                         .mapNotNull { it.value.price }
@@ -443,6 +449,12 @@ class AlgorithmTrader(
                             .maxByOrNull { it.toDouble() }
                             ?: minPriceInOrderShort
                     }
+
+                    maxPriceInOrderShort = orders.entries
+                        .filter { it.value.side == SIDE.SELL }
+                        .mapNotNull { it.value.price }
+                        .maxByOrNull { it.toDouble() }
+                        ?: minPriceInOrderShort
 
                     minPriceInOrderShort = orders.entries
                         .filter { it.value.side == SIDE.SELL }

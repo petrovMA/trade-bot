@@ -19,4 +19,8 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
 
     @Transactional
     override fun deleteById(id: Long) = activeOrdersRepository.deleteById(id)
+
+    @Transactional
+    override fun deleteByOrderId(orderId: String) = activeOrdersRepository.deleteByOrderId(orderId)
+
 }

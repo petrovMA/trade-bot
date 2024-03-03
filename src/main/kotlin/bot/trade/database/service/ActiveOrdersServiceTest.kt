@@ -9,6 +9,8 @@ import java.math.BigDecimal
 class ActiveOrdersServiceTest {
     fun test(service: ActiveOrdersService) {
 
+        service.deleteByOrderId("123")
+
         val order = ActiveOrder(
             id = null,
             botName = "test",

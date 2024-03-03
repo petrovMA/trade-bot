@@ -6,4 +6,5 @@ interface ActiveOrdersService {
     fun saveOrder(order: ActiveOrder): ActiveOrder
     fun getOrderById(id: Long): ActiveOrder?
     fun deleteById(id: Long)
+    fun deleteByOrderId(orderId: String)
 }

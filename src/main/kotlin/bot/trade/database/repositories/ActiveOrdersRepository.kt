@@ -7,7 +7,7 @@ import org.springframework.data.repository.CrudRepository
 
 interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
     fun findOrderById(id: Long): ActiveOrder?
-    fun deleteByOrderId(order: ActiveOrder): ActiveOrder?
+    fun deleteByOrderId(orderId: String)
     fun findAllByBotName(botName: String): Iterable<ActiveOrder>
     fun findAllByDirection(direction: DIRECTION): Iterable<ActiveOrder>
     fun findAllByDirectionAndOrderSide(direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
