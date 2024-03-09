@@ -12,4 +12,7 @@ interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
     fun findAllByDirection(direction: DIRECTION): Iterable<ActiveOrder>
     fun findAllByDirectionAndOrderSide(direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun deleteByDirectionAndOrderSide(direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
+    fun findTopByBotNameAndDirectionOrderByPriceDesc(botName: String, direction: DIRECTION): ActiveOrder?
+    fun findTopByBotNameAndDirectionOrderByPriceAsc(botName: String, direction: DIRECTION): ActiveOrder?
+    fun countByBotNameAndDirectionAndOrderSide(botName: String, direction: DIRECTION, side: SIDE): Long
 }
