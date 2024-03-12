@@ -1,5 +1,6 @@
 package bot.trade.exchanges.clients
 
+import bot.trade.database.data.entities.ActiveOrder
 import bot.trade.libs.*
 import bot.trade.libs.UnknownOrderSide
 import bot.trade.libs.UnknownOrderStatus
@@ -125,12 +126,37 @@ data class Order(
         fee = data.cumExecFee.toBigDecimal()
     )
 
+    constructor(activeOrder: ActiveOrder) : this(
+        price = activeOrder.price,
+        pair = TradePair(activeOrder.tradePair!!),
+        orderId = activeOrder.orderId.toString(),
+        origQty = activeOrder.amount!!,
+        executedQty = BigDecimal(0),
+        side = activeOrder.orderSide!!,
+        type = TYPE.MARKET,
+        status = STATUS.NEW,
+        stopPrice = activeOrder.stopPrice,
+        lastBorderPrice = activeOrder.lastBorderPrice
+    )
+
     override fun equals(other: Any?) = other is Order
             && orderId == other.orderId
             && pair == other.pair
             && compareBigDecimal(price, other.price)
-            && origQty.compareTo(other.origQty) == 0
-            && executedQty.compareTo(other.executedQty) == 0
+            && compareBigDecimal(origQty, other.origQty)
+            && compareBigDecimal(executedQty, other.executedQty)
+            && side == other.side
+            && type == other.type
+            && status == other.status
+            && compareBigDecimal(stopPrice, other.stopPrice)
+            && compareBigDecimal(lastBorderPrice, other.lastBorderPrice)
+            && compareBigDecimal(fee, other.fee)
+
+    fun equalsWithoutId(other: Any?) = other is Order
+            && pair == other.pair
+            && compareBigDecimal(price, other.price)
+            && compareBigDecimal(origQty, other.origQty)
+            && compareBigDecimal(executedQty, other.executedQty)
             && side == other.side
             && type == other.type
             && status == other.status

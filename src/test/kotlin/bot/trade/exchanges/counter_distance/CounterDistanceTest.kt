@@ -1,18 +1,27 @@
 package bot.trade.exchanges.counter_distance
 
+import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.div8
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.test.context.ActiveProfiles
 import utils.mapper.Mapper
 import java.math.BigDecimal
 
+@DataJpaTest
+@ActiveProfiles("test")
 class CounterDistanceTest {
+
+    @Autowired
+    private lateinit var repository: ActiveOrdersRepository
 
     @Test
     fun testCounterDistanceShort() {
-        val (algorithmTrader, exchange) = testExchange("counter_distance/shortSettings.json")
+        val (algorithmTrader, exchange) = testExchange("counter_distance/shortSettings.json", repository)
 
         exchange.setPosition(
             Position(
@@ -53,7 +62,7 @@ class CounterDistanceTest {
         algorithmTrader.handle(Trade(2022.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
 
         assertOrders(listOf(), exchange.orders)
-        assertOrders("counter_distance/ShortOrdersExpected_1.json".file(), algorithmTrader.orders().third)
+        assertOrders("counter_distance/ShortOrdersExpected_1.json".file(), algorithmTrader.orders().third.toList())
 
         algorithmTrader.handle(Trade(2020.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
 
@@ -85,12 +94,12 @@ class CounterDistanceTest {
         algorithmTrader.handle(Trade(1991.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1990.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
 
-        assertOrders("counter_distance/ShortOrdersExpected_2.json".file(), algorithmTrader.orders().third)
+        assertOrders("counter_distance/ShortOrdersExpected_2.json".file(), algorithmTrader.orders().third.toList())
     }
 
     @Test
     fun testCounterDistanceLong() {
-        val (algorithmTrader, exchange) = testExchange("counter_distance/longSettings.json")
+        val (algorithmTrader, exchange) = testExchange("counter_distance/longSettings.json", repository)
 
         exchange.setPosition(
             Position(
@@ -131,7 +140,7 @@ class CounterDistanceTest {
         algorithmTrader.handle(Trade(2022.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(2020.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
 
-        assertOrders("counter_distance/LongOrdersExpected_1.json".file(), algorithmTrader.orders().second)
+        assertOrders("counter_distance/LongOrdersExpected_1.json".file(), algorithmTrader.orders().second.toList())
 
         algorithmTrader.handle(Trade(2010.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(2005.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
@@ -149,7 +158,7 @@ class CounterDistanceTest {
         algorithmTrader.handle(Trade(1990.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
 
         assertOrders(listOf(), exchange.orders)
-        assertOrders("counter_distance/LongOrdersExpected_2.json".file(), algorithmTrader.orders().second)
+        assertOrders("counter_distance/LongOrdersExpected_2.json".file(), algorithmTrader.orders().second.toList())
 
         algorithmTrader.handle(Trade(1991.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
 
@@ -171,6 +180,6 @@ class CounterDistanceTest {
 
         algorithmTrader.handle(Trade(1992.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
 
-        assertOrders("counter_distance/LongOrdersExpected_3.json".file(), algorithmTrader.orders().second)
+        assertOrders("counter_distance/LongOrdersExpected_3.json".file(), algorithmTrader.orders().second.toList())
     }
 }

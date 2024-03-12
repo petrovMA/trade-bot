@@ -1,6 +1,7 @@
 package bot.telegram
 
 import bot.trade.Communicator
+import bot.trade.database.service.ActiveOrdersService
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.clients.ExchangeEnum
 import bot.trade.libs.CustomFileLoggingProcessor
@@ -22,6 +23,7 @@ class TelegramBot(
     private val adminId: String,
     exchangeBotsFiles: String,
     orderService: OrderService,
+    activeOrdersService: ActiveOrdersService,
     private val botUsername: String,
     botToken: String,
     exchangeFiles: File,
@@ -41,11 +43,13 @@ class TelegramBot(
     private val log = KotlinLogging.logger {}
     private val regex = """"orderId":\s*"([a-fA-F0-9-]+)"""".toRegex()
 
-    val communicator: Communicator = Communicator(intervalCandlestick = intervalCandlestick,
+    val communicator: Communicator = Communicator(
+        intervalCandlestick = intervalCandlestick,
         exchangeBotsFiles = exchangeBotsFiles,
         orderService = orderService,
         intervalStatistic = intervalStatistic,
         timeDifference = timeDifference,
+        activeOrdersService = activeOrdersService,
         candlestickDataCommandStr = candlestickDataCommandStr,
         candlestickDataPath = candlestickDataPath,
         taskQueue = taskQueue,

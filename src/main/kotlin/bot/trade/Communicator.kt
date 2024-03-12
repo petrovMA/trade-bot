@@ -1,5 +1,6 @@
 package bot.trade
 
+import bot.trade.database.service.ActiveOrdersService
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
@@ -20,7 +21,7 @@ class Communicator(
     private val exchangeFiles: File,
     private val exchangeBotsFiles: String,
     private val orderService: OrderService? = null,
-//    private val activeOrdersService: ActiveOrdersService,
+    private val activeOrdersService: ActiveOrdersService,
     intervalCandlestick: Duration?,
     intervalStatistic: Duration?,
     timeDifference: Duration?,
@@ -98,9 +99,9 @@ class Communicator(
                             if (tradeBots[botSettings.name] == null) {
                                 tradeBots[botSettings.name] = AlgorithmTrader(
                                     botSettings,
-//                                    activeOrderService = activeOrdersService,
+                                    exchangeBotsFiles,
+                                    activeOrdersService,
                                     tempUrlCalcHma = tempUrlCalcHma,
-                                    exchangeBotsFiles = exchangeBotsFiles,
                                     sendMessage = sendMessage
                                 )
                                 log.info("new BotSettingsTrader: $botSettings")
@@ -177,7 +178,7 @@ class Communicator(
                     else -> AlgorithmTrader(
                         tradeBotSettings,
                         exchangeBotsFiles,
-//                        activeOrdersService,
+                        activeOrdersService,
                         tempUrlCalcHma = tempUrlCalcHma,
                         logMessageQueue = logMessageQueue,
                         sendMessage = sendMessage
@@ -518,13 +519,6 @@ class Communicator(
     }
 
     fun getInfo() = tradeBots.values.map { it.botSettings to (it as AlgorithmBobblesIndicator).positions }
-
-    fun getOrders(botName: String) = tradeBots[botName]?.let {
-        if (it is AlgorithmTrader)
-            it.orders()
-        else
-            null
-    }
 
     fun getHedgeModule(botName: String) = tradeBots[botName]?.let {
         if (it is AlgorithmTrader)

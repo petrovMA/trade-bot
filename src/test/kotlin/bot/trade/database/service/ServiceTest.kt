@@ -1,14 +1,28 @@
 package bot.trade.database.service
 
 import bot.trade.database.data.entities.ActiveOrder
+import bot.trade.database.repositories.ActiveOrdersRepository
+import bot.trade.database.service.impl.ActiveOrdersServiceImpl
 import bot.trade.exchanges.clients.DIRECTION
 import bot.trade.exchanges.clients.SIDE
 import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.test.context.ActiveProfiles
 import java.math.BigDecimal
+import java.util.*
 
+@DataJpaTest
+@ActiveProfiles("test")
+class ServiceTest {
 
-class ActiveOrdersServiceTest {
-    fun test(service: ActiveOrdersService) {
+    @Autowired
+    private lateinit var repository: ActiveOrdersRepository
+
+    @Test
+    fun test() {
+        val service = ActiveOrdersServiceImpl(repository)
 
         service.deleteByDirectionAndSide("test", DIRECTION.SHORT, SIDE.SELL)
 
@@ -17,7 +31,7 @@ class ActiveOrdersServiceTest {
         val order1 = ActiveOrder(
             id = null,
             botName = "test",
-            orderId = "1",
+            orderId = UUID.randomUUID(),
             tradePair = "BTC_USDT",
             amount = BigDecimal(0.001),
             orderSide = SIDE.SELL,
@@ -30,7 +44,7 @@ class ActiveOrdersServiceTest {
         val order2 = ActiveOrder(
             id = null,
             botName = "test",
-            orderId = "2",
+            orderId = UUID.randomUUID(),
             tradePair = "BTC_USDT",
             amount = BigDecimal(0.001),
             orderSide = SIDE.SELL,
@@ -51,8 +65,8 @@ class ActiveOrdersServiceTest {
         val order1byId = service.getOrderById(id1!!)
         val order2byId = service.getOrderByPrice("test", DIRECTION.SHORT, BigDecimal(60050))
 
-        val order1byPrice = service.getOrderWithMinPrice("test", DIRECTION.SHORT)
-        val order2byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT)
+        val order1byPrice = service.getOrderWithMinPrice("test", DIRECTION.SHORT, SIDE.SELL)
+        val order2byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT, SIDE.SELL)
 
         Assertions.assertEquals(order1byId, order1byPrice)
         Assertions.assertEquals(order2byId, order2byPrice)
@@ -60,7 +74,7 @@ class ActiveOrdersServiceTest {
         val order3 = ActiveOrder(
             id = null,
             botName = "test",
-            orderId = "3",
+            orderId = UUID.randomUUID(),
             tradePair = "BTC_USDT",
             amount = BigDecimal(0.001),
             orderSide = SIDE.SELL,
@@ -74,14 +88,14 @@ class ActiveOrdersServiceTest {
 
         Assertions.assertEquals(3, service.count("test", DIRECTION.SHORT, SIDE.SELL))
 
-        val order3byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT)
+        val order3byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT, SIDE.SELL)
         val order3byId = service.getOrderById(id3!!)
 
         Assertions.assertNotEquals(order2byId, order3byPrice)
         Assertions.assertEquals(order3byId, order3byPrice)
 
-        val order1NotFound = service.getOrderWithMaxPrice("test", DIRECTION.LONG)
-        val order2NotFound = service.getOrderWithMinPrice("test", DIRECTION.LONG)
+        val order1NotFound = service.getOrderWithMaxPrice("test", DIRECTION.LONG, SIDE.SELL)
+        val order2NotFound = service.getOrderWithMinPrice("test", DIRECTION.LONG, SIDE.BUY)
 
         Assertions.assertEquals(null, order1NotFound)
         Assertions.assertEquals(null, order2NotFound)
