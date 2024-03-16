@@ -10,8 +10,6 @@ import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
 
@@ -308,6 +306,15 @@ class AlgorithmTrader(
 
                         resetLong()
                         resetShort()
+
+                        executeOrders()
+
+                        stopThis()
+
+                        return
+                    }
+
+                    BotEvent.Type.PAUSE -> {
 
                         executeOrders()
 

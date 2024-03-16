@@ -4,6 +4,7 @@ data class Commands(
         val commandHelp: Regex = "/?help\\s+[A-z,\\d]+".toRegex(),
         val commandCreateTradeBot: Regex = "/?create[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
         val commandStartTradeBot: Regex = "/?start\\s[a-zA-Z0-9_]+$".toRegex(),
+        val commandResumeTradeBot: Regex = "/?resume\\s[a-zA-Z0-9_]+$".toRegex(),
         val commandEmulateTradeBot: Regex = "/?emulate[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
         val commandLoadTradeBot: Regex = "/?load\\s[a-zA-Z0-9_]+$".toRegex(),
 
@@ -21,6 +22,7 @@ data class Commands(
         val commandAllOrders: Regex = "/?orders\\s+[Aa]ll".toRegex(),
         val commandStopAll: Regex = "/?stop\\s+[Aa]ll".toRegex(),
         val commandStop: Regex = "/?stop\\s+[\\w-]{3,15}".toRegex(),
+        val commandPause: Regex = "/?stop\\s+[\\w-]{3,15}".toRegex(),
         val commandDelete: Regex = "/?delete\\s+[\\w-]{3,15}".toRegex(),
         val commandShowProp: Regex = "/?showProperties\\s+[\\w-]{3,15}".toRegex(),
         val commandQueueSize: Regex = "/?queueSize\\s+[\\w-]{3,15}".toRegex(),

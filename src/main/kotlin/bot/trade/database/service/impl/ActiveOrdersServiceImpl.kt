@@ -60,6 +60,10 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
         activeOrdersRepository.deleteByBotNameAndDirection(botName, direction)
 
     @Transactional
+    override fun deleteByBotName(botName: String): Iterable<ActiveOrder> =
+        activeOrdersRepository.deleteByBotName(botName)
+
+    @Transactional
     override fun getOrderByPriceBetween(
         botName: String,
         direction: DIRECTION,

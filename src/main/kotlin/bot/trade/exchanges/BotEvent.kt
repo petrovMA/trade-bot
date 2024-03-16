@@ -11,6 +11,7 @@ class BotEvent(val text: String = "", val type: Type) : CommonExchangeData {
         SHOW_BALANCES,
         SHOW_GAP,
         INTERRUPT,
+        PAUSE,
         SET_SETTINGS,
         CREATE_ORDER
     }

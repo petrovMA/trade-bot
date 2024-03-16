@@ -13,10 +13,9 @@ interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
     fun deleteByOrderId(orderId: UUID)
     fun findAllByBotNameAndDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
     fun findByBotNameAndOrderId(botName: String, orderId: UUID): ActiveOrder?
-    fun findAllByDirection(direction: DIRECTION): Iterable<ActiveOrder>
     fun findAllByBotNameAndDirectionAndOrderSide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
-    fun deleteByDirectionAndOrderSide(direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun deleteByBotNameAndDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
+    fun deleteByBotName(botName: String): Iterable<ActiveOrder>
 
     fun deleteByBotNameAndDirectionAndOrderSide(
         botName: String,

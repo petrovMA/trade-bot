@@ -18,6 +18,7 @@ interface ActiveOrdersService {
     fun getOrderByPriceBetween(botName: String, direction: DIRECTION, minPrice: BigDecimal, maxPrice: BigDecimal): Iterable<ActiveOrder>
     fun deleteByDirectionAndSide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun deleteByDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
+    fun deleteByBotName(botName: String): Iterable<ActiveOrder>
     fun count(botName: String, direction: DIRECTION, side: SIDE): Long
     fun deleteById(id: Long)
     fun deleteByOrderId(orderId: UUID)

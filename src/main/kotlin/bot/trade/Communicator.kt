@@ -104,6 +104,9 @@ class Communicator(
                                     tempUrlCalcHma = tempUrlCalcHma,
                                     sendMessage = sendMessage
                                 )
+
+                                activeOrdersService.deleteByBotName(botSettings.name)
+
                                 log.info("new BotSettingsTrader: $botSettings")
 
                             } else {
@@ -192,22 +195,8 @@ class Communicator(
                 msg = ""
             }
 
-            cmd.commandStartTradeBot.matches(message) -> {
-                val param = message.split("\\s+".toRegex())
-                if (param.size == 2) {
-                    val key = param[1]
-                    msg = tradeBots[key]?.start()?.let {
-                        log.info("$key started")
-                        "$key started"
-                    } ?: run {
-                        log.info("$key not exist")
-                        "$key not exist"
-                    }
-                } else {
-                    msg = "command 'start' must have one param"
-                    log.info("command 'start' must have one param. Msg = $message")
-                }
-            }
+            cmd.commandStartTradeBot.matches(message) -> startBot(message)
+            cmd.commandResumeTradeBot.matches(message) -> startBot(message, false)
 
             cmd.commandCandlestickData.matches(message) -> {
                 val param = message.split("\\s+".toRegex())
@@ -417,6 +406,24 @@ class Communicator(
                         }
                     }
 
+                    cmd.commandPause.matches(message) -> {
+                        val param = message.split("\\s+".toRegex())
+                        if (param.size == 2) {
+                            val key = param[1]
+                            msg = get(key)?.let { value ->
+                                value.queue.add(BotEvent(type = BotEvent.Type.PAUSE))
+                                log.info("$key paused")
+                                "$key paused"
+                            } ?: run {
+                                log.info("$key not exist")
+                                "$key not exist"
+                            }
+                        } else {
+                            msg = "command 'pause' must have one param"
+                            log.info("command 'pause' must have one param. Msg = $message")
+                        }
+                    }
+
                     cmd.commandAllOrders.matches(message) -> {
                         val pairs = map { it.key }.joinToString(",")
 
@@ -505,6 +512,30 @@ class Communicator(
         }
 
         if (msg.isNotBlank()) return send(msg)
+    }
+
+    private fun startBot(message: String, isDeleteOldBotData: Boolean = true): String {
+
+        val param = message.split("\\s+".toRegex())
+
+        val key = param[1]
+
+        val msg = if (param.size == 2) {
+            tradeBots[key]?.start()?.let {
+                log.info("$key started")
+                "$key started"
+            } ?: run {
+                log.info("$key not exist")
+                "$key not exist"
+            }
+        } else {
+            log.info("command 'start' must have one param. Msg = $message")
+            "command 'start' must have one param"
+        }
+
+        if (isDeleteOldBotData) activeOrdersService.deleteByBotName(key)
+
+        return msg
     }
 
     fun sendOrder(message: String) {
