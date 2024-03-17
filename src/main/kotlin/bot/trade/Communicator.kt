@@ -563,6 +563,11 @@ class Communicator(
         else null
     }
 
+    fun positions(botName: String): Pair<Position?, Position?>? = tradeBots[botName]?.let { bot ->
+        if (bot is AlgorithmTrader) bot.positions()
+        else null
+    }
+
     fun orderBorders(botName: String): List<BigDecimal?>? = tradeBots[botName]?.let { bot ->
         if (bot is AlgorithmTrader) bot.orderBorders()
         else null

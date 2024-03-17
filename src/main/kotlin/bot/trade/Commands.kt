@@ -22,7 +22,7 @@ data class Commands(
         val commandAllOrders: Regex = "/?orders\\s+[Aa]ll".toRegex(),
         val commandStopAll: Regex = "/?stop\\s+[Aa]ll".toRegex(),
         val commandStop: Regex = "/?stop\\s+[\\w-]{3,15}".toRegex(),
-        val commandPause: Regex = "/?stop\\s+[\\w-]{3,15}".toRegex(),
+        val commandPause: Regex = "/?pause\\s+[\\w-]{3,15}".toRegex(),
         val commandDelete: Regex = "/?delete\\s+[\\w-]{3,15}".toRegex(),
         val commandShowProp: Regex = "/?showProperties\\s+[\\w-]{3,15}".toRegex(),
         val commandQueueSize: Regex = "/?queueSize\\s+[\\w-]{3,15}".toRegex(),

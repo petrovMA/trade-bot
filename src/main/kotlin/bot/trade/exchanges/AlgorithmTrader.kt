@@ -122,7 +122,7 @@ class AlgorithmTrader(
                     }
                 }
 
-                settings.parameters.longParameters?.entireTp?.let { entireTp ->
+                long?.entireTp?.let { entireTp ->
                     if (
                         entireTp.enabled &&
                         (trend?.trend in listOf(TREND.LONG, TREND.SHORT, null) || entireTp.enabledInHedge)
@@ -132,7 +132,13 @@ class AlgorithmTrader(
 
                         if (positionLong != null && triggerCount >= entireTp.maxTriggerAmount) {
 
-                            val (profitPercent, currentTpDistance) = calcProfit(positionLong!!, currentPrice)
+                            val withRealizedPnl = long.withRealizedPnl ?: false
+
+                            val (profitPercent, currentTpDistance) = calcProfit(
+                                positionLong!!,
+                                currentPrice,
+                                withRealizedPnl
+                            )
 
                             val entireTpDistance = if (entireTp.tpDistance.usePercent)
                                 positionLong!!.entryPrice.percent(entireTp.tpDistance.distance)
@@ -153,7 +159,7 @@ class AlgorithmTrader(
                     }
                 }
 
-                settings.parameters.shortParameters?.entireTp?.let { entireTp ->
+                short?.entireTp?.let { entireTp ->
                     if (
                         entireTp.enabled &&
                         (trend?.trend in listOf(TREND.LONG, TREND.SHORT, null) || entireTp.enabledInHedge)
@@ -163,7 +169,13 @@ class AlgorithmTrader(
 
                         if (positionShort != null && triggerCount >= entireTp.maxTriggerAmount) {
 
-                            val (profitPercent, currentTpDistance) = calcProfit(positionShort!!, currentPrice)
+                            val withRealizedPnl = short.withRealizedPnl ?: false
+
+                            val (profitPercent, currentTpDistance) = calcProfit(
+                                positionShort!!,
+                                currentPrice,
+                                withRealizedPnl
+                            )
 
                             val entireTpDistance = if (entireTp.tpDistance.usePercent)
                                 positionShort!!.entryPrice.percent(entireTp.tpDistance.distance)
@@ -693,14 +705,24 @@ class AlgorithmTrader(
         return params.counterDistance?.let { counterDistance ->
             when (currentDirection) {
                 DIRECTION.LONG -> {
-                    if (positionLong != null && calcProfit(positionLong!!, prevPrice).first < BigDecimal(0))
+                    if (positionLong != null && calcProfit(
+                            positionLong!!,
+                            prevPrice,
+                            params.withRealizedPnl
+                        ).first < BigDecimal(0)
+                    )
                         (step * counterDistance).round()
                     else
                         step.round()
                 }
 
                 DIRECTION.SHORT -> {
-                    if (positionShort != null && calcProfit(positionShort!!, prevPrice).first < BigDecimal(0))
+                    if (positionShort != null && calcProfit(
+                            positionShort!!,
+                            prevPrice,
+                            params.withRealizedPnl
+                        ).first < BigDecimal(0)
+                    )
                         (step * counterDistance).round()
                     else
                         step.round()
@@ -727,10 +749,6 @@ class AlgorithmTrader(
         else settings.minOrderAmount?.countOfDigitsAfterDotForAmount?.let { orderAmount.div8(price).round(it) }
             ?: orderAmount.div8(price).round(botSettings.countOfDigitsAfterDotForAmount)
     }
-
-    fun getTrend(): TrendCalculator.Trend? = trendCalculator?.getTrend()
-
-    fun orders() = Triple(botSettings, ordersLong(), ordersShort())
 
     fun calcHedgeModule(): HedgeModule? =
         if (settings.autoBalance.not() || trend?.trend !in listOf(TREND.HEDGE, TREND.FLAT)) null
@@ -789,14 +807,22 @@ class AlgorithmTrader(
         stopPrice = null
     )
 
-    private fun calcProfit(position: Position, currPrice: BigDecimal): Pair<BigDecimal, BigDecimal> {
-        val profitAbsolute = if (position.side.equals("sell", true))
-            position.entryPrice - currPrice
-        else
-            currPrice - position.entryPrice
+    private fun calcProfit(
+        position: Position,
+        currPrice: BigDecimal,
+        withRealizedPnl: Boolean?
+    ): Pair<BigDecimal, BigDecimal> {
 
-        val profitPercent = if (position.entryPrice != BigDecimal(0))
-            profitAbsolute.div8(position.entryPrice.div8(BigDecimal(100)))
+        val inPrice = if (withRealizedPnl == true) position.breakEvenPrice
+        else position.entryPrice
+
+        val profitAbsolute = if (position.side.equals("sell", true))
+            inPrice - currPrice
+        else
+            currPrice - inPrice
+
+        val profitPercent = if (inPrice != BigDecimal(0))
+            profitAbsolute.div8(inPrice.div8(BigDecimal(100)))
         else
             BigDecimal(0)
 
@@ -865,10 +891,13 @@ class AlgorithmTrader(
     fun orderBorders() =
         listOf(maxPriceInOrderLong, minPriceInOrderLong, maxPriceInOrderShort, minPriceInOrderShort, currentPrice)
 
-    data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
+    fun getTrend(): TrendCalculator.Trend? = trendCalculator?.getTrend()
 
-    private fun getOrdersBetween(orders: MutableMap<String, Order>, minPrice: BigDecimal, maxPrice: BigDecimal) =
-        orders.entries.filter { minPrice < it.value.price!! && it.value.price!! < maxPrice }
+    fun orders() = Triple(botSettings, ordersLong(), ordersShort())
+
+    fun positions() = positionLong to positionShort
+
+    data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
 
     override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal = TODO("Not yet implemented")
 

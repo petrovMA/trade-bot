@@ -176,16 +176,33 @@ data class Position(
     val unrealisedPnl: BigDecimal,
     val realisedPnl: BigDecimal,
     val entryPrice: BigDecimal,
+    val breakEvenPrice: BigDecimal,
     val leverage: BigDecimal,
+    val liqPrice: BigDecimal,
+    val size: BigDecimal,
     val side: String
 ) : CommonExchangeData {
     constructor(data: io.bybit.api.websocket.messages.response.Position.Data) : this(
         pair = data.symbol.run { TradePair(take(3), drop(3)) },
         marketPrice = data.markPrice.toBigDecimal(),
         unrealisedPnl = data.unrealisedPnl.toBigDecimal(),
-        realisedPnl = data.cumRealisedPnl.toBigDecimal(),
+        realisedPnl = data.curRealisedPnl.toBigDecimal(),
         entryPrice = data.entryPrice.toBigDecimal(),
+
+        breakEvenPrice = if (data.entryPrice.toBigDecimal() == BigDecimal(0)) BigDecimal(0)
+        else {
+            if (data.side.equals("BUY", true))
+                (data.entryPrice.toBigDecimal() * data.size.toBigDecimal() - data.curRealisedPnl.toBigDecimal()) / data.size.toBigDecimal()
+            else if (data.side.equals("SELL", true))
+                (data.entryPrice.toBigDecimal() * data.size.toBigDecimal() + data.curRealisedPnl.toBigDecimal()) / data.size.toBigDecimal()
+            else throw Exception("Unsupported order side = ${data.side}")
+        },
         leverage = data.leverage.toBigDecimal(),
+        liqPrice = data.liqPrice.let {
+            if (it.isEmpty()) 0.toBigDecimal()
+            else it.toBigDecimal()
+        },
+        size = data.size.toBigDecimal(),
         side = data.side
     )
 
@@ -193,9 +210,23 @@ data class Position(
         pair = data.symbol.run { TradePair(take(3), drop(3)) },
         marketPrice = data.markPrice.toBigDecimal(),
         unrealisedPnl = data.unrealisedPnl.toBigDecimal(),
-        realisedPnl = data.cumRealisedPnl.toBigDecimal(),
+        realisedPnl = data.curRealisedPnl.toBigDecimal(),
         entryPrice = data.avgPrice.toBigDecimal(),
+
+        breakEvenPrice = if (data.avgPrice.toBigDecimal() == BigDecimal(0)) BigDecimal(0)
+        else {
+            if (data.side.equals("BUY", true))
+                (data.avgPrice.toBigDecimal() * data.size.toBigDecimal() - data.curRealisedPnl.toBigDecimal()) / data.size.toBigDecimal()
+            else if (data.side.equals("SELL", true))
+                (data.avgPrice.toBigDecimal() * data.size.toBigDecimal() + data.curRealisedPnl.toBigDecimal()) / data.size.toBigDecimal()
+            else throw Exception("Unsupported order side = ${data.side}")
+        },
         leverage = data.leverage.toBigDecimal(),
+        liqPrice = data.liqPrice.let {
+            if (it.isEmpty()) 0.toBigDecimal()
+            else it.toBigDecimal()
+        },
+        size = data.size.toBigDecimal(),
         side = data.side
     )
 }
@@ -470,6 +501,7 @@ class BotSettingsTrader(
             @SerializedName("max_trigger_count") val orderMaxQuantity: Int, // Max Order count:: max amount of orders
             @SerializedName("set_close_orders") val setCloseOrders: Boolean = true, // set close position orders when bot starts
             @SerializedName("counter_distance") val counterDistance: BigDecimal? = null,
+            @SerializedName("use_realized_pnl_in_calc_profit") val withRealizedPnl: Boolean? = null,
             @SerializedName("entire_tp") val entireTp: EntireTp?
         ) {
             class TradingRange(

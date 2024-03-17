@@ -13,6 +13,7 @@ data class Position(
         val category: String,
         val createdTime: String,
         val cumRealisedPnl: String,
+        val curRealisedPnl: String,
         val entryPrice: String,
         val isReduceOnly: Boolean,
         val leverage: String,

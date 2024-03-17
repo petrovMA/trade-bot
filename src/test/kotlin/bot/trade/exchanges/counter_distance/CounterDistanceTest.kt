@@ -30,7 +30,10 @@ class CounterDistanceTest {
                 unrealisedPnl = BigDecimal(0),
                 realisedPnl = BigDecimal(0),
                 entryPrice = BigDecimal(2000),
+                breakEvenPrice = BigDecimal(2000),
                 leverage = BigDecimal(1),
+                liqPrice = BigDecimal(1000),
+                size = BigDecimal(100),
                 side = "Sell"
             )
         )
@@ -108,7 +111,10 @@ class CounterDistanceTest {
                 unrealisedPnl = BigDecimal(0),
                 realisedPnl = BigDecimal(0),
                 entryPrice = BigDecimal(2000),
+                breakEvenPrice = BigDecimal(2000),
                 leverage = BigDecimal(1),
+                liqPrice = BigDecimal(1000),
+                size = BigDecimal(100),
                 side = "buy"
             )
         )

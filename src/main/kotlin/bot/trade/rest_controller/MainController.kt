@@ -118,6 +118,7 @@ class MainController(orderService: OrderService, val activeOrdersService: Active
 
         val hedge = bot.communicator.getHedgeModule(botName)
         val trend = bot.communicator.getTrend(botName)
+        val (positionLong, positionShort) = bot.communicator.positions(botName) ?: (null to null)
         val (maxPriceInOrderLong, minPriceInOrderLong, maxPriceInOrderShort, minPriceInOrderShort, currentPrice)
                 = bot.communicator.orderBorders(botName) ?: listOf(null, null, null, null, null)
 
@@ -176,6 +177,7 @@ class MainController(orderService: OrderService, val activeOrdersService: Active
                     .replace("${'$'}trend", trend.toString() + (hedge ?: ""))
                     .replace("${'$'}prices", strPrices)
                     .replace("${'$'}buttons", botsList)
+                    .replace("${'$'}positions", "$positionLong<br>$positionShort")
             )
     }
 }

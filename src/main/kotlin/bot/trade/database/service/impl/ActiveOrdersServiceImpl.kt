@@ -80,20 +80,4 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
     override fun getOrderByPrice(botName: String, direction: DIRECTION, price: BigDecimal): ActiveOrder? =
         activeOrdersRepository.findByBotNameAndDirectionAndPrice(botName, direction, price)
 
-    @Transactional
-    override fun getOrderWithMaxPrice(botName: String, direction: DIRECTION): ActiveOrder? =
-        activeOrdersRepository.findTopByBotNameAndDirectionOrderByPriceDesc(botName, direction)
-
-    @Transactional
-    override fun getOrderWithMinPrice(botName: String, direction: DIRECTION): ActiveOrder? =
-        activeOrdersRepository.findTopByBotNameAndDirectionOrderByPriceAsc(botName, direction)
-
-    @Transactional
-    override fun count(botName: String, direction: DIRECTION, side: SIDE): Long =
-        activeOrdersRepository.countByBotNameAndDirectionAndOrderSide(botName, direction, side)
-
-    @Transactional
-    override fun deleteByOrderIds(vararg orderIds: String) =
-        orderIds.forEach { activeOrdersRepository.deleteByOrderId(it) }
-
 }

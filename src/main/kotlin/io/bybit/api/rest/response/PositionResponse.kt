@@ -28,6 +28,7 @@ class PositionResponse(
             val bustPrice: String,
             val createdTime: String,
             val cumRealisedPnl: String,
+            val curRealisedPnl: String,
             val isReduceOnly: Boolean,
             val leverage: String,
             val leverageSysUpdatedTime: String,

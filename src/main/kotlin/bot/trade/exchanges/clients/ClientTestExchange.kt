@@ -14,7 +14,10 @@ class ClientTestExchange : ClientFutures {
         unrealisedPnl = BigDecimal(0),
         realisedPnl = BigDecimal(0),
         entryPrice = BigDecimal(20000),
+        breakEvenPrice = BigDecimal(20000),
         leverage = BigDecimal(1),
+        liqPrice = BigDecimal(1000),
+        size = BigDecimal(1000),
         side = "None"
     )
     private val candlesticksData: MutableList<Candlestick> = mutableListOf()
