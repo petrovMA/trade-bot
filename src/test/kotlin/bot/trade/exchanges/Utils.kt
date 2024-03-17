@@ -1,5 +1,8 @@
 package bot.trade.exchanges
 
+import bot.trade.database.data.entities.ActiveOrder
+import bot.trade.database.repositories.ActiveOrdersRepository
+import bot.trade.database.service.impl.ActiveOrdersServiceImpl
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.json
 import bot.trade.libs.readConf
@@ -27,16 +30,19 @@ fun assertOrders(expected: List<Order>, actual: List<Order>) {
     }
 }
 
-fun assertOrders(expectedFile: File?, actual: Map<String, Order>, messagePredicate: String = "") {
+fun assertOrders(expectedFile: File?, actual: List<ActiveOrder>, messagePredicate: String = "") {
 
     val expected = expectedFile
         ?.let { Mapper.asMapObjects<String, Order>(it, object : TypeToken<Map<String?, Order?>?>() {}.type) }
         ?: mapOf()
 
+    val actualOrders = actual.map { Order(it) }
+
     assert(expected.size == actual.size) { "${messagePredicate}expected.size != actual.size, (${expected.size} != ${actual.size})" }
     expected.forEach { (k, v) ->
-        assert(actual.containsKey(k)) { "${messagePredicate}actual not contains key $k" }
-        assert(v == actual[k]) { "${messagePredicate}[$k] not equals,\nExpected:\n${json(v)}\n\nActual:\n${json(actual[k]!!)}" }
+        val actualOrder = actualOrders.find { BigDecimal(k) == it.price }
+        assert(actualOrder != null) { "${messagePredicate}actual not contains key $k" }
+        assert(v.equalsWithoutId(actualOrder)) { "${messagePredicate}[$k] not equals,\nExpected:\n${json(v)}\n\nActual:\n${json(actualOrder!!)}" }
     }
 }
 
@@ -58,22 +64,24 @@ fun assertCandlesticks(expected: List<Candlestick>, actual: List<Candlestick>, m
 }
 
 
-fun testExchange(settingsFile: String, endTime: Long? = null) = ClientTestExchange().let { exchange ->
-    AlgorithmTrader(
-        botSettings = Mapper.asObject<BotSettingsTrader>(settingsFile.file().readText()),
-        exchangeBotsFiles = "",
-        queue = LinkedBlockingDeque<CommonExchangeData>(),
-        exchangeEnum = ExchangeEnum.TEST,
-        conf = readConf("TEST.conf".file().path)!!,
-        api = "",
-        sec = "",
-        client = exchange,
-        isLog = false,
-        isEmulate = true,
-        tempUrlCalcHma = "http://95.217.0.250",
-        endTimeForTrendCalculator = endTime,
-    ) { _, _ -> } to exchange
-}
+fun testExchange(settingsFile: String, repository: ActiveOrdersRepository, endTime: Long? = null) =
+    ClientTestExchange().let { exchange ->
+        AlgorithmTrader(
+            botSettings = Mapper.asObject<BotSettingsTrader>(settingsFile.file().readText()),
+            exchangeBotsFiles = "",
+            activeOrdersService = ActiveOrdersServiceImpl(repository),
+            queue = LinkedBlockingDeque<CommonExchangeData>(),
+            exchangeEnum = ExchangeEnum.TEST,
+            conf = readConf("TEST.conf".file().path)!!,
+            api = "",
+            sec = "",
+            client = exchange,
+            isLog = false,
+            isEmulate = true,
+            tempUrlCalcHma = "http://95.217.0.250",
+            endTimeForTrendCalculator = endTime,
+        ) { _, _ -> } to exchange
+    }
 
 fun Trade.toKline() = Candlestick(
     openTime = time,

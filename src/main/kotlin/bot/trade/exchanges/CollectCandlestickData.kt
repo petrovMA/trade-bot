@@ -4,8 +4,6 @@ import bot.trade.exchanges.clients.*
 import bot.trade.libs.*
 import mu.KLogger
 import mu.KotlinLogging
-import org.apache.log4j.PropertyConfigurator
-import org.sqlite.SQLiteException
 import java.math.BigDecimal
 import java.sql.Connection
 import java.sql.DriverManager
@@ -15,8 +13,6 @@ import java.time.*
 
 
 fun main() {
-
-    PropertyConfigurator.configure("log4j.properties")
 
     CollectCandlestickData(
         command = Command.WRITE,
@@ -303,7 +299,7 @@ class CollectCandlestickData(
         try {
             lastCandlestick =
                 getCandle(stmt.executeQuery("SELECT * FROM $tableName ORDER BY ID_OPEN_TIME DESC LIMIT 1"))
-        } catch (e: SQLiteException) {
+        } catch (e: Exception) {
             log.info("Can't find table: $tableName")
         } catch (t: Throwable) {
             log.info("Error:\n", t)

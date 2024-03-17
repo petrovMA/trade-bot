@@ -1,17 +1,27 @@
 package bot.trade.exchanges.entire_tp
 
+import bot.trade.database.data.entities.ActiveOrder
+import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.test.context.ActiveProfiles
 import utils.mapper.Mapper
 import java.math.BigDecimal
 
+@DataJpaTest
+@ActiveProfiles("test")
 class EntireTpTest {
+
+    @Autowired
+    private lateinit var repository: ActiveOrdersRepository
 
     @Test
     fun testCheckTpDistance() {
-        val (algorithmTrader, exchange) = testExchange("entire_tp/checkTpDistanceLongSettings.json")
+        val (algorithmTrader, exchange) = testExchange("entire_tp/checkTpDistanceLongSettings.json", repository)
 
         exchange.setPosition(
             Position(
@@ -128,17 +138,17 @@ class EntireTpTest {
             exchange.orders
         )
 
-        assertOrders(emptyMap(), algorithmTrader.orders().second)
+        assertOrders(emptyList(), algorithmTrader.orders().second.toList().map { Order(it) })
     }
 
     @Test
     fun testCheckMaxTriggerAmountShort() {
-        val (algorithmTrader, exchange) = testExchange("entire_tp/checkMaxTriggerAmountShortSettings.json")
+        val (algorithmTrader, exchange) = testExchange("entire_tp/checkMaxTriggerAmountShortSettings.json", repository)
 
         Mapper.asMapObjects<String, Order>(
             file = "entire_tp/checkMaxTriggerAmountShortOrders.json".file(),
             type = object : TypeToken<Map<String?, Order?>?>() {}.type
-        ).forEach { (k, v) -> algorithmTrader.orders().second[k] = v }
+        ).mapValues { (_, v) -> ActiveOrder(v, algorithmTrader.botSettings.name) }
 
         exchange.setPosition(
             Position(

@@ -1,24 +1,34 @@
 package bot.trade.exchanges
 
+import bot.trade.database.data.entities.ActiveOrder
+import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.div8
 import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.test.context.ActiveProfiles
 import utils.mapper.Mapper
 import java.math.BigDecimal
 
+@DataJpaTest
+@ActiveProfiles("test")
 class AlgorithmTraderTest {
+
+    @Autowired
+    private lateinit var repository: ActiveOrdersRepository
 
     @Test
     fun testExecuteInOrdersWithMinOrderAmount() {
-        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersWithMinOrderAmountSettings.json")
+        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersWithMinOrderAmountSettings.json", repository)
 
-        algorithmTrader.orders().second.clear()
+        repository.deleteByBotNameAndDirection(algorithmTrader.botSettings.name, DIRECTION.LONG)
 
         Mapper.asMapObjects<String, Order>(
             "testExecuteInOrdersWithMinOrderAmountOrders.json".file(),
             object : TypeToken<Map<String?, Order?>?>() {}.type
-        ).forEach { (k, v) -> algorithmTrader.orders().second[k] = v }
+        ).mapValues { (_, v) -> ActiveOrder(v, algorithmTrader.botSettings.name) }
 
         algorithmTrader.handle(Trade(1518.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
@@ -51,12 +61,12 @@ class AlgorithmTraderTest {
             exchange.orders
         )
 
-        assertOrders("testExecuteInOrdersWithMinOrderAmountOrdersExpected.json".file(), algorithmTrader.orders().second)
+        assertOrders("testExecuteInOrdersWithMinOrderAmountOrdersExpected.json".file(), algorithmTrader.orders().second.toList())
     }
 
     @Test
     fun testCheckLongStrategy() {
-        val (algorithmTrader, exchange) = testExchange("testCheckLongStrategySettings.json")
+        val (algorithmTrader, exchange) = testExchange("testCheckLongStrategySettings.json", repository)
 
         val expectedOrder1 = Order(
             orderId = "",
@@ -91,7 +101,7 @@ class AlgorithmTraderTest {
             status = STATUS.NEW
         )
 
-        algorithmTrader.orders().second.clear()
+        repository.deleteByBotNameAndDirection(algorithmTrader.botSettings.name, DIRECTION.LONG)
 
         algorithmTrader.handle(Trade(1516.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1514.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
@@ -135,12 +145,12 @@ class AlgorithmTraderTest {
 
         assertOrders(listOf(expectedOrder1, expectedOrder2, expectedOrder3), exchange.orders)
 
-        assertOrders("testCheckLongStrategyOrdersExpected.json".file(), algorithmTrader.orders().second)
+        assertOrders("testCheckLongStrategyOrdersExpected.json".file(), algorithmTrader.orders().second.toList())
     }
 
     @Test
     fun testCheckShortStrategy() {
-        val (algorithmTrader, exchange) = testExchange("testCheckShortStrategy/testCheckShortStrategySettings.json")
+        val (algorithmTrader, exchange) = testExchange("testCheckShortStrategy/testCheckShortStrategySettings.json", repository)
 
         val expectedOrder1 = Order(
             orderId = "",
@@ -153,7 +163,7 @@ class AlgorithmTraderTest {
             status = STATUS.NEW
         )
 
-        algorithmTrader.orders().third.clear()
+        repository.deleteByBotNameAndDirection(algorithmTrader.botSettings.name, DIRECTION.SHORT)
 
         var number = 0L
         var price = BigDecimal(0)
@@ -166,105 +176,105 @@ class AlgorithmTraderTest {
             if (i in 15805..15840) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_1.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15705 until 15800) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_2.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15605 until 15700) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_3.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15505 until 15600) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_4.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15405 until 15500) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_5.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15305 until 15400) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_6.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15205 until 15300) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_7.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15105 until 15200) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_8.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 15005 until 15100) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_9.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14905 until 15000) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_10.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14805 until 14900) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_11.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14705 until 14800) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_12.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14605 until 14700) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_13.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14505 until 14600) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_14.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
             if (i in 14405 until 14500) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_15.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -278,7 +288,7 @@ class AlgorithmTraderTest {
             if (i in 14495 until 14500) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_16.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -286,7 +296,7 @@ class AlgorithmTraderTest {
 
         assertOrders(
             "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_17.json".file(),
-            algorithmTrader.orders().third,
+            algorithmTrader.orders().third.toList(),
             "Assertion failed on price = ${price.toPrice()}, "
         )
 
@@ -298,7 +308,7 @@ class AlgorithmTraderTest {
             if (i in 15335 startExclusive 15385) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_17.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -306,7 +316,7 @@ class AlgorithmTraderTest {
             if (i in 14579..14581) {
                 assertOrders(
                     "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_18.json".file(),
-                    algorithmTrader.orders().third,
+                    algorithmTrader.orders().third.toList(),
                     "Assertion failed on price = ${price.toPrice()}, "
                 )
             }
@@ -316,14 +326,14 @@ class AlgorithmTraderTest {
 
         assertOrders(
             "testCheckShortStrategy/testCheckShortStrategyOrdersExpected_19.json".file(),
-            algorithmTrader.orders().third,
+            algorithmTrader.orders().third.toList(),
             "Assertion failed on price = ${price.toPrice()}, "
         )
     }
 
     @Test
     fun testInOrdersShortWithPercentInOrderDistance() {
-        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersShortWithPercentOrderDistanceSettings.json")
+        val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersShortWithPercentOrderDistanceSettings.json", repository)
 
         algorithmTrader.handle(Trade(1500.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1499.toBigDecimal(), 1.toBigDecimal(), 1).toKline())
@@ -354,7 +364,7 @@ class AlgorithmTraderTest {
 
         algorithmTrader.handle(Trade(1586.toBigDecimal(), 1.toBigDecimal(), 6).toKline())
 
-        assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third)
+        assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third.toList())
     }
 
 //    @Test
@@ -391,6 +401,6 @@ class AlgorithmTraderTest {
 //
 //        algorithmTrader.handle(Trade(1586.toBigDecimal(), 1.toBigDecimal(), 6).toKline())
 //
-//        assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third)
+//        assertOrders("testExecuteInOrdersShortWithPercentOrderDistanceOrders.json".file(), algorithmTrader.orders().third.toList())
 //    }
 }

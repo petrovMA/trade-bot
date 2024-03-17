@@ -6,7 +6,6 @@ import bot.trade.exchanges.clients.*
 import bot.trade.libs.readConf
 import bot.telegram.TelegramBot
 import bot.trade.database.service.ActiveOrdersService
-import bot.trade.database.service.ActiveOrdersServiceTest
 import bot.trade.libs.CustomFileLoggingProcessor
 import mu.KLogger
 import mu.KotlinLogging
@@ -18,12 +17,11 @@ import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 
 @RestController
-class MainController(orderService: OrderService, activeOrdersService: ActiveOrdersService) {
+class MainController(orderService: OrderService, val activeOrdersService: ActiveOrdersService) {
     final val log: KLogger = KotlinLogging.logger {}
     final val bot: TelegramBot
 
     init {
-//        ActiveOrdersServiceTest().test(activeOrdersService) // TODO :: tests before run
         val exchangeFile = File("exchange")
         val exchangeBotsFiles = "exchangeBots"
         val taskExecutor = TaskExecutor(LinkedBlockingDeque())
@@ -40,6 +38,7 @@ class MainController(orderService: OrderService, activeOrdersService: ActiveOrde
                 adminId = propConf.getString("bot_properties.bot.admin_id"),
                 exchangeBotsFiles = exchangeBotsFiles,
                 orderService = orderService,
+                activeOrdersService = activeOrdersService,
                 botUsername = propConf.getString("bot_properties.bot.bot_name"),
                 botToken = propConf.getString("bot_properties.bot.bot_token"),
                 defaultCommands = mapOf(),
@@ -117,7 +116,6 @@ class MainController(orderService: OrderService, activeOrdersService: ActiveOrde
         </thead>
         """.trimIndent()
 
-        val infoResponse = bot.communicator.getOrders(botName)
         val hedge = bot.communicator.getHedgeModule(botName)
         val trend = bot.communicator.getTrend(botName)
         val (maxPriceInOrderLong, minPriceInOrderLong, maxPriceInOrderShort, minPriceInOrderShort, currentPrice)
@@ -127,57 +125,43 @@ class MainController(orderService: OrderService, activeOrdersService: ActiveOrde
                 "maxPriceInOrderShort = $maxPriceInOrderShort, minPriceInOrderShort = $minPriceInOrderShort, " +
                 "currentPrice = $currentPrice"
 
-        log.info("Response for /orders = $infoResponse")
-
         val botsList = bot.communicator
             .getBotsList()
             .joinToString(separator = "") {
                 """<a href="/orders?botName=$it" class="btn btn-primary">$it</a>""".trimIndent()
             }
 
-        if (infoResponse == null)
-            return ResponseEntity.ok()
-                .header("Content-Type", "text/html")
-                .body(
-                    File("pages/main.html")
-                        .readText()
-                        .replace("${'$'}buttons", botsList)
-                )
-
-
         var rowNum = 1
 
-        val longTableContent = infoResponse
-            .second
-            .map { it.value }
+        val longTableContent = activeOrdersService.getOrders(botName, DIRECTION.LONG)
+            .toList()
             .sortedBy { it.price }
             .joinToString(prefix = "<tbody>", postfix = "</tbody>", separator = "") {
                 """
-                    <tr class="${if (it.side == SIDE.BUY) "buy" else "sell"}">
+                    <tr class="${if (it.orderSide == SIDE.BUY) "buy" else "sell"}">
             <th scope="row">${rowNum++}</th>
             <td>${it.price}</td>
             <td>${it.stopPrice}</td>
             <td>${it.lastBorderPrice}</td>
-            <td>${it.origQty}</td>
+            <td>${it.amount}</td>
         </tr>
                 """.trimIndent()
             }
 
         rowNum = 1
 
-        val shortTableContent = infoResponse
-            .third
-            .map { it.value }
+        val shortTableContent = activeOrdersService.getOrders(botName, DIRECTION.SHORT)
+            .toList()
             .sortedBy { it.price }
             .run { reversed() }
             .joinToString(prefix = "<tbody>", postfix = "</tbody>", separator = "") {
                 """
-                    <tr class="${if (it.side == SIDE.BUY) "buy" else "sell"}">
+                    <tr class="${if (it.orderSide == SIDE.BUY) "buy" else "sell"}">
             <th scope="row">${rowNum++}</th>
             <td>${it.price}</td>
             <td>${it.stopPrice}</td>
             <td>${it.lastBorderPrice}</td>
-            <td>${it.origQty}</td>
+            <td>${it.amount}</td>
         </tr>
                 """.trimIndent()
             }

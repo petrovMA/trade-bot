@@ -1,5 +1,7 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
-    id("org.springframework.boot") version "3.1.0"
+    id("org.springframework.boot") version "3.2.3"
     kotlin("jvm") version "1.9.0"
     id("org.jetbrains.kotlin.plugin.spring") version "1.9.0"
     application
@@ -21,14 +23,8 @@ repositories {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.springframework.boot:spring-boot-starter-web:3.1.5") {
-        exclude(group = "ch.qos.logback", module = "logback-classic")
-        exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
-    }
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.1.2") {
-        exclude(group = "ch.qos.logback", module = "logback-classic")
-        exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
-    }
+    implementation("org.springframework.boot:spring-boot-starter-web:3.2.3")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.2.3")
     implementation("com.h2database:h2:2.2.220")
     implementation("org.apache.commons:commons-lang3:3.12.0")
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
@@ -48,22 +44,24 @@ dependencies {
 //    implementation("org.knowm.xchange:xchange-bybit:5.0.12")
     implementation("org.knowm.xchange:xchange-stream-huobi:5.1.1-SNAPSHOT")
 
-    implementation("org.slf4j:slf4j-api:2.0.5")
-    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
-
-
-    // todo  Instruction https://gist.github.com/rppowell-lasfs/f0e3b2d18c3be03ada38a3e367eaf1b8
-    // https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc
-    implementation("org.xerial:sqlite-jdbc:3.43.2.1")
-
     // logging
-    implementation("org.slf4j:slf4j-log4j12:2.0.5")
-    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.20.0")
+    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.23.1")
+    implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.23.1")
+    implementation("org.apache.logging.log4j:log4j-api:2.23.1")
+    implementation("org.apache.logging.log4j:log4j-core:2.23.1")
 
-//    testImplementation("org.springframework.boot:spring-boot-starter-test:3.2.3")
-//    testImplementation("com.h2database:h2:2.2.224")
+    implementation("javax.xml.bind:jaxb-api:2.3.1")
+
+    testImplementation("org.springframework.boot:spring-boot-starter-test:3.2.3")
 }
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.withType<KotlinCompile> {
+    kotlinOptions {
+        freeCompilerArgs += "-Xjsr305=strict"
+    }
 }

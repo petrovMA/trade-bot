@@ -124,7 +124,9 @@ class Emulate(
         updStaticOrders: Double? = null
     ): EmulateResult? {
         try {
-            val trade = AlgorithmTrader(
+
+            // TODO:: Move it to TEST package for using ActiveOrdersService
+            /*val trade = AlgorithmTrader(
                 conf = conf,
                 exchangeBotsFiles = "emulateTestBots",
                 queue = client.queue,
@@ -138,10 +140,10 @@ class Emulate(
                 isLog = logging,
                 tempUrlCalcHma = "",
                 isEmulate = true
-            ) { _, _ -> }
+            ) { _, _ -> }*/
 
-            trade.start()
-            trade.join()
+//            trade.start()
+//            trade.join()
 
             File("exchange/emulate/data/results").delete()
 
@@ -191,8 +193,8 @@ class Emulate(
                         .toDouble(),
                     secondBalanceByLastPrice = String.format("%.4f", secondBalanceByLastPrice).replace(',', '.')
                         .toDouble(),
-                    from = convertTime(trade.from).removePrefix("20"),
-                    to = convertTime(trade.to).removePrefix("20"),
+                    from = """convertTime(trade.from).removePrefix("20")""",
+                    to = """convertTime(trade.to).removePrefix("20")""",
                     buyProfitPercent = buyProf,
                     sellProfitPercent = sellProf,
                     candlesBuyInterval = candlesBuy?.toDouble(),

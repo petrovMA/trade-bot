@@ -1,13 +1,22 @@
 package bot.trade.exchanges
 
+import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.exchanges.libs.TrendCalculator
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.test.context.ActiveProfiles
 import utils.mapper.Mapper.asObject
 import java.math.BigDecimal
 
 
+//@DataJpaTest
+//@ActiveProfiles("test")
 class AlgorithmTraderTrendTest {
+
+//    @Autowired
+    private lateinit var repository: ActiveOrdersRepository
 
     //@Test // TODO:: this test works only with server: http://95.217.0.250:5000/
     fun test() {
@@ -24,7 +33,7 @@ class AlgorithmTraderTrendTest {
         val expectedCandlestick = "expected_klines.txt".file().readLines().map { asObject<Candlestick>(it) }
         val streamData = "klines_stream.txt".file().readLines().map { asObject<Candlestick>(it) }
 
-        val (algorithmTrader, exchange) = testExchange("testExecuteTrendSettings.json", candlestickData.last().openTime)
+        val (algorithmTrader, exchange) = testExchange("testExecuteTrendSettings.json", repository, candlestickData.last().openTime)
 
         exchange.addKlineData(candlestickData)
 
