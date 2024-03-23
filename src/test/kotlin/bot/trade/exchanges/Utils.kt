@@ -78,7 +78,6 @@ fun testExchange(settingsFile: String, repository: ActiveOrdersRepository, endTi
             client = exchange,
             isLog = false,
             isEmulate = true,
-            tempUrlCalcHma = "http://95.217.0.250",
             endTimeForTrendCalculator = endTime,
         ) { _, _ -> } to exchange
     }

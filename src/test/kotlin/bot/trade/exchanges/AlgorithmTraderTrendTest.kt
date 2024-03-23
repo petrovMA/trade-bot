@@ -3,6 +3,7 @@ package bot.trade.exchanges
 import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.exchanges.libs.TrendCalculator
+import bot.trade.libs.round
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
@@ -11,20 +12,15 @@ import utils.mapper.Mapper.asObject
 import java.math.BigDecimal
 
 
-//@DataJpaTest
-//@ActiveProfiles("test")
+@DataJpaTest
+@ActiveProfiles("test")
 class AlgorithmTraderTrendTest {
 
-//    @Autowired
+    @Autowired
     private lateinit var repository: ActiveOrdersRepository
 
-    //@Test // TODO:: this test works only with server: http://95.217.0.250:5000/
+    @Test
     fun test() {
-        // last kline time: GMT: Sunday, 17 December 2023 г., 5:00:00
-        // hma1 = 0.5099, hma2 = 0.5059, hma3 = 0.5038 rsi30m = 62.4481 rsi1h = 63.5574 rsi2h = 56.876
-
-        // Trend(hma1=0.51, hma2=0.51, hma3=0.50, rsi1=68.13, rsi2=64.84, trend=LONG)
-        // Trend(hma1=0.51, hma2=0.51, hma3=0.50, rsi1=68.93, rsi2=65.59, trend=LONG)
 
         val candlestickData = "klines_data.txt".file().readLines()
             .map { asObject<Candlestick>(it) }
@@ -42,11 +38,11 @@ class AlgorithmTraderTrendTest {
         streamData.forEach { algorithmTrader.handle(it) }
 
         algorithmTrader.getTrend()!!.run {
-            assertIndicator(BigDecimal(0.51), hma1, BigDecimal(0.1))
-            assertIndicator(BigDecimal(0.51), hma2, BigDecimal(0.1))
-            assertIndicator(BigDecimal(0.50), hma3, BigDecimal(0.1))
-            assertIndicator(BigDecimal(68.13), rsi1, BigDecimal(0.1))
-            assertIndicator(BigDecimal(64.84), rsi2, BigDecimal(0.1))
+            assertIndicator(BigDecimal(0.51), hma1, BigDecimal(0.01))
+            assertIndicator(BigDecimal(0.51), hma2, BigDecimal(0.01))
+            assertIndicator(BigDecimal(0.50), hma3, BigDecimal(0.01))
+            assertIndicator(BigDecimal(68.93), rsi1.round(2), BigDecimal(0.01)) // 68.9286811692868
+            assertIndicator(BigDecimal(65.59), rsi2.round(2), BigDecimal(0.01)) // 65.59467098685978
         }
 
         val field = AlgorithmTrader::class.java.getDeclaredField("trendCalculator")
@@ -54,6 +50,6 @@ class AlgorithmTraderTrendTest {
 
         val trendCalculator = field.get(algorithmTrader) as TrendCalculator
 
-        assertCandlesticks(expectedCandlestick, trendCalculator.hma3Converter.getCandlesticks())
+        assertCandlesticks(expectedCandlestick, trendCalculator.hma3Converter.getBars().map { Candlestick(it) })
     }
 }

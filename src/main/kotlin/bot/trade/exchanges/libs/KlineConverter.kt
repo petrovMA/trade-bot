@@ -3,7 +3,10 @@ package bot.trade.exchanges.libs
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.libs.ListLimit
 import bot.trade.libs.round
+import bot.trade.libs.toZonedTime
+import org.ta4j.core.BaseBar
 import java.time.Duration
+
 
 class KlineConverter(
     private val inputKlineInterval: Duration,
@@ -16,9 +19,10 @@ class KlineConverter(
             throw Exception("inputKlineInterval % outputKlineInterval != 0")
     }
 
-    private val candlesticks = ListLimit<Candlestick>(size)
+    private val bars = ListLimit<BaseBar>(size)
 
     private var currentCandlestick: Candlestick? = null
+    private var lastCandlestick: Candlestick? = null
     private var prevKline: Candlestick? = null
 
     fun addCandlesticks(vararg inputCandlesticks: Candlestick): Boolean {
@@ -90,13 +94,27 @@ class KlineConverter(
 
     fun closeCurrentCandlestick() {
         currentCandlestick?.let {
-            if (candlesticks.isEmpty() || candlesticks.last().openTime < it.openTime)
-                candlesticks.add(it)
+            if (lastCandlestick == null || lastCandlestick!!.openTime < it.openTime) {
+                bars.add(
+                    BaseBar(
+                        outputKlineInterval,
+                        it.closeTime.toZonedTime(),
+                        it.open,
+                        it.high,
+                        it.low,
+                        it.close,
+                        it.volume,
+                        it.close * it.volume
+                    )
+                )
+
+                lastCandlestick = it
+            }
         }
         currentCandlestick = null
     }
 
-    fun getCandlesticks(): List<Candlestick> = candlesticks
+    fun getBars(): List<BaseBar> = bars
 
     private fun setPrevKline(kline: Candlestick) {
         prevKline = Candlestick(

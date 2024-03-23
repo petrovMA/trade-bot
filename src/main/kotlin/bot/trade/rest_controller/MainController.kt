@@ -50,7 +50,6 @@ class MainController(orderService: OrderService, val activeOrdersService: Active
                 logMessageQueue = logMessageQueue,
                 taskQueue = taskExecutor.getQueue(),
                 exchangeFiles = exchangeFile,
-                tempUrlCalcHma = propConf.getString("bot_properties.hma_address_calc")
             ).also { TelegramBotsApi(DefaultBotSession::class.java).registerBot(it) }
         } catch (e: Exception) {
             e.printStackTrace()

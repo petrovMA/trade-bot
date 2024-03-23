@@ -1,5 +1,6 @@
 package bot.trade.exchanges.libs
 
+import bot.trade.exchanges.assertCandlesticks
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.libs.h
 import bot.trade.libs.m
@@ -21,9 +22,9 @@ class KlineConverterTest {
         val klineConverter = KlineConverter(5.m(), 2.h(), 20)
         klineConverter.addCandlesticks(*input.toTypedArray())
 
-        assertEquals(expected.take(7), klineConverter.getCandlesticks())
+        assertCandlesticks(expected.take(7), klineConverter.getBars().map { Candlestick(it) })
         klineConverter.closeCurrentCandlestick()
-        assertEquals(expected, klineConverter.getCandlesticks())
+        assertCandlesticks(expected, klineConverter.getBars().map { Candlestick(it) })
     }
 
     @Test

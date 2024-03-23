@@ -140,6 +140,7 @@ fun time() = System.currentTimeMillis().ms()
 
 fun Duration.format() = convertTime(this.toMillis())
 
+fun Long.toZonedTime() = ZonedDateTime.ofInstant(Instant.ofEpochMilli(this), ZoneId.systemDefault());
 
 fun readConf(path: String?): Config? = try {
     path?.run {
@@ -235,3 +236,6 @@ fun String.toDuration() = DurationStyle.detectAndParse(this)
 
 fun format(value: BigDecimal?, locale: Locale? = null): String =
     locale?.let { String.format(it, "%.8f", value) } ?: String.format("%.8f", value)
+
+fun compareBigDecimal(a: BigDecimal?, b: BigDecimal?): Boolean =
+    (a == b || (a != null && b != null && a.compareTo(b) == 0))

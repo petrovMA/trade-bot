@@ -34,7 +34,6 @@ class TelegramBot(
     candlestickDataPath: Map<ExchangeEnum, String>,
     logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
     taskQueue: BlockingQueue<Thread>,
-    val tempUrlCalcHma: String,
     private val defaultCommands: Map<String, String>
 ) : TelegramLongPollingBot(botToken) {
 
@@ -56,7 +55,6 @@ class TelegramBot(
         exchangeFiles = exchangeFiles,
         logMessageQueue = logMessageQueue,
         sendFile = { sendFile(it) },
-        tempUrlCalcHma = tempUrlCalcHma,
         sendMessage = { message, isMarkDown -> sendMessage(message, isMarkDown) })
 
     override fun onUpdateReceived(update: Update) {

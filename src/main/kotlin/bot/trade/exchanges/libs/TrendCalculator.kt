@@ -2,19 +2,17 @@ package bot.trade.exchanges.libs
 
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.m
-import bot.trade.libs.round
 import com.fasterxml.jackson.databind.ObjectMapper
 import mu.KotlinLogging
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.lang.Thread.sleep
+import org.ta4j.core.Bar
+import org.ta4j.core.BaseBarSeries
+import org.ta4j.core.indicators.HMAIndicator
+import org.ta4j.core.indicators.RSIIndicator
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator
 import java.math.BigDecimal
 import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.*
 
 
 class TrendCalculator(
@@ -26,7 +24,6 @@ class TrendCalculator(
     private val rsi1: Pair<Duration, Int>,
     private val rsi2: Pair<Duration, Int>,
     private val inputKlineInterval: Pair<Duration, INTERVAL> = 5.m() to INTERVAL.FIVE_MINUTES,
-    private val tempUrlCalcHma: String,
     endTime: Long? = System.currentTimeMillis()
 ) {
     private val log = KotlinLogging.logger {}
@@ -69,11 +66,11 @@ class TrendCalculator(
     }
 
     private fun calcTrend() {
-        val hma1 = calcHMA(hma1Converter.getCandlesticks(), hma1.second)
-        val hma2 = calcHMA(hma2Converter.getCandlesticks(), hma2.second)
-        val hma3 = calcHMA(hma3Converter.getCandlesticks(), hma3.second)
-        val rsi1 = rsiTradingView(rsi1Converter.getCandlesticks(), rsi1.second)
-        val rsi2 = rsiTradingView(rsi2Converter.getCandlesticks(), rsi2.second)
+        val hma1 = ta4jHma(hma1Converter.getBars(), hma1.second)
+        val hma2 = ta4jHma(hma2Converter.getBars(), hma2.second)
+        val hma3 = ta4jHma(hma3Converter.getBars(), hma3.second)
+        val rsi1 = ta4jRsi(rsi1Converter.getBars(), rsi1.second)
+        val rsi2 = ta4jRsi(rsi2Converter.getBars(), rsi2.second)
         val trend = if (rsi1 > BigDecimal(50)) {
             if (rsi2 > BigDecimal(50)) {
                 if (hma1 < hma2 && hma2 < hma3) Trend.TREND.HEDGE
@@ -142,72 +139,13 @@ class TrendCalculator(
         } while (true)
     }
 
-    private fun calcHMA(kline: List<Candlestick>, period: Int): BigDecimal {
+    private fun ta4jHma(kline: List<Bar>, hmaPeriod: Int): BigDecimal =
+        HMAIndicator(ClosePriceIndicator(BaseBarSeries(kline)), hmaPeriod)
+            .getValue(kline.size - 1).doubleValue().toBigDecimal()
 
-        val client = OkHttpClient()
-
-        val dataList = kline.map { it.close }
-
-        val params = TreeMap<String, Any>().apply {
-            put("data_list", dataList)
-            put("hma_period", period)
-        }
-
-        val request = Request.Builder().url("$tempUrlCalcHma:5000/hma").post(body(params)).build()
-
-        var resp: okhttp3.Response? = null
-
-        var trying = 0
-
-        do {
-            resp = try {
-                client.newCall(request).execute()
-            } catch (t: Throwable) {
-                log.error("Error hma calculation request: ${t.message}")
-                sleep(200)
-                continue
-            }
-            if (resp!!.code != 200) {
-                log.error("Error hma calculation response, code: ${resp.code}, bode: \n${resp.body!!.string()}")
-                sleep(200)
-            } else break
-        } while (trying++ < 10)
-
-        if (resp == null)
-            throw Exception("Error hma calculation request")
-
-        val time = Instant.ofEpochMilli(kline.first().closeTime).atOffset(ZoneOffset.UTC).toString()
-
-        val result = objectMapper.readTree(resp.body!!.string())["hma"].decimalValue().round(2)
-
-        log.info("HMA_$period for time $time: $result")
-
-        return result
-    }
-
-    private fun calcRSI(kline: List<Candlestick>, period: Int): BigDecimal {
-
-        val client = OkHttpClient()
-
-        val dataList = kline.map { it.close }
-
-        val params = TreeMap<String, Any>().apply {
-            put("data_list", dataList)
-            put("rsi_period", period)
-        }
-
-        val request = Request.Builder().url("$tempUrlCalcHma:5000/rsi").post(body(params)).build()
-
-        val respBody = client.newCall(request).execute().body!!.string()
-
-        val time = Instant.ofEpochMilli(kline.first().closeTime).atOffset(ZoneOffset.UTC).toString()
-
-        val result = objectMapper.readTree(respBody)["rsi"].decimalValue()
-
-        log.info("RSI_$period for time $time: $result")
-
-        return result
-    }
+    private fun ta4jRsi(kline: List<Bar>, rsiPeriod: Int): BigDecimal =
+        RSIIndicator(ClosePriceIndicator(BaseBarSeries(kline)), rsiPeriod)
+            .getValue(kline.size - 1).doubleValue().toBigDecimal()
 
     private fun body(obj: Any) =
         objectMapper.writeValueAsString(obj).toRequestBody("application/json".toMediaTypeOrNull()!!)
@@ -221,36 +159,5 @@ class TrendCalculator(
         val trend: TREND
     ) {
         enum class TREND { LONG, SHORT, FLAT, HEDGE }
-    }
-
-    private fun rsiTradingView(kline: List<Candlestick>, period: Int = 14, roundRsi: Boolean = true): BigDecimal {
-
-        val dataList = kline.map { it.close.toDouble() }
-
-        if (dataList.size <= period) {
-            throw IllegalArgumentException("Not enough data to calculate RSI")
-        }
-
-        val delta = dataList.zipWithNext { a, b -> b - a }
-        val up = delta.map { if (it > 0) it else 0.0 }
-        val down = delta.map { if (it < 0) -it else 0.0 }
-
-        val alpha = 1.0 / period
-        var avgUp = up.takeLast(period).average()
-        var avgDown = down.takeLast(period).average()
-
-        val rsi = mutableListOf<Double>()
-
-        for (i in 0 until period) {
-            avgUp = (avgUp * (1 - alpha)) + (up[i] * alpha)
-            avgDown = (avgDown * (1 - alpha)) + (down[i] * alpha)
-
-            val rs = if (avgDown == 0.0) Double.MAX_VALUE else avgUp / avgDown
-            val rsiValue = 100 - (100 / (1 + rs))
-
-            rsi.add(if (roundRsi) "%.2f".format(rsiValue).replace(",", ".").toDouble() else rsiValue)
-        }
-
-        return rsi.last().toBigDecimal()
     }
 }

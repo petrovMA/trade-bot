@@ -15,7 +15,7 @@ import java.math.BigDecimal
 
 class TrendCalculatorTest {
 
-    //@Test // TODO:: this test works only with server: http://95.217.0.250:5000/
+    @Test
     fun getTrend() {
         val client = ClientTestExchange()
 
@@ -34,8 +34,7 @@ class TrendCalculatorTest {
             5.m() to 200,
             2.h() to 14,
             4.h() to 14,
-            endTime = 1701849900000,
-            tempUrlCalcHma = "http://95.217.0.250"
+            endTime = 1701849900000
         )
 
         Mapper.asListObjects<Candlestick>(
@@ -46,9 +45,9 @@ class TrendCalculatorTest {
             .forEach { trendCalculator.addCandlesticks(it) }
 
         trendCalculator.getTrend()!!.run {
-            assertEquals(BigDecimal(2267.94).round(2), hma1)
-            assertEquals(BigDecimal(2275.61).round(2), hma2)
-            assertEquals(BigDecimal(2271.70).round(2), hma3)
+            assertEquals(BigDecimal(2267.94).round(2), hma1.round(2))
+            assertEquals(BigDecimal(2275.61).round(2), hma2.round(2))
+            assertEquals(BigDecimal(2271.70).round(2), hma3.round(2))
             assertIndicator(BigDecimal(56.56).round(2), rsi1, BigDecimal(1))
             assertIndicator(BigDecimal(61.12).round(2), rsi2, BigDecimal(1))
         }

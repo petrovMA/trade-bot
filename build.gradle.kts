@@ -44,6 +44,9 @@ dependencies {
 //    implementation("org.knowm.xchange:xchange-bybit:5.0.12")
     implementation("org.knowm.xchange:xchange-stream-huobi:5.1.1-SNAPSHOT")
 
+    // https://mvnrepository.com/artifact/org.ta4j/ta4j-core
+    implementation("org.ta4j:ta4j-core:0.15")
+
     // logging
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
     implementation("org.apache.logging.log4j:log4j-to-slf4j:2.23.1")

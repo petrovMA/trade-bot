@@ -11,6 +11,7 @@ import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.derivative.FuturesContract
+import org.ta4j.core.Bar
 import java.math.BigDecimal
 
 interface CommonExchangeData
@@ -163,9 +164,6 @@ data class Order(
             && compareBigDecimal(stopPrice, other.stopPrice)
             && compareBigDecimal(lastBorderPrice, other.lastBorderPrice)
             && compareBigDecimal(fee, other.fee)
-
-    private fun compareBigDecimal(a: BigDecimal?, b: BigDecimal?): Boolean =
-        (a == b || (a != null && b != null && a.compareTo(b) == 0))
 
     override fun hashCode(): Int = super.hashCode()
 }
@@ -414,14 +412,24 @@ data class Candlestick(
         volume = kline.volume.toBigDecimal()
     )
 
+    constructor(bar: Bar) : this(
+        openTime = bar.beginTime.toInstant().toEpochMilli(),
+        closeTime = bar.endTime.toInstant().toEpochMilli(),
+        open = bar.openPrice.doubleValue().toBigDecimal(),
+        high = bar.highPrice.doubleValue().toBigDecimal(),
+        low = bar.lowPrice.doubleValue().toBigDecimal(),
+        close = bar.closePrice.doubleValue().toBigDecimal(),
+        volume = bar.volume.doubleValue().toBigDecimal()
+    )
+
     override fun equals(other: Any?): Boolean = other is Candlestick
             && other.openTime == openTime
             && other.closeTime == closeTime
-            && other.open.round() == open.round()
-            && other.high.round() == high.round()
-            && other.low.round() == low.round()
-            && other.close.round() == close.round()
-            && other.volume.round() == volume.round()
+            && compareBigDecimal(other.open, open)
+            && compareBigDecimal(other.high, high)
+            && compareBigDecimal(other.low, low)
+            && compareBigDecimal(other.close, close)
+            && compareBigDecimal(other.volume, volume)
 }
 
 abstract class BotSettings(

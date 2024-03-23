@@ -24,7 +24,6 @@ class AlgorithmTrader(
     api: String = conf.getString("api"),
     sec: String = conf.getString("sec"),
     client: Client = newClient(exchangeEnum, api, sec),
-    private val tempUrlCalcHma: String,
     isLog: Boolean = true,
     isEmulate: Boolean = false,
     logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
@@ -86,7 +85,6 @@ class AlgorithmTrader(
                 hma3 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
                 rsi1 = rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
                 rsi2 = rsi2.timeFrame.toDuration() to rsi2.rsiPeriod,
-                tempUrlCalcHma = tempUrlCalcHma,
                 endTime = endTimeForTrendCalculator
             )
         }
