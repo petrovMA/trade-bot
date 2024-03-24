@@ -41,12 +41,6 @@ interface Client {
     fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream
 
     /**
-     * This method only for tests (emulate) trading
-     * Adds Event to socket queue
-     * */
-    fun nextEvent(): CommonExchangeData = BotEvent(type = BotEvent.Type.INTERRUPT)
-
-    /**
      * close OkHttpClient
      * */
     fun close()

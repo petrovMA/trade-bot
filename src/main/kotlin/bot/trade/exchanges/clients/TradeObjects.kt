@@ -13,6 +13,7 @@ import org.knowm.xchange.currency.CurrencyPair
 import org.knowm.xchange.derivative.FuturesContract
 import org.ta4j.core.Bar
 import java.math.BigDecimal
+import java.time.Duration
 
 interface CommonExchangeData
 
@@ -422,6 +423,16 @@ data class Candlestick(
         volume = bar.volume.doubleValue().toBigDecimal()
     )
 
+    constructor(line: List<String>, interval: Duration) : this(
+        openTime = line[0].toLong(),
+        closeTime = line[0].toLong() + interval.toMillis(),
+        open = line[1].toBigDecimal(),
+        high = line[2].toBigDecimal(),
+        low = line[3].toBigDecimal(),
+        close = line[4].toBigDecimal(),
+        volume = line[5].toBigDecimal()
+    )
+
     override fun equals(other: Any?): Boolean = other is Candlestick
             && other.openTime == openTime
             && other.closeTime == closeTime
@@ -431,6 +442,12 @@ data class Candlestick(
             && compareBigDecimal(other.close, close)
             && compareBigDecimal(other.volume, volume)
 }
+
+class BotEmulateParams(
+    @SerializedName("from") val from: String,
+    @SerializedName("to") val to: String,
+    @SerializedName("bot_params") val botParams: BotSettingsTrader
+)
 
 abstract class BotSettings(
     val type: String = "",

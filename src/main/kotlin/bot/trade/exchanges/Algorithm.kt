@@ -65,8 +65,7 @@ abstract class Algorithm(
 
             stream.run { start() }
 
-            var msg = if (isEmulate) client.nextEvent() /* only for test */
-            else queue.poll(waitTime)
+            var msg = queue.poll(waitTime)
 
             do {
                 try {
@@ -74,8 +73,7 @@ abstract class Algorithm(
 
                     if (stopThread) break
 
-                    msg = if (isEmulate) client.nextEvent() /* only for test */
-                    else queue.poll(waitTime)
+                    msg = queue.poll(waitTime)
 
                 } catch (e: InterruptedException) {
                     log?.error("${botSettings.name} ${e.message}", e)

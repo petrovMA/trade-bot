@@ -132,6 +132,21 @@ class Communicator(
                 }
             }
 
+
+            cmd.commandEmulate.matches(message) -> {
+                val params = message.split("\\n+".toRegex(), limit = 2)
+
+                try {
+                    params[1].deserialize<BotEmulateParams>()
+                } catch (t: Throwable) {
+                    msg = "Incorrect settings format:\n${params[1]}"
+                    log.warn("Incorrect settings format:\n${params[1]}", t)
+                    null
+                }?.let { emulateParams ->
+
+                }
+            }
+
             cmd.commandHelp.matches(message) -> {
                 val helpFor = message.split("\\s+".toRegex())[1]
                 when (helpFor) {

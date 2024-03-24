@@ -189,7 +189,7 @@ class TestClient(
         return true
     }
 
-    override fun nextEvent(): CommonExchangeData {
+    fun nextEvent(): CommonExchangeData {
         val candlestick = candlesticks[candlestickNum]
 
         when (state) {

@@ -17,7 +17,7 @@ import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 
 @RestController
-class MainController(orderService: OrderService, val activeOrdersService: ActiveOrdersService) {
+class MainController(orderService: OrderService, private val activeOrdersService: ActiveOrdersService) {
     final val log: KLogger = KotlinLogging.logger {}
     final val bot: TelegramBot
 
