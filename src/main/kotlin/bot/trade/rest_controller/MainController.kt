@@ -7,6 +7,7 @@ import bot.trade.libs.readConf
 import bot.telegram.TelegramBot
 import bot.trade.database.service.ActiveOrdersService
 import bot.trade.libs.CustomFileLoggingProcessor
+import bot.trade.libs.deserialize
 import mu.KLogger
 import mu.KotlinLogging
 import org.springframework.http.ResponseEntity
@@ -17,7 +18,7 @@ import java.io.File
 import java.util.concurrent.LinkedBlockingDeque
 
 @RestController
-class MainController(orderService: OrderService, val activeOrdersService: ActiveOrdersService) {
+class MainController(orderService: OrderService, private val activeOrdersService: ActiveOrdersService) {
     final val log: KLogger = KotlinLogging.logger {}
     final val bot: TelegramBot
 
@@ -70,6 +71,21 @@ class MainController(orderService: OrderService, val activeOrdersService: Active
         log.debug("Response for /endpoint/trade = {}", response)
 
         bot.communicator.sendOrder(request)
+
+        return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/emulate")
+    fun emulate(@RequestBody request: String): ResponseEntity<Response> {
+        log.info("Request for /endpoint/trade = $request")
+
+        val params = request.deserialize<BotEmulateParams>()
+
+        // process the request here and prepare the response
+        val response = Response("success", "Received $request")
+        log.debug("Response for /endpoint/trade = {}", response)
+
+        bot.communicator.emulate(params)
 
         return ResponseEntity.ok(response)
     }

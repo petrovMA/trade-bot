@@ -132,6 +132,20 @@ class Communicator(
                 }
             }
 
+            cmd.commandEmulate.matches(message) -> {
+                val params = message.split("\\n+".toRegex(), limit = 2)
+
+                try {
+                    params[1].deserialize<BotEmulateParams>()
+                } catch (t: Throwable) {
+                    msg = "Incorrect settings format:\n${params[1]}"
+                    log.warn("Incorrect settings format:\n${params[1]}", t)
+                    null
+                }?.let { emulateParams ->
+                    emulate(emulateParams)
+                }
+            }
+
             cmd.commandHelp.matches(message) -> {
                 val helpFor = message.split("\\s+".toRegex())[1]
                 when (helpFor) {
@@ -606,6 +620,23 @@ class Communicator(
             }
             send(msg)
         }
+    }
+
+    fun emulate(params: BotEmulateParams) {
+
+        val algorithm = AlgorithmTrader(
+            params.botParams,
+            "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
+            activeOrdersService,
+            sendMessage = { _, _ -> }
+        )
+
+        val test = TestClientFileData({ botMessage -> algorithm.handle(botMessage) }, params)
+        algorithm.client = test
+
+        val result = test.emulate()
+
+        println(result)
     }
 
     private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)

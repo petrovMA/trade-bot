@@ -2,7 +2,6 @@ package bot.trade.exchanges.emulate
 
 import bot.trade.exchanges.CandlestickListsIterator
 import bot.trade.exchanges.clients.*
-import bot.trade.exchanges.AlgorithmTrader
 import bot.trade.exchanges.connect
 import bot.trade.exchanges.emulate.libs.writeIntoExcelNew
 import bot.trade.libs.*

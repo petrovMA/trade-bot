@@ -1,6 +1,5 @@
 package bot.trade.exchanges.clients
 
-import bot.trade.exchanges.BotEvent
 import bot.trade.exchanges.clients.stream.Stream
 import java.util.concurrent.BlockingQueue
 
@@ -39,12 +38,6 @@ interface Client {
      * @param queue container for all income events
      * */
     fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream
-
-    /**
-     * This method only for tests (emulate) trading
-     * Adds Event to socket queue
-     * */
-    fun nextEvent(): CommonExchangeData = BotEvent(type = BotEvent.Type.INTERRUPT)
 
     /**
      * close OkHttpClient

@@ -140,7 +140,7 @@ fun time() = System.currentTimeMillis().ms()
 
 fun Duration.format() = convertTime(this.toMillis())
 
-fun Long.toZonedTime() = ZonedDateTime.ofInstant(Instant.ofEpochMilli(this), ZoneId.systemDefault());
+fun Long.toZonedTime() = ZonedDateTime.ofInstant(Instant.ofEpochMilli(this), ZoneId.systemDefault())
 
 fun readConf(path: String?): Config? = try {
     path?.run {

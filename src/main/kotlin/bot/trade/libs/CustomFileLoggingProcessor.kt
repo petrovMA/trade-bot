@@ -27,7 +27,7 @@ class CustomFileLoggingProcessor(private val logMessageQueue: BlockingQueue<Mess
     }
 
     private fun processMessage(message: Message) {
-        if (message.outputFile.parentFile.exists().not())
+        if (message.outputFile.parentFile != null && message.outputFile.parentFile.exists().not())
             message.outputFile.parentFile.mkdirs()
 
         if (message.outputFile.exists().not())
@@ -35,8 +35,11 @@ class CustomFileLoggingProcessor(private val logMessageQueue: BlockingQueue<Mess
 
         log.trace(message.text)
 
-        message.outputFile.appendText("\n${now().format(formatter)} - ${message.text}")
+        val line = if (message.printTime) "\n${now().format(formatter)} - ${message.text}"
+        else "\n${message.text}"
+
+        message.outputFile.appendText(line)
     }
 
-    data class Message(val outputFile: File, val text: String)
+    data class Message(val outputFile: File, val text: String, val printTime: Boolean = true)
 }

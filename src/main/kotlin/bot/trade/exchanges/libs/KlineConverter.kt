@@ -2,7 +2,6 @@ package bot.trade.exchanges.libs
 
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.libs.ListLimit
-import bot.trade.libs.round
 import bot.trade.libs.toZonedTime
 import org.ta4j.core.BaseBar
 import java.time.Duration
@@ -86,7 +85,7 @@ class KlineConverter(
                     }
                 }
 
-                setPrevKline(it)
+                prevKline = it
             }
 
         return isNewKline
@@ -115,16 +114,4 @@ class KlineConverter(
     }
 
     fun getBars(): List<BaseBar> = bars
-
-    private fun setPrevKline(kline: Candlestick) {
-        prevKline = Candlestick(
-            openTime = kline.openTime,
-            closeTime = kline.closeTime,
-            open = kline.open.round(),
-            high = kline.high.round(),
-            low = kline.low.round(),
-            close = kline.close.round(),
-            volume = kline.volume.round()
-        )
-    }
 }

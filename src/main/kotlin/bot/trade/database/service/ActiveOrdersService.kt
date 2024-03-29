@@ -11,8 +11,8 @@ interface ActiveOrdersService {
     fun getOrderById(id: Long): ActiveOrder?
     fun getOrderByOrderId(botName: String, orderId: UUID): ActiveOrder?
     fun getOrders(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
-    fun getOrderWithMaxPrice(botName: String, direction: DIRECTION, side: SIDE): ActiveOrder?
-    fun getOrderWithMinPrice(botName: String, direction: DIRECTION, side: SIDE): ActiveOrder?
+    fun getOrderWithMaxPrice(botName: String, direction: DIRECTION, maxPrice: BigDecimal): ActiveOrder?
+    fun getOrderWithMinPrice(botName: String, direction: DIRECTION, minPrice: BigDecimal): ActiveOrder?
     fun getOrdersBySide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun getOrderByPrice(botName: String, direction: DIRECTION, price: BigDecimal): ActiveOrder?
     fun getOrderByPriceBetween(botName: String, direction: DIRECTION, minPrice: BigDecimal, maxPrice: BigDecimal): Iterable<ActiveOrder>
