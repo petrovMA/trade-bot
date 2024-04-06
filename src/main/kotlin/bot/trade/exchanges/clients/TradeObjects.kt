@@ -178,7 +178,7 @@ data class Position(
     val breakEvenPrice: BigDecimal,
     val leverage: BigDecimal,
     val liqPrice: BigDecimal,
-    val size: BigDecimal,
+    var size: BigDecimal,
     val side: String
 ) : CommonExchangeData {
     constructor(data: io.bybit.api.websocket.messages.response.Position.Data) : this(
@@ -444,8 +444,8 @@ data class Candlestick(
 }
 
 class BotEmulateParams(
-    @SerializedName("from") val from: String,
-    @SerializedName("to") val to: String,
+    @SerializedName("from") val from: String?,
+    @SerializedName("to") val to: String?,
     @SerializedName("bot_params") val botParams: BotSettingsTrader
 )
 

@@ -64,8 +64,8 @@ class AlgorithmTrader(
     private var minPriceInOrderShort: BigDecimal? = null
 
     private var hedgeModule: HedgeModule? = null
-    private var positionLong: Position? = null // todo:: Add more variables (size, liqPrice etc)
-    private var positionShort: Position? = null // todo:: Add more variables (size, liqPrice etc)
+    private var positionLong: Position? = null
+    private var positionShort: Position? = null
 
     var from: Long = Long.MAX_VALUE
     var to: Long = Long.MIN_VALUE
@@ -371,16 +371,12 @@ class AlgorithmTrader(
                             activeOrdersService.saveOrder(order(price, currentDirection, params))
 
                         minPriceInOrderLong =
-                            activeOrdersService.getOrderWithMinPrice(settings.name, DIRECTION.LONG, SIDE.BUY)
+                            activeOrdersService.getOrderWithMinPrice(settings.name, DIRECTION.LONG, currentPrice - step)
                                 ?.price ?: maxPriceInOrderLong
                     }
 
-                    minPriceInOrderLong =
-                        activeOrdersService.getOrderWithMinPrice(settings.name, DIRECTION.LONG, SIDE.BUY)
-                            ?.price ?: maxPriceInOrderLong
-
                     maxPriceInOrderLong =
-                        activeOrdersService.getOrderWithMaxPrice(settings.name, DIRECTION.LONG, SIDE.BUY)
+                        activeOrdersService.getOrderWithMaxPrice(settings.name, DIRECTION.LONG, currentPrice)
                             ?.price ?: minPriceInOrderLong
 
                     var step = calcInPriceStep(maxPriceInOrderLong!!, params, hedgeModule, currentDirection, false)
@@ -429,16 +425,12 @@ class AlgorithmTrader(
                             activeOrdersService.saveOrder(order(price, currentDirection, params))
 
                         maxPriceInOrderShort =
-                            activeOrdersService.getOrderWithMaxPrice(settings.name, DIRECTION.SHORT, SIDE.SELL)
+                            activeOrdersService.getOrderWithMaxPrice(settings.name, DIRECTION.SHORT, currentPrice + step)
                                 ?.price ?: minPriceInOrderShort
                     }
 
-                    maxPriceInOrderShort =
-                        activeOrdersService.getOrderWithMaxPrice(settings.name, DIRECTION.SHORT, SIDE.SELL)
-                            ?.price ?: minPriceInOrderShort
-
                     minPriceInOrderShort =
-                        activeOrdersService.getOrderWithMinPrice(settings.name, DIRECTION.SHORT, SIDE.SELL)
+                        activeOrdersService.getOrderWithMinPrice(settings.name, DIRECTION.SHORT, BigDecimal(0))
                             ?.price ?: maxPriceInOrderShort
 
                     var step = calcInPriceStep(minPriceInOrderShort!!, params, hedgeModule, currentDirection, true)
@@ -764,12 +756,12 @@ class AlgorithmTrader(
             if (openLongPosition == openShortPosition)
                 null
             else if (openLongPosition > openShortPosition) {
-                if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
+                if (!compareBigDecimal(openLongPosition, BigDecimal(0)) && !compareBigDecimal(openShortPosition, BigDecimal(0)))
                     HedgeModule((BigDecimal(2) - (openShortPosition / openLongPosition)).round(), DIRECTION.SHORT)
                 else
                     HedgeModule(BigDecimal(2), DIRECTION.SHORT)
             } else {
-                if (openLongPosition != BigDecimal(0) && openShortPosition != BigDecimal(0))
+                if (!compareBigDecimal(openLongPosition, BigDecimal(0)) && !compareBigDecimal(openShortPosition, BigDecimal(0)))
                     HedgeModule((BigDecimal(2) - (openLongPosition / openShortPosition)).round(), DIRECTION.LONG)
                 else
                     HedgeModule(BigDecimal(2), DIRECTION.LONG)
@@ -819,7 +811,7 @@ class AlgorithmTrader(
         else
             currPrice - inPrice
 
-        val profitPercent = if (inPrice != BigDecimal(0))
+        val profitPercent = if (!compareBigDecimal(inPrice, BigDecimal(0)))
             profitAbsolute.div8(inPrice.div8(BigDecimal(100)))
         else
             BigDecimal(0)

@@ -40,12 +40,12 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
         activeOrdersRepository.findAllByBotNameAndDirectionAndOrderSide(botName, direction, side)
 
     @Transactional
-    override fun getOrderWithMaxPrice(botName: String, direction: DIRECTION, side: SIDE): ActiveOrder? =
-        activeOrdersRepository.findTopByBotNameAndDirectionAndOrderSideOrderByPriceDesc(botName, direction, side)
+    override fun getOrderWithMaxPrice(botName: String, direction: DIRECTION, maxPrice: BigDecimal): ActiveOrder? =
+        activeOrdersRepository.findTopByBotNameAndDirectionAndPriceLessThanEqualOrderByPriceDesc(botName, direction, maxPrice)
 
     @Transactional
-    override fun getOrderWithMinPrice(botName: String, direction: DIRECTION, side: SIDE): ActiveOrder? =
-        activeOrdersRepository.findTopByBotNameAndDirectionAndOrderSideOrderByPriceAsc(botName, direction, side)
+    override fun getOrderWithMinPrice(botName: String, direction: DIRECTION, minPrice: BigDecimal): ActiveOrder? =
+        activeOrdersRepository.findTopByBotNameAndDirectionAndPriceGreaterThanEqualOrderByPriceAsc(botName, direction, minPrice)
 
     @Transactional
     override fun count(botName: String, direction: DIRECTION, side: SIDE): Long =

@@ -1,17 +1,19 @@
 package bot.trade.exchanges.clients
 
+import bot.trade.exchanges.BotEvent
 import bot.trade.exchanges.clients.stream.StreamThreadStub
 import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.concurrent.BlockingQueue
 
 class TestClientFileData(
     val handler: (CommonExchangeData?) -> Unit,
-    val balance: TestBalance,
-    startCandleNum: Int,
+    val params: BotEmulateParams,
     private val fee: BigDecimal = BigDecimal(0.1)
 ) : Client {
     private val log = KotlinLogging.logger {}
@@ -19,43 +21,65 @@ class TestClientFileData(
     var lastSellPrice: BigDecimal = BigDecimal(0)
         private set
     private var lastBuyPrice: BigDecimal = BigDecimal(0)
+    private val profit = TestBalance(tradePair = params.botParams.pair)
+
+    private var positionLong: Position = Position(
+        pair = TradePair("TEST_PAIR"),
+        marketPrice = 0.0.toBigDecimal(),
+        unrealisedPnl = 0.0.toBigDecimal(),
+        realisedPnl = 0.0.toBigDecimal(),
+        entryPrice = 0.0.toBigDecimal(),
+        breakEvenPrice = 0.0.toBigDecimal(),
+        leverage = 0.0.toBigDecimal(),
+        liqPrice = 0.0.toBigDecimal(),
+        size = 0.0.toBigDecimal(),
+        side = "BUY"
+    )
+
+    private var positionShort: Position = Position(
+        pair = TradePair("TEST_PAIR"),
+        marketPrice = 0.0.toBigDecimal(),
+        unrealisedPnl = 0.0.toBigDecimal(),
+        realisedPnl = 0.0.toBigDecimal(),
+        entryPrice = 0.0.toBigDecimal(),
+        breakEvenPrice = 0.0.toBigDecimal(),
+        leverage = 0.0.toBigDecimal(),
+        liqPrice = 0.0.toBigDecimal(),
+        size = 0.0.toBigDecimal(),
+        side = "SELL"
+    )
 
     private var clientOrderId = 0
 
-    var updateStaticOrdersCount: Int = 0
-        private set
-    var executedOrdersCount: Int = 0
-        private set
-
     private lateinit var candlestick: Candlestick
 
-    fun emulate(fileData: File) {
+    fun emulate():TestBalance {
+
+        val fileData = File("database/${params.botParams.pair}_klines.csv")
+
+        val from = params.from?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }
+        val to = params.to?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }
+
         fileData.forEachLine { line ->
-            candlestick = Candlestick(line.split(';'), 1.m())
-            handler(candlestick)
+            if (line.isNotBlank()) {
+                candlestick = Candlestick(line.split(';'), 1.m())
+                if (from == null || from.isBefore(candlestick.openTime.toZonedTime())) {
+                    if (to == null || to.isAfter(candlestick.openTime.toZonedTime()))
+                        handler(candlestick)
+                }
+            }
         }
+
+        handler(BotEvent(type = BotEvent.Type.INTERRUPT))
+
+        return profit
     }
 
-    override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> =TODO("not implemented")
+    override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> = TODO("not implemented")
 
     override fun getOpenOrders(pair: TradePair): List<Order> = orders.map { it.value }
 
-    override fun getBalances(): Map<String, List<Balance>> = mapOf(
-        "Total Balance" to listOf(
-            Balance(
-                asset = balance.tradePair.first,
-                free = balance.firstBalance,
-                total = balance.firstBalance,
-                locked = BigDecimal(0)
-            ),
-            Balance(
-                asset = balance.tradePair.second,
-                free = balance.secondBalance,
-                total = balance.secondBalance,
-                locked = BigDecimal(0)
-            )
-        )
-    )
+    override fun getBalances(): Map<String, List<Balance>> = TODO("not implemented")
 
     override fun getOrderBook(pair: TradePair, limit: Int): OrderBook = OrderBook(
         asks = listOf(Offer(price = lastBuyPrice, qty = BigDecimal(0))),
@@ -86,32 +110,43 @@ class TestClientFileData(
         positionSide: DIRECTION?,
         isReduceOnly: Boolean
     ): Order {
+        ++clientOrderId
         when (order.type) {
             TYPE.MARKET -> {
                 when (order.side) {
                     SIDE.BUY -> {
-                        val newSecondBalance = balance.secondBalance - (order.origQty * candlestick.high)
-                        if (BigDecimal.ZERO <= newSecondBalance) {
-                            balance.secondBalance = newSecondBalance
-                            executedOrdersCount++
-                            balance.firstBalance += (order.origQty - order.origQty.percent(fee))
-                        } else throw NotEnoughBalanceException("Account has insufficient balance for requested action.")
+                        val newSecondBalance = profit.secondBalance - (order.origQty * candlestick.high)
+                        profit.secondBalance = newSecondBalance
+                        profit.firstBalance += (order.origQty - order.origQty.percent(fee))
+
+                        when (positionSide) {
+                            DIRECTION.LONG -> positionLong.size += order.origQty
+                            DIRECTION.SHORT -> positionShort.size -= order.origQty
+                            else -> throw RuntimeException("Not supported DIRECTION")
+                        }
                     }
 
                     SIDE.SELL -> {
-                        val newFirstBalance = balance.firstBalance - order.origQty
-                        if (BigDecimal.ZERO <= newFirstBalance) {
-                            balance.firstBalance = newFirstBalance
-                            executedOrdersCount++
-                            var profit = order.origQty * candlestick.low
-                            profit = (profit - profit.percent(fee))
+                        val newFirstBalance = profit.firstBalance - order.origQty
+                        profit.firstBalance = newFirstBalance
+                        var profit = order.origQty * candlestick.low
+                        profit = (profit - profit.percent(fee))
 
-                            balance.secondBalance += profit
-                        } else throw NotEnoughBalanceException("Account has insufficient balance for requested action.")
+                        this.profit.secondBalance += profit
+
+                        when (positionSide) {
+                            DIRECTION.LONG -> positionLong.size -= order.origQty
+                            DIRECTION.SHORT -> positionShort.size += order.origQty
+                            else -> throw RuntimeException("Not supported DIRECTION")
+                        }
                     }
 
                     else -> throw UnsupportedOrderSideException()
                 }
+
+                handler(positionLong)
+                handler(positionShort)
+
                 return order
             }
 
@@ -149,9 +184,9 @@ class TestClientFileData(
             order.status = STATUS.CANCELED
 
             if (order.side == SIDE.SELL)
-                balance.firstBalance += order.origQty
+                profit.firstBalance += order.origQty
             else if (order.side == SIDE.BUY)
-                balance.secondBalance += order.origQty * (order.price ?: 0.0.toBigDecimal())
+                profit.secondBalance += order.origQty * (order.price ?: 0.0.toBigDecimal())
         } ?: log.info("Order: id = $orderId Not found!")
         return true
     }

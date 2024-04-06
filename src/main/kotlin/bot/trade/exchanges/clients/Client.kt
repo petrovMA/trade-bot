@@ -1,6 +1,5 @@
 package bot.trade.exchanges.clients
 
-import bot.trade.exchanges.BotEvent
 import bot.trade.exchanges.clients.stream.Stream
 import java.util.concurrent.BlockingQueue
 
