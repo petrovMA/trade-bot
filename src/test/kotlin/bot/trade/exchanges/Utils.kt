@@ -4,6 +4,7 @@ import bot.trade.database.data.entities.ActiveOrder
 import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.database.service.impl.ActiveOrdersServiceImpl
 import bot.trade.exchanges.clients.*
+import bot.trade.libs.compareBigDecimal
 import bot.trade.libs.json
 import bot.trade.libs.readConf
 import com.google.gson.reflect.TypeToken
@@ -42,7 +43,13 @@ fun assertOrders(expectedFile: File?, actual: List<ActiveOrder>, messagePredicat
     expected.forEach { (k, v) ->
         val actualOrder = actualOrders.find { BigDecimal(k) == it.price }
         assert(actualOrder != null) { "${messagePredicate}actual not contains key $k" }
-        assert(v.equalsWithoutId(actualOrder)) { "${messagePredicate}[$k] not equals,\nExpected:\n${json(v)}\n\nActual:\n${json(actualOrder!!)}" }
+        assert(v.equalsWithoutId(actualOrder)) {
+            "${messagePredicate}[$k] not equals,\nExpected:\n${json(v)}\n\nActual:\n${
+                json(
+                    actualOrder!!
+                )
+            }"
+        }
     }
 }
 
@@ -101,3 +108,15 @@ fun String.file() = resourceFile<AlgorithmTraderTest>(this)
 infix fun Int.startExclusive(other: Int): IntRange = IntRange(this + 1, other)
 
 fun BigDecimal.toPrice() = String.format(Locale.US, "%.8f", this)
+
+fun assertPosition(expected: Position?, actual: Position?) {
+    assert(compareBigDecimal(expected?.size, actual?.size))
+    assert(compareBigDecimal(expected?.marketPrice, actual?.marketPrice))
+    assert(compareBigDecimal(expected?.unrealisedPnl, actual?.unrealisedPnl))
+    assert(compareBigDecimal(expected?.realisedPnl, actual?.realisedPnl))
+    assert(compareBigDecimal(expected?.entryPrice, actual?.entryPrice))
+    assert(compareBigDecimal(expected?.breakEvenPrice, actual?.breakEvenPrice))
+    assert(compareBigDecimal(expected?.leverage, actual?.leverage))
+    assert(compareBigDecimal(expected?.liqPrice, actual?.liqPrice))
+    assert(expected?.size == actual?.size)
+}

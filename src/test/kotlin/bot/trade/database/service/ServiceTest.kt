@@ -65,8 +65,8 @@ class ServiceTest {
         val order1byId = service.getOrderById(id1!!)
         val order2byId = service.getOrderByPrice("test", DIRECTION.SHORT, BigDecimal(60050))
 
-        val order1byPrice = service.getOrderWithMinPrice("test", DIRECTION.SHORT, SIDE.SELL)
-        val order2byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT, SIDE.SELL)
+        val order1byPrice = service.getOrderWithMinPrice("test", DIRECTION.SHORT, BigDecimal(0))
+        val order2byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT, BigDecimal(999999999999))
 
         Assertions.assertEquals(order1byId, order1byPrice)
         Assertions.assertEquals(order2byId, order2byPrice)
@@ -88,14 +88,14 @@ class ServiceTest {
 
         Assertions.assertEquals(3, service.count("test", DIRECTION.SHORT, SIDE.SELL))
 
-        val order3byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT, SIDE.SELL)
+        val order3byPrice = service.getOrderWithMaxPrice("test", DIRECTION.SHORT, BigDecimal(999999999999))
         val order3byId = service.getOrderById(id3!!)
 
         Assertions.assertNotEquals(order2byId, order3byPrice)
         Assertions.assertEquals(order3byId, order3byPrice)
 
-        val order1NotFound = service.getOrderWithMaxPrice("test", DIRECTION.LONG, SIDE.SELL)
-        val order2NotFound = service.getOrderWithMinPrice("test", DIRECTION.LONG, SIDE.BUY)
+        val order1NotFound = service.getOrderWithMaxPrice("test", DIRECTION.LONG, BigDecimal(999999999999))
+        val order2NotFound = service.getOrderWithMinPrice("test", DIRECTION.LONG, BigDecimal(0))
 
         Assertions.assertEquals(null, order1NotFound)
         Assertions.assertEquals(null, order2NotFound)

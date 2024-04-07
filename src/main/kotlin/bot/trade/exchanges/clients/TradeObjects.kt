@@ -228,6 +228,20 @@ data class Position(
         size = data.size.toBigDecimal(),
         side = data.side
     )
+
+    override fun equals(other: Any?) = other is Position
+            && side == other.side
+            && pair == other.pair
+            && compareBigDecimal(marketPrice, other.marketPrice)
+            && compareBigDecimal(unrealisedPnl, other.unrealisedPnl)
+            && compareBigDecimal(realisedPnl, other.realisedPnl)
+            && compareBigDecimal(entryPrice, other.entryPrice)
+            && compareBigDecimal(breakEvenPrice, other.breakEvenPrice)
+            && compareBigDecimal(leverage, other.leverage)
+            && compareBigDecimal(liqPrice, other.liqPrice)
+            && compareBigDecimal(size, other.size)
+
+    override fun hashCode(): Int = super.hashCode()
 }
 
 data class TradePair(val first: String, val second: String) {

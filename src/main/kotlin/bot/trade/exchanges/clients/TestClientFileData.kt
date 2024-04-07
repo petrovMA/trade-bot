@@ -14,8 +14,9 @@ import java.util.concurrent.BlockingQueue
 class TestClientFileData(
     val handler: (CommonExchangeData?) -> Unit,
     val params: BotEmulateParams,
+    private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
     private val fee: BigDecimal = BigDecimal(0.1)
-) : Client {
+) : ClientFutures {
     private val log = KotlinLogging.logger {}
     private var orders: MutableMap<String, Order> = HashMap()
     var lastSellPrice: BigDecimal = BigDecimal(0)
@@ -53,9 +54,7 @@ class TestClientFileData(
 
     private lateinit var candlestick: Candlestick
 
-    fun emulate():TestBalance {
-
-        val fileData = File("database/${params.botParams.pair}_klines.csv")
+    fun emulate(): TestBalance {
 
         val from = params.from?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }
         val to = params.to?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }
@@ -113,36 +112,7 @@ class TestClientFileData(
         ++clientOrderId
         when (order.type) {
             TYPE.MARKET -> {
-                when (order.side) {
-                    SIDE.BUY -> {
-                        val newSecondBalance = profit.secondBalance - (order.origQty * candlestick.high)
-                        profit.secondBalance = newSecondBalance
-                        profit.firstBalance += (order.origQty - order.origQty.percent(fee))
-
-                        when (positionSide) {
-                            DIRECTION.LONG -> positionLong.size += order.origQty
-                            DIRECTION.SHORT -> positionShort.size -= order.origQty
-                            else -> throw RuntimeException("Not supported DIRECTION")
-                        }
-                    }
-
-                    SIDE.SELL -> {
-                        val newFirstBalance = profit.firstBalance - order.origQty
-                        profit.firstBalance = newFirstBalance
-                        var profit = order.origQty * candlestick.low
-                        profit = (profit - profit.percent(fee))
-
-                        this.profit.secondBalance += profit
-
-                        when (positionSide) {
-                            DIRECTION.LONG -> positionLong.size -= order.origQty
-                            DIRECTION.SHORT -> positionShort.size += order.origQty
-                            else -> throw RuntimeException("Not supported DIRECTION")
-                        }
-                    }
-
-                    else -> throw UnsupportedOrderSideException()
-                }
+                updatePosition(positionSide!!, order.side, order.origQty)
 
                 handler(positionLong)
                 handler(positionShort)
@@ -150,29 +120,7 @@ class TestClientFileData(
                 return order
             }
 
-            TYPE.LIMIT -> {
-                if (isStaticUpdate) updateStaticOrdersCount++
-                ++clientOrderId
-                val newOrder = Order(
-                    pair = order.pair,
-                    side = order.side,
-                    type = order.type,
-                    origQty = order.origQty,
-                    price = order.price,
-                    executedQty = BigDecimal(0),
-                    status = STATUS.NEW,
-                    orderId = clientOrderId.toString()
-                )
-
-                if (order.side == SIDE.SELL)
-                    balance.firstBalance -= order.origQty
-                else if (order.side == SIDE.BUY)
-                    balance.secondBalance -= order.origQty * (order.price ?: 0.0.toBigDecimal())
-
-                orders[newOrder.orderId] = newOrder
-
-                return newOrder
-            }
+            TYPE.LIMIT -> TODO("not implemented")
 
             else -> return order
         }
@@ -197,4 +145,172 @@ class TestClientFileData(
     override fun getAllPairs(): List<TradePair> = TODO("not implemented")
 
     override fun close() = Unit
+
+    override fun getPositions(pair: TradePair): List<Position> = listOf(positionLong, positionShort)
+
+    override fun switchMode(category: String, mode: Int, pair: TradePair?, coin: String?) {}
+
+
+    private fun updatePosition(direction: DIRECTION, side: SIDE, amount: BigDecimal) {
+        val price = if (side == SIDE.BUY) candlestick.high else candlestick.low
+
+        val priceWithFee = if (side == SIDE.BUY) price + price.percent(fee) else price - price.percent(fee)
+
+        when (direction) {
+            DIRECTION.LONG -> {
+                if (compareBigDecimal(positionLong.size, BigDecimal(0)) && side == SIDE.BUY) {
+                    positionLong = Position(
+                        pair = TradePair("TEST_PAIR"),
+                        marketPrice = price,
+                        unrealisedPnl = 0.0.toBigDecimal(),
+                        realisedPnl = 0.0.toBigDecimal(),
+                        entryPrice = price,
+                        breakEvenPrice = price,
+                        leverage = 0.0.toBigDecimal(),
+                        liqPrice = 0.0.toBigDecimal(),
+                        size = amount,
+                        side = "BUY"
+                    )
+
+                    profit.secondBalance -= (amount * priceWithFee)
+                    profit.firstBalance += amount
+
+                } else {
+                    positionLong = if (side == SIDE.BUY) {
+                        val newAmount = positionLong.size + amount
+                        val newAveragePrice =
+                            ((positionLong.breakEvenPrice * positionLong.size) + (price * amount)) / newAmount
+
+                        profit.secondBalance -= (amount * priceWithFee)
+                        profit.firstBalance += amount
+
+                        Position(
+                            pair = TradePair("TEST_PAIR"),
+                            marketPrice = candlestick.high,
+                            unrealisedPnl = 0.0.toBigDecimal(),
+                            realisedPnl = 0.0.toBigDecimal(),
+                            entryPrice = positionLong.entryPrice,
+                            breakEvenPrice = newAveragePrice,
+                            leverage = 0.0.toBigDecimal(),
+                            liqPrice = 0.0.toBigDecimal(),
+                            size = newAmount,
+                            side = "BUY"
+                        )
+                    } else {
+                        val newAmount = positionLong.size - amount
+
+                        val priceChange = (price - positionLong.breakEvenPrice) / (positionLong.size / amount)
+
+                        profit.secondBalance += (amount * priceWithFee)
+                        profit.firstBalance -= amount
+
+                        if (newAmount > BigDecimal(0.0)) {
+                            Position(
+                                pair = TradePair("TEST_PAIR"),
+                                marketPrice = 0.0.toBigDecimal(),
+                                unrealisedPnl = 0.0.toBigDecimal(),
+                                realisedPnl = 0.0.toBigDecimal(),
+                                entryPrice = positionLong.entryPrice,
+                                breakEvenPrice = positionLong.breakEvenPrice + priceChange,
+                                leverage = 0.0.toBigDecimal(),
+                                liqPrice = 0.0.toBigDecimal(),
+                                size = newAmount,
+                                side = "BUY"
+                            )
+                        } else {
+                            Position(
+                                pair = TradePair("TEST_PAIR"),
+                                marketPrice = 0.0.toBigDecimal(),
+                                unrealisedPnl = 0.0.toBigDecimal(),
+                                realisedPnl = 0.0.toBigDecimal(),
+                                entryPrice = 0.0.toBigDecimal(),
+                                breakEvenPrice = 0.0.toBigDecimal(),
+                                leverage = 0.0.toBigDecimal(),
+                                liqPrice = 0.0.toBigDecimal(),
+                                size = 0.0.toBigDecimal(),
+                                side = "BUY"
+                            )
+                        }
+                    }
+                }
+            }
+
+            DIRECTION.SHORT -> {
+                if (compareBigDecimal(positionShort.size, BigDecimal(0)) && side == SIDE.SELL) {
+                    positionShort = Position(
+                        pair = TradePair("TEST_PAIR"),
+                        marketPrice = price,
+                        unrealisedPnl = 0.0.toBigDecimal(),
+                        realisedPnl = 0.0.toBigDecimal(),
+                        entryPrice = price,
+                        breakEvenPrice = price,
+                        leverage = 0.0.toBigDecimal(),
+                        liqPrice = 0.0.toBigDecimal(),
+                        size = amount,
+                        side = "SELL"
+                    )
+
+                    profit.secondBalance += (amount * priceWithFee)
+                    profit.firstBalance -= amount
+                } else {
+                    positionShort = if (side == SIDE.SELL) {
+                        val newAmount = positionShort.size + amount
+
+                        val priceChange = (price - positionShort.breakEvenPrice) / (newAmount / amount)
+
+                        profit.secondBalance += (amount * priceWithFee)
+                        profit.firstBalance -= amount
+
+                        Position(
+                            pair = TradePair("TEST_PAIR"),
+                            marketPrice = price,
+                            unrealisedPnl = 0.0.toBigDecimal(),
+                            realisedPnl = 0.0.toBigDecimal(),
+                            entryPrice = positionShort.entryPrice,
+                            breakEvenPrice = positionShort.breakEvenPrice + priceChange,
+                            leverage = 0.0.toBigDecimal(),
+                            liqPrice = 0.0.toBigDecimal(),
+                            size = newAmount,
+                            side = "SELL"
+                        )
+                    } else {
+                        val newAmount = positionShort.size + amount
+                        val newAveragePrice =
+                            ((positionShort.breakEvenPrice * positionShort.size) + (price * amount)) / newAmount
+
+                        profit.secondBalance -= (amount * priceWithFee)
+                        profit.firstBalance += amount
+
+                        if (newAmount > BigDecimal(0.0)) {
+                            Position(
+                                pair = TradePair("TEST_PAIR"),
+                                marketPrice = 0.0.toBigDecimal(),
+                                unrealisedPnl = 0.0.toBigDecimal(),
+                                realisedPnl = 0.0.toBigDecimal(),
+                                entryPrice = positionShort.entryPrice,
+                                breakEvenPrice = newAveragePrice,
+                                leverage = 0.0.toBigDecimal(),
+                                liqPrice = 0.0.toBigDecimal(),
+                                size = newAmount,
+                                side = "SELL"
+                            )
+                        } else {
+                            Position(
+                                pair = TradePair("TEST_PAIR"),
+                                marketPrice = 0.0.toBigDecimal(),
+                                unrealisedPnl = 0.0.toBigDecimal(),
+                                realisedPnl = 0.0.toBigDecimal(),
+                                entryPrice = 0.0.toBigDecimal(),
+                                breakEvenPrice = 0.0.toBigDecimal(),
+                                leverage = 0.0.toBigDecimal(),
+                                liqPrice = 0.0.toBigDecimal(),
+                                size = 0.0.toBigDecimal(),
+                                side = "SELL"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
