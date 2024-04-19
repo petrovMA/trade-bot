@@ -256,7 +256,7 @@ class TestClientFileData(
                     positionShort = if (side == SIDE.SELL) {
                         val newAmount = positionShort.size + amount
 
-                        val priceChange = (price - positionShort.breakEvenPrice) / (newAmount / amount)
+                        val priceChange = (price - positionShort.breakEvenPrice) / newAmount
 
                         profit.secondBalance += (amount * priceWithFee)
                         profit.firstBalance -= amount
@@ -274,9 +274,7 @@ class TestClientFileData(
                             side = "SELL"
                         )
                     } else {
-                        val newAmount = positionShort.size + amount
-                        val newAveragePrice =
-                            ((positionShort.breakEvenPrice * positionShort.size) + (price * amount)) / newAmount
+                        val newAmount = positionShort.size - amount
 
                         profit.secondBalance -= (amount * priceWithFee)
                         profit.firstBalance += amount
@@ -288,7 +286,7 @@ class TestClientFileData(
                                 unrealisedPnl = 0.0.toBigDecimal(),
                                 realisedPnl = 0.0.toBigDecimal(),
                                 entryPrice = positionShort.entryPrice,
-                                breakEvenPrice = newAveragePrice,
+                                breakEvenPrice = ((positionShort.breakEvenPrice * positionShort.size) + (price * amount)) / newAmount,
                                 leverage = 0.0.toBigDecimal(),
                                 liqPrice = 0.0.toBigDecimal(),
                                 size = newAmount,

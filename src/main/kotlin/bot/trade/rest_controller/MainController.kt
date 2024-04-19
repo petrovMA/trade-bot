@@ -6,6 +6,7 @@ import bot.trade.exchanges.clients.*
 import bot.trade.libs.readConf
 import bot.telegram.TelegramBot
 import bot.trade.database.service.ActiveOrdersService
+import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.libs.CustomFileLoggingProcessor
 import bot.trade.libs.deserialize
 import mu.KLogger
@@ -76,7 +77,7 @@ class MainController(orderService: OrderService, private val activeOrdersService
     }
 
     @PostMapping("/emulate")
-    fun emulate(@RequestBody request: String): ResponseEntity<Response> {
+    fun emulate(@RequestBody request: String): ResponseEntity<TestBalance> {
         log.info("Request for /endpoint/trade = $request")
 
         val params = request.deserialize<BotEmulateParams>()
@@ -85,9 +86,9 @@ class MainController(orderService: OrderService, private val activeOrdersService
         val response = Response("success", "Received $request")
         log.debug("Response for /endpoint/trade = {}", response)
 
-        bot.communicator.emulate(params)
+        val result = bot.communicator.emulate(params)
 
-        return ResponseEntity.ok(response)
+        return ResponseEntity.ok(result)
     }
 
     @GetMapping("/positions")

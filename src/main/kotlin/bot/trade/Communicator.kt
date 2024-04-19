@@ -4,6 +4,7 @@ import bot.trade.database.service.ActiveOrdersService
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
+import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.exchanges.libs.TrendCalculator
 import bot.trade.libs.*
 import bot.trade.rest_controller.Notification
@@ -622,7 +623,7 @@ class Communicator(
         }
     }
 
-    fun emulate(params: BotEmulateParams) {
+    fun emulate(params: BotEmulateParams): TestBalance {
 
         val algorithm = AlgorithmTrader(
             params.botParams,
@@ -637,6 +638,8 @@ class Communicator(
         val result = test.emulate()
 
         println(result)
+
+        return result
     }
 
     private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
