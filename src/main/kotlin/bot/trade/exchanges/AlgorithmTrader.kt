@@ -245,6 +245,35 @@ class AlgorithmTrader(
                 }
 
                 executeOrders()
+
+
+                //todo:: COMPARE POSITION WITH OPEN ORDERS (DEBUGGING)
+                val pLong = positionLong
+                val openLong = activeOrdersService
+                    .getOrdersBySide(settings.name, DIRECTION.LONG, SIDE.SELL)
+
+
+                val pShort = positionShort
+                val openShort = activeOrdersService
+                    .getOrdersBySide(settings.name, DIRECTION.SHORT, SIDE.BUY)
+
+                if (
+                    positionLong
+                        ?.size
+                        ?.run { compareBigDecimal(this, openLong.mapNotNull { it.amount }.sumOf { it }) } == false
+                ) {
+                    println(pLong)
+                    println(openLong)
+                }
+
+                if (
+                    positionShort
+                        ?.size
+                        ?.run { compareBigDecimal(this, openShort.mapNotNull { it.amount }.sumOf { it }) } == false
+                ) {
+                    println(pShort)
+                    println(openShort)
+                }
             }
 
             is Position -> {
@@ -425,7 +454,11 @@ class AlgorithmTrader(
                             activeOrdersService.saveOrder(order(price, currentDirection, params))
 
                         maxPriceInOrderShort =
-                            activeOrdersService.getOrderWithMaxPrice(settings.name, DIRECTION.SHORT, currentPrice + step)
+                            activeOrdersService.getOrderWithMaxPrice(
+                                settings.name,
+                                DIRECTION.SHORT,
+                                currentPrice + step
+                            )
                                 ?.price ?: minPriceInOrderShort
                     }
 
@@ -756,12 +789,20 @@ class AlgorithmTrader(
             if (openLongPosition == openShortPosition)
                 null
             else if (openLongPosition > openShortPosition) {
-                if (!compareBigDecimal(openLongPosition, BigDecimal(0)) && !compareBigDecimal(openShortPosition, BigDecimal(0)))
+                if (!compareBigDecimal(openLongPosition, BigDecimal(0)) && !compareBigDecimal(
+                        openShortPosition,
+                        BigDecimal(0)
+                    )
+                )
                     HedgeModule((BigDecimal(2) - (openShortPosition / openLongPosition)).round(), DIRECTION.SHORT)
                 else
                     HedgeModule(BigDecimal(2), DIRECTION.SHORT)
             } else {
-                if (!compareBigDecimal(openLongPosition, BigDecimal(0)) && !compareBigDecimal(openShortPosition, BigDecimal(0)))
+                if (!compareBigDecimal(openLongPosition, BigDecimal(0)) && !compareBigDecimal(
+                        openShortPosition,
+                        BigDecimal(0)
+                    )
+                )
                     HedgeModule((BigDecimal(2) - (openLongPosition / openShortPosition)).round(), DIRECTION.LONG)
                 else
                     HedgeModule(BigDecimal(2), DIRECTION.LONG)

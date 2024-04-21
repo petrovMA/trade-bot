@@ -26,16 +26,16 @@ data class TestBalance(
     var lastBoyTime: Long = java.lang.Long.MIN_VALUE,
     var line1: String = "",
     var line2: String = ""
-)
-
-data class TestOrder(
-    var pair: String? = null,
-    var orderId: Long? = null,
-    var clientOrderId: Long? = null,
-    var price: Double? = null,
-    var origQty: Double? = null,
-    var executedQty: Double? = null,
-    var type: TYPE? = null,
-    var status: STATUS? = null,
-    var side: SIDE? = null
-)
+) {
+    data class TestOrder(
+        var pair: String? = null,
+        var orderId: Long? = null,
+        var clientOrderId: Long? = null,
+        var price: Double? = null,
+        var origQty: Double? = null,
+        var executedQty: Double? = null,
+        var type: TYPE? = null,
+        var status: STATUS? = null,
+        var side: SIDE? = null
+    )
+}
