@@ -625,6 +625,9 @@ class Communicator(
 
     fun emulate(params: BotEmulateParams): TestBalance {
 
+        // clear order storage
+        activeOrdersService.deleteByBotName(params.botParams.name)
+
         val algorithm = AlgorithmTrader(
             params.botParams,
             "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",

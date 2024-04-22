@@ -257,12 +257,20 @@ class AlgorithmTrader(
                 val openShort = activeOrdersService
                     .getOrdersBySide(settings.name, DIRECTION.SHORT, SIDE.BUY)
 
-                if (positionLong?.size?.run { this == openLong.mapNotNull { it.amount }.sumOf { it } } == false) {
+                if (
+                    positionLong
+                        ?.size
+                        ?.run { compareBigDecimal(this, openLong.mapNotNull { it.amount }.sumOf { it }) } == false
+                ) {
                     println(pLong)
                     println(openLong)
                 }
 
-                if (positionShort?.size?.run { this == openShort.mapNotNull { it.amount }.sumOf { it } } == false) {
+                if (
+                    positionShort
+                        ?.size
+                        ?.run { compareBigDecimal(this, openShort.mapNotNull { it.amount }.sumOf { it }) } == false
+                ) {
                     println(pShort)
                     println(openShort)
                 }
