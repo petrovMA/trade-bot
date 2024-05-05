@@ -12,6 +12,7 @@ import java.io.File
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
+import kotlin.collections.HashMap
 
 
 class AlgorithmTrader(
@@ -54,7 +55,7 @@ class AlgorithmTrader(
     private var trendCalculator: TrendCalculator? = null
     private var trend: TrendCalculator.Trend? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
-    private val ordersForExecute: ArrayList<ActiveOrder> = ArrayList()
+    private val ordersForExecute: MutableMap<Long, ActiveOrder> = HashMap()
 
     private var isInOrdersInitialized: Boolean = false
 
@@ -530,7 +531,7 @@ class AlgorithmTrader(
                         }
                         if (it.stopPrice?.run { this >= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, it)
-                            ordersForExecute.add(it)
+                            ordersForExecute[it.id!!] = (it)
                         }
                     } else if (params.trailingInOrderDistance() != null && params.triggerInOrderDistance() != null) {
                         if (it.lastBorderPrice == null || it.lastBorderPrice!! > currentPrice) {
@@ -547,11 +548,11 @@ class AlgorithmTrader(
                         }
                         if (it.stopPrice?.run { this <= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, it)
-                            ordersForExecute.add(it)
+                            ordersForExecute[it.id!!] = (it)
                         }
                     } else {
                         if (it.orderSide == SIDE.BUY && currentPrice < it.price!!) {
-                            ordersForExecute.add(it)
+                            ordersForExecute[it.id!!] = (it)
                         }
                     }
                 }
@@ -575,7 +576,7 @@ class AlgorithmTrader(
                         }
                         if (it.stopPrice?.run { this <= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, it)
-                            ordersForExecute.add(it)
+                            ordersForExecute[it.id!!] = (it)
                         }
                     } else if (params.trailingInOrderDistance() != null && params.triggerInOrderDistance() != null) {
                         if (it.lastBorderPrice == null || it.lastBorderPrice!! < currentPrice) {
@@ -592,11 +593,11 @@ class AlgorithmTrader(
                         }
                         if (it.stopPrice?.run { this >= currentPrice } == true) {
                             log?.debug("{} Order close: {}", botSettings.name, it)
-                            ordersForExecute.add(it)
+                            ordersForExecute[it.id!!] = (it)
                         }
                     } else {
                         if (it.orderSide == SIDE.SELL && currentPrice > it.price!!) {
-                            ordersForExecute.add(it)
+                            ordersForExecute[it.id!!] = (it)
                         }
                     }
                 }
@@ -605,19 +606,19 @@ class AlgorithmTrader(
     }
 
     private fun checkOrders() {
-        ordersForExecute.forEach {
-            when (it.direction!!) {
+        ordersForExecute.forEach { (_, v) ->
+            when (v.direction!!) {
                 DIRECTION.LONG -> {
-                    when (it.orderSide) {
+                    when (v.orderSide) {
                         SIDE.BUY -> {
                             activeOrdersService.saveOrder(
                                 ActiveOrder(
-                                    id = it.id,
+                                    id = v.id,
                                     botName = settings.name,
-                                    orderId = it.orderId,
+                                    orderId = v.orderId,
                                     tradePair = botSettings.pair.toString(),
-                                    price = it.price,
-                                    amount = it.amount,
+                                    price = v.price,
+                                    amount = v.amount,
                                     orderSide = SIDE.SELL,
                                     direction = DIRECTION.LONG,
                                     lastBorderPrice = null,
@@ -626,22 +627,22 @@ class AlgorithmTrader(
                             )
                         }
 
-                        SIDE.SELL -> activeOrdersService.deleteByOrderId(it.orderId!!)
-                        else -> log?.error("${botSettings.name} Unknown side: ${it.orderSide}")
+                        SIDE.SELL -> activeOrdersService.deleteByOrderId(v.orderId!!)
+                        else -> log?.error("${botSettings.name} Unknown side: ${v.orderSide}")
                     }
                 }
 
                 DIRECTION.SHORT -> {
-                    when (it.orderSide) {
+                    when (v.orderSide) {
                         SIDE.SELL -> {
                             activeOrdersService.saveOrder(
                                 ActiveOrder(
-                                    id = it.id,
+                                    id = v.id,
                                     botName = settings.name,
-                                    orderId = it.orderId,
+                                    orderId = v.orderId,
                                     tradePair = botSettings.pair.toString(),
-                                    price = it.price,
-                                    amount = it.amount,
+                                    price = v.price,
+                                    amount = v.amount,
                                     orderSide = SIDE.BUY,
                                     direction = DIRECTION.SHORT,
                                     lastBorderPrice = null,
@@ -650,8 +651,8 @@ class AlgorithmTrader(
                             )
                         }
 
-                        SIDE.BUY -> activeOrdersService.deleteByOrderId(it.orderId!!)
-                        else -> log?.error("${botSettings.name} Unknown side: ${it.orderSide}")
+                        SIDE.BUY -> activeOrdersService.deleteByOrderId(v.orderId!!)
+                        else -> log?.error("${botSettings.name} Unknown side: ${v.orderSide}")
                     }
                 }
             }
@@ -810,13 +811,19 @@ class AlgorithmTrader(
         }
 
     private fun resetLong() {
-        ordersForExecute.addAll(activeOrdersService.getOrdersBySide(settings.name, DIRECTION.LONG, SIDE.SELL))
+        ordersForExecute.putAll(
+            activeOrdersService.getOrdersBySide(settings.name, DIRECTION.LONG, SIDE.SELL)
+                .map { it.id!! to it }
+        )
 
         activeOrdersService.deleteByDirection(settings.name, DIRECTION.LONG)
     }
 
     private fun resetShort() {
-        ordersForExecute.addAll(activeOrdersService.getOrdersBySide(settings.name, DIRECTION.SHORT, SIDE.BUY))
+        ordersForExecute.putAll(
+            activeOrdersService.getOrdersBySide(settings.name, DIRECTION.SHORT, SIDE.BUY)
+                .map { it.id!! to it }
+        )
 
         activeOrdersService.deleteByDirection(settings.name, DIRECTION.SHORT)
     }
@@ -865,17 +872,17 @@ class AlgorithmTrader(
         var longAmount = BigDecimal.ZERO
         var shortAmount = BigDecimal.ZERO
 
-        ordersForExecute.forEach {
-            when (it.direction!!) {
-                DIRECTION.LONG -> when (it.orderSide) {
-                    SIDE.BUY -> longAmount += it.amount!!
-                    SIDE.SELL -> longAmount -= it.amount!!
+        ordersForExecute.forEach { (_, v) ->
+            when (v.direction!!) {
+                DIRECTION.LONG -> when (v.orderSide) {
+                    SIDE.BUY -> longAmount += v.amount!!
+                    SIDE.SELL -> longAmount -= v.amount!!
                     else -> {}
                 }
 
-                DIRECTION.SHORT -> when (it.orderSide) {
-                    SIDE.BUY -> shortAmount -= it.amount!!
-                    SIDE.SELL -> shortAmount += it.amount!!
+                DIRECTION.SHORT -> when (v.orderSide) {
+                    SIDE.BUY -> shortAmount -= v.amount!!
+                    SIDE.SELL -> shortAmount += v.amount!!
                     else -> {}
                 }
             }
