@@ -63,18 +63,6 @@ class MainController(orderService: OrderService, private val activeOrdersService
     data class Response(val status: String, val data: Any)
     data class BotsInfoResponse(val settings: BotSettings, val position: Any)
 
-    @PostMapping("/endpoint/trade")
-    fun receivePostTrade(@RequestBody request: String): ResponseEntity<Response> {
-        log.info("Request for /endpoint/trade = $request")
-
-        // process the request here and prepare the response
-        val response = Response("success", "Received $request")
-        log.debug("Response for /endpoint/trade = {}", response)
-
-        bot.communicator.sendOrder(request)
-
-        return ResponseEntity.ok(response)
-    }
 
     @PostMapping("/emulate")
     fun emulate(@RequestBody request: String): ResponseEntity<TestBalance> {
@@ -89,6 +77,19 @@ class MainController(orderService: OrderService, private val activeOrdersService
         val result = bot.communicator.emulate(params)
 
         return ResponseEntity.ok(result)
+    }
+
+    @PostMapping("/endpoint/trade")
+    fun receivePostTrade(@RequestBody request: String): ResponseEntity<Response> {
+        log.info("Request for /endpoint/trade = $request")
+
+        // process the request here and prepare the response
+        val response = Response("success", "Received $request")
+        log.debug("Response for /endpoint/trade = {}", response)
+
+        bot.communicator.sendOrder(request)
+
+        return ResponseEntity.ok(response)
     }
 
     @GetMapping("/positions")

@@ -628,15 +628,18 @@ class Communicator(
         // clear order storage
         activeOrdersService.deleteByBotName(params.botParams.name)
 
+        val test = TestClientFileData(params)
+
         val algorithm = AlgorithmTrader(
             params.botParams,
             "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
             activeOrdersService,
+            client = test,
             sendMessage = { _, _ -> }
         )
 
-        val test = TestClientFileData({ botMessage -> algorithm.handle(botMessage) }, params)
-        algorithm.client = test
+        algorithm.setup()
+        test.handler = { botMessage -> algorithm.handle(botMessage) }
 
         val result = test.emulate()
 

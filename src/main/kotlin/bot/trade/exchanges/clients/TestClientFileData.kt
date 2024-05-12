@@ -12,11 +12,11 @@ import java.time.ZoneId
 import java.util.concurrent.BlockingQueue
 
 class TestClientFileData(
-    val handler: (CommonExchangeData?) -> Unit,
     val params: BotEmulateParams,
     private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
     private val fee: BigDecimal = BigDecimal(0.1)
 ) : ClientFutures {
+    var handler: (CommonExchangeData?) -> Unit = {}
     private val log = KotlinLogging.logger {}
     private var orders: MutableMap<String, Order> = HashMap()
     var lastSellPrice: BigDecimal = BigDecimal(0)
