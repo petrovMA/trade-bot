@@ -380,6 +380,8 @@ enum class INTERVAL(val time: String) {
         WEEKLY -> 3_600_000L * 24 * 7
         MONTHLY -> 3_600_000L * 24 * 31
     }
+
+    fun toDuration() = toMillsTime().ms()
 }
 
 data class DepthEventOrders(val ask: Offer, val bid: Offer) : CommonExchangeData

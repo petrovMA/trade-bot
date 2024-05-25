@@ -121,10 +121,13 @@ class TrendCalculator(
                 interval = inputKlineInterval.second,
                 countCandles = 1000,
                 start = startTime,
-                end = null
+                end = endTime // todo:: FIX Exception("kline interval not equals to inputKlineInterval:\n${k}")
             )
                 .sortedBy { it.closeTime }
-                .also { startTime = it.last().closeTime }
+                .also {
+                    if (it.isEmpty()) return
+                    else startTime = it.last().closeTime
+                }
                 .forEach {
                     hma1Converter.addCandlesticks(it)
                     hma2Converter.addCandlesticks(it)

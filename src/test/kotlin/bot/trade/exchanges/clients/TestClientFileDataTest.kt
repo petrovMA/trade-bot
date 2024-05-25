@@ -3,6 +3,7 @@ package bot.trade.exchanges.clients
 import bot.trade.exchanges.assertPosition
 import bot.trade.libs.deserialize
 import bot.trade.libs.m
+import bot.trade.libs.toZonedTime
 import org.junit.jupiter.api.Test
 import utils.resourceFile
 import java.math.BigDecimal
@@ -18,7 +19,8 @@ class TestClientFileDataTest {
         val emulateClient = TestClientFileData(
             fee = BigDecimal(0.1),
             fileData = resourceFile<TestClientFileDataTest>("test_klines.csv"),
-            handler = { },
+            to = System.currentTimeMillis().toZonedTime(),
+            from = System.currentTimeMillis().toZonedTime(),
             params = resourceFile<TestClientFileDataTest>("emulateSettings.json").readText()
                 .deserialize<BotEmulateParams>()
         )
@@ -163,7 +165,8 @@ class TestClientFileDataTest {
         val emulateClient = TestClientFileData(
             //fee = BigDecimal(0.1),
             fileData = resourceFile<TestClientFileDataTest>("test_klines.csv"),
-            handler = { },
+            to = System.currentTimeMillis().toZonedTime(),
+            from = System.currentTimeMillis().toZonedTime(),
             params = resourceFile<TestClientFileDataTest>("emulateSettings.json").readText()
                 .deserialize<BotEmulateParams>()
         )

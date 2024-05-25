@@ -634,6 +634,7 @@ class Communicator(
             params.botParams,
             "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
             activeOrdersService,
+            endTimeForTrendCalculator = test.from.toInstant().toEpochMilli(),
             client = test,
             sendMessage = { _, _ -> }
         )

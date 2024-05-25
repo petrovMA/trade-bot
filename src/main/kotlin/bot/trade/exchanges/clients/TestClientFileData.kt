@@ -3,18 +3,22 @@ package bot.trade.exchanges.clients
 import bot.trade.exchanges.BotEvent
 import bot.trade.exchanges.clients.stream.StreamThreadStub
 import bot.trade.exchanges.emulate.TestBalance
+import bot.trade.exchanges.libs.KlineConverter
 import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.concurrent.BlockingQueue
 
 class TestClientFileData(
     val params: BotEmulateParams,
     private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
-    private val fee: BigDecimal = BigDecimal(0.1)
+    private val fee: BigDecimal = BigDecimal(0.1),
+    val from: ZonedDateTime = params.from?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }!!,
+    val to: ZonedDateTime = params.to?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }!!
 ) : ClientFutures {
     var handler: (CommonExchangeData?) -> Unit = {}
     private val log = KotlinLogging.logger {}
@@ -56,9 +60,6 @@ class TestClientFileData(
 
     fun emulate(): TestBalance {
 
-        val from = params.from?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }
-        val to = params.to?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }
-
         fileData.forEachLine { line ->
             if (line.isNotBlank()) {
                 candlestick = Candlestick(line.split(';'), 1.m())
@@ -99,7 +100,29 @@ class TestClientFileData(
         countCandles: Int,
         start: Long?,
         end: Long?
-    ): List<Candlestick> = TODO("Not yet implemented")
+    ): List<Candlestick> {
+
+        val converter = KlineConverter(
+            inputKlineInterval = 1.m(),
+            outputKlineInterval = interval.toDuration(),
+            size = countCandles
+        )
+
+        val from = start?.toZonedTime()
+        val to = end?.toZonedTime()
+
+        fileData.forEachLine { line ->
+            if (line.isNotBlank()) {
+                candlestick = Candlestick(line.split(';'), 1.m())
+                if (from == null || from.isBefore(candlestick.openTime.toZonedTime())) {
+                    if (to == null || to.isAfter(candlestick.openTime.toZonedTime()))
+                        converter.addCandlesticks(candlestick)
+                }
+            }
+        }
+
+        return converter.getBars().map { Candlestick(it) }
+    }
 
     override fun newOrder(
         order: Order,
