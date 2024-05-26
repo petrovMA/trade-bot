@@ -3,7 +3,6 @@ package bot.trade.exchanges.clients
 import bot.trade.exchanges.BotEvent
 import bot.trade.exchanges.clients.stream.StreamThreadStub
 import bot.trade.exchanges.emulate.TestBalance
-import bot.trade.exchanges.libs.KlineConverter
 import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File
@@ -17,8 +16,8 @@ class TestClientFileData(
     val params: BotEmulateParams,
     private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
     private val fee: BigDecimal = BigDecimal(0.1),
-    val from: ZonedDateTime = params.from?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }!!,
-    val to: ZonedDateTime = params.to?.let { LocalDateTime.parse(it).atZone(ZoneId.systemDefault()) }!!
+    val from: ZonedDateTime = params.from?.let { ZonedDateTime.parse(it) }!!,
+    val to: ZonedDateTime = params.to?.let { ZonedDateTime.parse(it) }!!
 ) : ClientFutures {
     var handler: (CommonExchangeData?) -> Unit = {}
     private val log = KotlinLogging.logger {}
@@ -101,6 +100,8 @@ class TestClientFileData(
         start: Long?,
         end: Long?
     ): List<Candlestick> {
+        TODO("Not yet implemented")
+        /*val klineInterval = 1.m()
 
         val converter = KlineConverter(
             inputKlineInterval = 1.m(),
@@ -109,11 +110,13 @@ class TestClientFileData(
         )
 
         val from = start?.toZonedTime()
-        val to = end?.toZonedTime()
+        val to = end?.let { (it + klineInterval.toMillis()*10).toZonedTime() }
+
+        // currentCandlestick!!.closeTime 1684007940000
 
         fileData.forEachLine { line ->
             if (line.isNotBlank()) {
-                candlestick = Candlestick(line.split(';'), 1.m())
+                candlestick = Candlestick(line.split(';'), klineInterval)
                 if (from == null || from.isBefore(candlestick.openTime.toZonedTime())) {
                     if (to == null || to.isAfter(candlestick.openTime.toZonedTime()))
                         converter.addCandlesticks(candlestick)
@@ -121,7 +124,7 @@ class TestClientFileData(
             }
         }
 
-        return converter.getBars().map { Candlestick(it) }
+        return converter.getBars().map { Candlestick(it) }*/
     }
 
     override fun newOrder(

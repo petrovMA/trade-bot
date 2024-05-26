@@ -511,7 +511,8 @@ class BotSettingsTrader(
         @SerializedName("not_auto_calc_trend") val notAutoCalcTrend: Boolean = false,
         @SerializedName("rsi1") val rsi1: Rsi,
         @SerializedName("rsi2") val rsi2: Rsi,
-        @SerializedName("hma_parameters") val hmaParameters: HmaParameters
+        @SerializedName("hma_parameters") val hmaParameters: HmaParameters,
+        @SerializedName("input_kline_interval") val inputKlineInterval: String?
     ) {
         class Rsi(
             @SerializedName("rsi_period") val rsiPeriod: Int,

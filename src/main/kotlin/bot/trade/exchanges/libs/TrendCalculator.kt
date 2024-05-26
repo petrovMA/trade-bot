@@ -16,15 +16,15 @@ import java.time.Duration
 
 
 class TrendCalculator(
-    client: Client,
-    pair: TradePair,
+    private val client: Client,
+    private val pair: TradePair,
     private val hma1: Pair<Duration, Int>,
     private val hma2: Pair<Duration, Int>,
     private val hma3: Pair<Duration, Int>,
     private val rsi1: Pair<Duration, Int>,
     private val rsi2: Pair<Duration, Int>,
-    private val inputKlineInterval: Pair<Duration, INTERVAL> = 5.m() to INTERVAL.FIVE_MINUTES,
-    endTime: Long? = System.currentTimeMillis()
+    private val inputKlineInterval: Pair<Duration, INTERVAL>,
+    private val endTime: Long? = System.currentTimeMillis()
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -40,17 +40,10 @@ class TrendCalculator(
     val rsi1Converter = KlineConverter(inputKlineInterval.first, rsi1.first, (rsi1.second + 1))
     val rsi2Converter = KlineConverter(inputKlineInterval.first, rsi2.first, (rsi2.second + 1))
 
-    init {
+    fun init() {
         initKlineForIndicator(
             client = client,
             pair = pair,
-            klineConverterParams = listOf(
-                hma1.first to (hma1.second * 1.5).toInt(),
-                hma2.first to (hma2.second * 1.3).toInt(),
-                hma3.first to (hma3.second * 1.2).toInt(),
-                rsi1.first to (rsi1.second + 1),
-                rsi2.first to (rsi2.second + 1)
-            ),
             endIndicatorTime = endTime ?: System.currentTimeMillis()
         )
     }
@@ -103,14 +96,9 @@ class TrendCalculator(
         return trend
     }
 
-    private fun initKlineForIndicator(
-        client: Client,
-        pair: TradePair,
-        klineConverterParams: List<Pair<Duration, Int>>,
-        endIndicatorTime: Long
-    ) {
+    private fun initKlineForIndicator(client: Client, pair: TradePair, endIndicatorTime: Long) {
 
-        val milliseconds = klineConverterParams.maxOfOrNull { it.first.toMillis() * (it.second + 1) }!!
+        val milliseconds = getMaxConverterTime()
 
         val endTime = endIndicatorTime.let { it - it % inputKlineInterval.first.toMillis() }
         var startTime = endTime - milliseconds
@@ -121,7 +109,10 @@ class TrendCalculator(
                 interval = inputKlineInterval.second,
                 countCandles = 1000,
                 start = startTime,
-                end = endTime // todo:: FIX Exception("kline interval not equals to inputKlineInterval:\n${k}")
+
+                // 1684008000000
+                // 1684008000000
+                end = endIndicatorTime // todo:: FIX Exception("kline interval not equals to inputKlineInterval:\n${k}")
             )
                 .sortedBy { it.closeTime }
                 .also {
@@ -141,6 +132,14 @@ class TrendCalculator(
 
         } while (true)
     }
+
+    fun getMaxConverterTime() = listOf(
+        hma1.first to (hma1.second * 1.5).toInt(),
+        hma2.first to (hma2.second * 1.3).toInt(),
+        hma3.first to (hma3.second * 1.2).toInt(),
+        rsi1.first to (rsi1.second + 1),
+        rsi2.first to (rsi2.second + 1)
+    ).maxOfOrNull { it.first.toMillis() * (it.second + 1) }!!
 
     private fun ta4jHma(kline: List<Bar>, hmaPeriod: Int): BigDecimal =
         HMAIndicator(ClosePriceIndicator(BaseBarSeries(kline)), hmaPeriod)

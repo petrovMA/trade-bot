@@ -29,6 +29,7 @@ class AlgorithmTrader(
     isEmulate: Boolean = false,
     logMessageQueue: LinkedBlockingDeque<CustomFileLoggingProcessor.Message>? = null,
     private val endTimeForTrendCalculator: Long? = null,
+    private var trendCalculator: TrendCalculator? = null,
     sendMessage: (String, Boolean) -> Unit
 ) : Algorithm(
     botSettings = botSettings,
@@ -52,7 +53,6 @@ class AlgorithmTrader(
     private val minOrderAmount = settings.minOrderAmount?.amount ?: BigDecimal.ZERO
     private val long = settings.parameters.longParameters
     private val short = settings.parameters.shortParameters
-    private var trendCalculator: TrendCalculator? = null
     private var trend: TrendCalculator.Trend? = null
     private val log = if (isLog) KotlinLogging.logger {} else null
     private val ordersForExecute: MutableMap<Long, ActiveOrder> = HashMap()
@@ -77,7 +77,7 @@ class AlgorithmTrader(
         positionLong = futuresClient.getPositions(botSettings.pair).find { it.side.equals("BUY", true) }
         positionShort = futuresClient.getPositions(botSettings.pair).find { it.side.equals("SELL", true) }
 
-        trendCalculator = settings.trendDetector?.run {
+        trendCalculator = trendCalculator ?: settings.trendDetector?.run {
             TrendCalculator(
                 client = client,
                 pair = botSettings.pair,
@@ -86,8 +86,10 @@ class AlgorithmTrader(
                 hma3 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
                 rsi1 = rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
                 rsi2 = rsi2.timeFrame.toDuration() to rsi2.rsiPeriod,
-                endTime = endTimeForTrendCalculator
-            )
+                endTime = endTimeForTrendCalculator,
+                inputKlineInterval = inputKlineInterval?.let { it.toDuration() to it.toInterval() }
+                    ?: (5.m() to INTERVAL.FIVE_MINUTES)
+            ).apply { init() }
         }
     }
 

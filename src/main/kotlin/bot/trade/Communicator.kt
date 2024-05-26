@@ -12,8 +12,7 @@ import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
-import java.time.Duration
-import java.time.LocalDate
+import java.time.*
 import java.util.*
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
@@ -630,11 +629,44 @@ class Communicator(
 
         val test = TestClientFileData(params)
 
+
+        val trendCalculator: TrendCalculator? = params.botParams.trendDetector?.run {
+            TrendCalculator(
+                client = test,
+                pair = params.botParams.pair,
+                hma1 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma1Period,
+                hma2 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma2Period,
+                hma3 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
+                rsi1 = rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
+                rsi2 = rsi2.timeFrame.toDuration() to rsi2.rsiPeriod,
+                inputKlineInterval = inputKlineInterval?.let { it.toDuration() to it.toInterval() }
+                    ?: (5.m() to INTERVAL.FIVE_MINUTES)
+            ).also {
+
+                val maxConverterTime = it.getMaxConverterTime()
+
+                val from: ZonedDateTime = params.from?.let { time -> ZonedDateTime.parse(time).minusSeconds(maxConverterTime.ms().toSeconds()) }!!
+                val to: ZonedDateTime = params.from.let { time -> ZonedDateTime.parse(time) }
+
+                File("database/${params.botParams.pair}_klines.csv").forEachLine { line ->
+                    if (line.isNotBlank()) {
+                        val candlestick = Candlestick(line.split(';'), 1.m())
+                        if (from == null || from.isBefore(candlestick.openTime.toZonedTime())) {
+                            if (to == null || to.isAfter(candlestick.openTime.toZonedTime()))
+                                it.addCandlesticks(candlestick)
+                        }
+                    }
+                }
+            }
+        }
+
+
         val algorithm = AlgorithmTrader(
             params.botParams,
             "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
             activeOrdersService,
             endTimeForTrendCalculator = test.from.toInstant().toEpochMilli(),
+            trendCalculator = trendCalculator,
             client = test,
             sendMessage = { _, _ -> }
         )
