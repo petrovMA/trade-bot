@@ -13,6 +13,7 @@ data class TestBalance(
     var orderB: TestOrder? = null,
     var tradePair: TradePair,
     var firstBalance: BigDecimal = 0.toBigDecimal(),
+    var feesSum: BigDecimal = 0.toBigDecimal(),
     var secondBalance: BigDecimal = 0.toBigDecimal(),
     var balanceTrade: BigDecimal = 0.toBigDecimal(),
     var correctAverageHigh: BigDecimal = 0.toBigDecimal(),

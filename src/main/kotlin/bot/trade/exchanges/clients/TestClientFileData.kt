@@ -198,6 +198,7 @@ class TestClientFileData(
 
                     profit.secondBalance -= (amount * priceWithFee)
                     profit.firstBalance += amount
+                    profit.feesSum += price.percent(fee)
 
                 } else {
                     positionLong = if (side == SIDE.BUY) {
@@ -207,6 +208,7 @@ class TestClientFileData(
 
                         profit.secondBalance -= (amount * priceWithFee)
                         profit.firstBalance += amount
+                        profit.feesSum += price.percent(fee)
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -227,6 +229,7 @@ class TestClientFileData(
 
                         profit.secondBalance += (amount * priceWithFee)
                         profit.firstBalance -= amount
+                        profit.feesSum += price.percent(fee)
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -276,6 +279,7 @@ class TestClientFileData(
 
                     profit.secondBalance += (amount * priceWithFee)
                     profit.firstBalance -= amount
+                    profit.feesSum += price.percent(fee)
                 } else {
                     positionShort = if (side == SIDE.SELL) {
                         val newAmount = positionShort.size + amount
@@ -284,6 +288,7 @@ class TestClientFileData(
 
                         profit.secondBalance += (amount * priceWithFee)
                         profit.firstBalance -= amount
+                        profit.feesSum += price.percent(fee)
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -302,6 +307,7 @@ class TestClientFileData(
 
                         profit.secondBalance -= (amount * priceWithFee)
                         profit.firstBalance += amount
+                        profit.feesSum += price.percent(fee)
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
