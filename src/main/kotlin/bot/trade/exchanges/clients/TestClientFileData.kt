@@ -13,7 +13,7 @@ import java.util.concurrent.BlockingQueue
 class TestClientFileData(
     val params: BotEmulateParams,
     private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
-    private val fee: BigDecimal = BigDecimal(0.01),
+    private val fee: BigDecimal = BigDecimal(0.1),
     val from: ZonedDateTime = params.from?.let { ZonedDateTime.parse(it) }!!,
     val to: ZonedDateTime = params.to?.let { ZonedDateTime.parse(it) }!!
 ) : ClientFutures {
