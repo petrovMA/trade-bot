@@ -32,7 +32,7 @@ abstract class Algorithm(
     val interval: INTERVAL = conf.getString("interval.interval")!!.toInterval()
 
     protected val path: String = "$exchangeBotsFiles/${botSettings.name}".also { File(it).mkdirs() }
-    private val settingsPath = "$path/settings.json".also { saveBotSettings(botSettings, it) }
+    private val settingsPath = "$path/settings.json".also { if (!isEmulate) saveBotSettings(botSettings, it) }
 
     private val log = if (isLog) KotlinLogging.logger {} else null
 

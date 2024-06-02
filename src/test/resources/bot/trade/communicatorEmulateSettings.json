@@ -1,0 +1,108 @@
+{
+  "from": "2023-12-14T00:00:00-05:00",
+  "to": "2024-01-21T00:00:00-05:00",
+  "bot_params": {
+    "flow_name": "ETHUSDT_BOTH",
+    "symbol": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "exchange_type": "Bybit",
+    "strategy_type": "BOTH",
+    "order_type": "MARKET",
+    "parameters": {
+      "long_parameters": {
+        "trading_range": {
+          "lower_bound": 3600,
+          "upper_bound": 4400,
+          "use_percent": false
+        },
+        "in_order_quantity": {
+          "value": 0.01,
+          "use_percent": false
+        },
+        "in_order_distance": {
+          "distance": 5,
+          "use_percent": false
+        },
+        "trailing_in_order_distance": {
+          "distance": 3,
+          "use_percent": false
+        },
+        "trigger_distance": {
+          "distance": 15.0,
+          "use_percent": false
+        },
+        "min_tp_distance": {
+          "distance": 5.0,
+          "use_percent": false
+        },
+        "max_tp_distance": {
+          "distance": 7.0,
+          "use_percent": false
+        },
+        "max_trigger_count": 450,
+        "set_close_orders": false,
+        "counter_distance": 2.5
+      },
+      "short_parameters": {
+        "trading_range": {
+          "lower_bound": 3600,
+          "upper_bound": 4400,
+          "use_percent": false
+        },
+        "in_order_quantity": {
+          "value": 0.01,
+          "use_percent": false
+        },
+        "in_order_distance": {
+          "distance": 5,
+          "use_percent": false
+        },
+        "trigger_in_order_distance": {
+          "distance": 10.0,
+          "use_percent": false
+        },
+        "trigger_distance": {
+          "distance": 15.0,
+          "use_percent": false
+        },
+        "min_tp_distance": {
+          "distance": 5.0,
+          "use_percent": false
+        },
+        "max_tp_distance": {
+          "distance": 7.0,
+          "use_percent": false
+        },
+        "max_trigger_count": 450,
+        "set_close_orders": false,
+        "counter_distance": 2.5
+      }
+    },
+    "trend_detector": {
+      "input_kline_interval": "1m",
+      "not_auto_calc_trend": false,
+      "rsi1": {
+        "rsi_period": 14,
+        "time_frame": "1m"
+      },
+      "rsi2": {
+        "rsi_period": 14,
+        "time_frame": "5d"
+      },
+      "hma_parameters": {
+        "hma1_period": 10,
+        "hma2_period": 70,
+        "hma3_period": 200,
+        "time_frame": "15m"
+      }
+    },
+    "market_type": "USDT Perpetual",
+    "market_type_comment": "USDT Perpetual, Inverse Perpetual, Spot",
+    "strategy_type_comment": "Long, Short, Spot",
+    "auto_balance": true,
+    "countOfDigitsAfterDotForAmount": 2,
+    "countOfDigitsAfterDotForPrice": 2
+  }
+}

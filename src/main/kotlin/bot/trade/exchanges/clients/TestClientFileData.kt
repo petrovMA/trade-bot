@@ -7,15 +7,13 @@ import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
-import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.BlockingQueue
 
 class TestClientFileData(
     val params: BotEmulateParams,
     private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
-    private val fee: BigDecimal = BigDecimal(0.1),
+    private val fee: BigDecimal = BigDecimal(0.01),
     val from: ZonedDateTime = params.from?.let { ZonedDateTime.parse(it) }!!,
     val to: ZonedDateTime = params.to?.let { ZonedDateTime.parse(it) }!!
 ) : ClientFutures {
@@ -62,8 +60,8 @@ class TestClientFileData(
         fileData.forEachLine { line ->
             if (line.isNotBlank()) {
                 candlestick = Candlestick(line.split(';'), 1.m())
-                if (from == null || from.isBefore(candlestick.openTime.toZonedTime())) {
-                    if (to == null || to.isAfter(candlestick.openTime.toZonedTime()))
+                if (candlestick.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
+                    if (candlestick.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) })
                         handler(candlestick)
                 }
             }

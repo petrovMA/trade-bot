@@ -665,6 +665,7 @@ class Communicator(
             params.botParams,
             "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
             activeOrdersService,
+            isEmulate = true,
             endTimeForTrendCalculator = test.from.toInstant().toEpochMilli(),
             trendCalculator = trendCalculator,
             client = test,

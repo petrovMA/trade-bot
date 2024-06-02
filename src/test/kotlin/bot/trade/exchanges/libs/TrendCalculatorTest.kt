@@ -3,6 +3,7 @@ package bot.trade.exchanges.libs
 import bot.trade.exchanges.assertIndicator
 import bot.trade.exchanges.clients.Candlestick
 import bot.trade.exchanges.clients.ClientTestExchange
+import bot.trade.exchanges.clients.INTERVAL
 import bot.trade.exchanges.clients.TradePair
 import bot.trade.libs.*
 import com.google.gson.reflect.TypeToken
@@ -34,7 +35,8 @@ class TrendCalculatorTest {
             5.m() to 200,
             2.h() to 14,
             4.h() to 14,
-            endTime = 1701849900000
+            5.m() to INTERVAL.FIVE_MINUTES,
+            1701849900000
         )
 
         Mapper.asListObjects<Candlestick>(
