@@ -196,9 +196,12 @@ class TestClientFileData(
                         side = "BUY"
                     )
 
-                    profit.secondBalance -= (amount * priceWithFee)
+                    val amountWithFee = (amount * priceWithFee)
+                    profit.secondBalance -= amountWithFee
                     profit.firstBalance += amount
-                    profit.feesSum += price.percent(fee)
+                    profit.feesSum += ((price * amount) - amountWithFee).abs()
+                    profit.tradeVolume += (price * amount)
+                    profit.ordersAmount++
 
                 } else {
                     positionLong = if (side == SIDE.BUY) {
@@ -206,9 +209,12 @@ class TestClientFileData(
                         val newAveragePrice =
                             ((positionLong.breakEvenPrice * positionLong.size) + (price * amount)) / newAmount
 
-                        profit.secondBalance -= (amount * priceWithFee)
+                        val amountWithFee = (amount * priceWithFee)
+                        profit.secondBalance -= amountWithFee
                         profit.firstBalance += amount
-                        profit.feesSum += price.percent(fee)
+                        profit.feesSum += ((price * amount) - amountWithFee).abs()
+                        profit.tradeVolume += (price * amount)
+                        profit.ordersAmount++
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -227,9 +233,12 @@ class TestClientFileData(
 
                         val priceChange = (price - positionLong.breakEvenPrice) / (positionLong.size / amount)
 
-                        profit.secondBalance += (amount * priceWithFee)
+                        val amountWithFee = (amount * priceWithFee)
+                        profit.secondBalance += amountWithFee
                         profit.firstBalance -= amount
-                        profit.feesSum += price.percent(fee)
+                        profit.feesSum += ((price * amount) - amountWithFee).abs()
+                        profit.tradeVolume += (price * amount)
+                        profit.ordersAmount++
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -277,18 +286,25 @@ class TestClientFileData(
                         side = "SELL"
                     )
 
-                    profit.secondBalance += (amount * priceWithFee)
+                    val amountWithFee = (amount * priceWithFee)
+                    profit.secondBalance += amountWithFee
                     profit.firstBalance -= amount
-                    profit.feesSum += price.percent(fee)
+                    profit.feesSum += ((price * amount) - amountWithFee).abs()
+                    profit.tradeVolume += (price * amount)
+                    profit.ordersAmount++
+
                 } else {
                     positionShort = if (side == SIDE.SELL) {
                         val newAmount = positionShort.size + amount
 
                         val priceChange = (price - positionShort.breakEvenPrice) / newAmount
 
-                        profit.secondBalance += (amount * priceWithFee)
+                        val amountWithFee = (amount * priceWithFee)
+                        profit.secondBalance += amountWithFee
                         profit.firstBalance -= amount
-                        profit.feesSum += price.percent(fee)
+                        profit.feesSum += ((price * amount) - amountWithFee).abs()
+                        profit.tradeVolume += (price * amount)
+                        profit.ordersAmount++
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -305,9 +321,12 @@ class TestClientFileData(
                     } else {
                         val newAmount = positionShort.size - amount
 
-                        profit.secondBalance -= (amount * priceWithFee)
+                        val amountWithFee = (amount * priceWithFee)
+                        profit.secondBalance -= amountWithFee
                         profit.firstBalance += amount
-                        profit.feesSum += price.percent(fee)
+                        profit.feesSum += ((price * amount) - amountWithFee).abs()
+                        profit.tradeVolume += (price * amount)
+                        profit.ordersAmount++
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
