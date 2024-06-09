@@ -1,5 +1,6 @@
 package bot.trade.exchanges.clients
 
+import bot.trade.database.service.ActiveOrdersService
 import bot.trade.exchanges.BotEvent
 import bot.trade.exchanges.clients.stream.StreamThreadStub
 import bot.trade.exchanges.emulate.TestBalance
@@ -12,6 +13,7 @@ import java.util.concurrent.BlockingQueue
 
 class TestClientFileData(
     val params: BotEmulateParams,
+    private val activeOrdersService: ActiveOrdersService? = null,
     private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
     private val fee: BigDecimal = BigDecimal(0.1),
     val from: ZonedDateTime = params.from?.let { ZonedDateTime.parse(it) }!!,
@@ -61,13 +63,30 @@ class TestClientFileData(
             if (line.isNotBlank()) {
                 candlestick = Candlestick(line.split(';'), 1.m())
                 if (candlestick.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
-                    if (candlestick.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) })
+                    if (candlestick.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) }) {
+
                         handler(candlestick)
+
+                        activeOrdersService?.run {
+                            count(params.botParams.name, DIRECTION.LONG, SIDE.SELL).let {
+                                if (it > profit.maxLongOpenOrdersAmount)
+                                    profit.maxLongOpenOrdersAmount = it.toInt()
+                            }
+                            count(params.botParams.name, DIRECTION.SHORT, SIDE.BUY).let {
+                                if (it > profit.maxShortOpenOrdersAmount)
+                                    profit.maxShortOpenOrdersAmount = it.toInt()
+                            }
+                        }
+
+                    }
                 }
             }
         }
 
         handler(BotEvent(type = BotEvent.Type.INTERRUPT))
+
+        profit.feesSum = profit.feesSum.round()
+        profit.secondBalance = profit.secondBalance.round()
 
         return profit
     }

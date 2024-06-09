@@ -16,6 +16,8 @@ data class TestBalance(
     var feesSum: BigDecimal = 0.toBigDecimal(),
     var tradeVolume: BigDecimal = 0.toBigDecimal(),
     var ordersAmount: Int = 0,
+    var maxLongOpenOrdersAmount: Int = 0,
+    var maxShortOpenOrdersAmount: Int = 0,
     var secondBalance: BigDecimal = 0.toBigDecimal(),
     var balanceTrade: BigDecimal = 0.toBigDecimal(),
     var correctAverageHigh: BigDecimal = 0.toBigDecimal(),

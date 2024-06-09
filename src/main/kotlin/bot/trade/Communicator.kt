@@ -82,6 +82,26 @@ class Communicator(
                 log.info(msg)
             }
 
+            cmd.commandEmulate.matches(message) -> {
+                val params = message.split("\\n+".toRegex(), limit = 2)
+
+                try {
+                    params[1].deserialize<BotEmulateParams>()
+                } catch (t: Throwable) {
+                    msg = "Incorrect settings format:\n${params[1]}"
+                    log.warn("Incorrect settings format:\n${params[1]}", t)
+                    null
+                }?.let { emulateParams ->
+                    val emulateResponse = emulate(emulateParams)
+
+                    msg = "#EmulateResponse params:\n```json\n${json(emulateParams)}\n```\n" +
+                            "\n\nResponse:\n```json\n${json(emulateResponse)}\n```"
+
+                    send(msg, true)
+                    msg = ""
+                }
+            }
+
             cmd.commandCreate.matches(message) -> {
                 val params = message.split("\\n+".toRegex(), limit = 2)
 
@@ -129,20 +149,6 @@ class Communicator(
                             }
                         }
                     }
-                }
-            }
-
-            cmd.commandEmulate.matches(message) -> {
-                val params = message.split("\\n+".toRegex(), limit = 2)
-
-                try {
-                    params[1].deserialize<BotEmulateParams>()
-                } catch (t: Throwable) {
-                    msg = "Incorrect settings format:\n${params[1]}"
-                    log.warn("Incorrect settings format:\n${params[1]}", t)
-                    null
-                }?.let { emulateParams ->
-                    emulate(emulateParams)
                 }
             }
 
@@ -627,7 +633,7 @@ class Communicator(
         // clear order storage
         activeOrdersService.deleteByBotName(params.botParams.name)
 
-        val test = TestClientFileData(params)
+        val test = TestClientFileData(params, activeOrdersService)
 
 
         val trendCalculator: TrendCalculator? = params.botParams.trendDetector?.run {
@@ -645,7 +651,9 @@ class Communicator(
 
                 val maxConverterTime = it.getMaxConverterTime()
 
-                val from: ZonedDateTime = params.from?.let { time -> ZonedDateTime.parse(time).minusSeconds(maxConverterTime.ms().toSeconds()) }!!
+                val from: ZonedDateTime = params.from?.let { time ->
+                    ZonedDateTime.parse(time).minusSeconds(maxConverterTime.ms().toSeconds())
+                }!!
                 val to: ZonedDateTime = params.from.let { time -> ZonedDateTime.parse(time) }
 
                 File("database/${params.botParams.pair}_klines.csv").forEachLine { line ->
