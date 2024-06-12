@@ -62,10 +62,8 @@ class TelegramBot(
         val text = try {
             if (chatId == adminId) update.message.text
             else {
-                if (update.message.from.id.toString() == adminId && Regex("@?$botUsername.+").matches(update.message.text)) update.message.text.replace(
-                    Regex("@?$botUsername\\s+"),
-                    ""
-                )
+                if (update.message.from.id.toString() == adminId && Regex("@?$botUsername .+\\s+[\\-+\\w:,\"{}\\.\\s]+").matches(update.message.text))
+                    update.message.text.replace(Regex("@?$botUsername\\s+"), "")
                 else null
             }
         } catch (e: java.lang.NullPointerException) {

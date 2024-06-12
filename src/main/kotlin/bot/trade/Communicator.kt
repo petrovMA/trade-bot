@@ -4,6 +4,7 @@ import bot.trade.database.service.ActiveOrdersService
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
+import bot.trade.exchanges.emulate.EmulateFromFile
 import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.exchanges.libs.TrendCalculator
 import bot.trade.libs.*
@@ -92,12 +93,7 @@ class Communicator(
                     log.warn("Incorrect settings format:\n${params[1]}", t)
                     null
                 }?.let { emulateParams ->
-                    val emulateResponse = emulate(emulateParams)
-
-                    msg = "#EmulateResponse params:\n```json\n${json(emulateParams)}\n```\n" +
-                            "\n\nResponse:\n```json\n${json(emulateResponse)}\n```"
-
-                    send(msg, true)
+                    taskQueue?.put(EmulateFromFile(sendMessage, emulateParams, this))
                     msg = ""
                 }
             }
