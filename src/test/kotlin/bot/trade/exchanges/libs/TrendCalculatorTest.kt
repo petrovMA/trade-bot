@@ -37,7 +37,7 @@ class TrendCalculatorTest {
             4.h() to 14,
             5.m() to INTERVAL.FIVE_MINUTES,
             1701849900000
-        )
+        ).apply { init() }
 
         Mapper.asListObjects<Candlestick>(
             resourceFile<KlineConverterTest>("trend_calc_input_web_socket.json").readText(),
