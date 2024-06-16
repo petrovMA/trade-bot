@@ -63,7 +63,7 @@ class KlineConverter(
                                     volume = currentCandlestick!!.volume + k.volume
                                 )
                             else if (currentCandlestick!!.closeTime + 1 < k.openTime)
-                                throw Exception("inputCandlesticks has a gap in sequence:\n${currentCandlestick}\n${k}")
+                                throw Exception("inputCandlesticks has a gap in sequence:\n$currentCandlestick\n$k")
                         }
 
                         if (currentCandlestick!!.closeTime % outputKlineInterval.toMillis() == 0L) {
