@@ -647,10 +647,10 @@ class Communicator(
 
                 val maxConverterTime = it.getMaxConverterTime()
 
-                val from: ZonedDateTime = params.from?.let { time ->
+                val from: ZonedDateTime? = params.from?.let { time ->
                     ZonedDateTime.parse(time).minusSeconds(maxConverterTime.ms().toSeconds())
-                }!!
-                val to: ZonedDateTime = params.from.let { time -> ZonedDateTime.parse(time) }
+                }
+                val to: ZonedDateTime? = params.from.let { time -> ZonedDateTime.parse(time) }
 
                 File("database/${params.botParams.pair}_klines.csv").forEachLine { line ->
                     if (line.isNotBlank()) {
