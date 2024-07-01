@@ -93,7 +93,7 @@ class Communicator(
                     log.warn("Incorrect settings format:\n${params[1]}", t)
                     null
                 }?.let { emulateParams ->
-                    taskQueue?.put(EmulateFromFile(sendMessage, emulateParams, this))
+                    taskQueue?.put(EmulateFromFile(sendMessage, sendFile, emulateParams, this))
                     msg = ""
                 }
             }
@@ -258,6 +258,21 @@ class Communicator(
                     cmd.commandStatus.matches(message) -> {
                         msg = "${cmd.commandStatus}:\n"
                         forEach { msg += "${it.value.state} => ${it.key}\n" }
+
+                        taskQueue?.toList()?.let { activeTasks ->
+                            if (activeTasks.isNotEmpty())
+                                msg += "\n\nActive Tasks:"
+
+                            activeTasks.forEach {
+                                msg += when (it) {
+                                    is EmulateFromFile -> "\nemulate: ${it.emulateParams.botParams.pair} " +
+                                            "${it.emulateParams.from} - ${it.emulateParams.to}"
+
+                                    else -> "unknown task"
+                                }
+                            }
+                        }
+
                         log.info(msg)
                     }
 
@@ -624,7 +639,7 @@ class Communicator(
         }
     }
 
-    fun emulate(params: BotEmulateParams): TestBalance {
+    fun emulate(params: BotEmulateParams): Pair<TestBalance, File?> {
 
         // clear order storage
         activeOrdersService.deleteByBotName(params.botParams.name)
@@ -679,9 +694,7 @@ class Communicator(
         algorithm.setup()
         test.handler = { botMessage -> algorithm.handle(botMessage) }
 
-        val result = test.emulate()
-
-        println(result)
+        val result = test.emulate(isWriteOrdersToLog = params.isWriteOrdersToLog ?: false)
 
         return result
     }

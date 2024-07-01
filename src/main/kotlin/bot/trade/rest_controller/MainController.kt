@@ -76,7 +76,7 @@ class MainController(orderService: OrderService, private val activeOrdersService
 
         val result = bot.communicator.emulate(params)
 
-        return ResponseEntity.ok(result)
+        return ResponseEntity.ok(result.first)
     }
 
     @PostMapping("/endpoint/trade")

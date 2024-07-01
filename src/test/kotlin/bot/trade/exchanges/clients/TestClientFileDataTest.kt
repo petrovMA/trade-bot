@@ -157,7 +157,7 @@ class TestClientFileDataTest {
 
         val profit = emulateClient.emulate()
 
-        println(profit)
+        println(profit.first)
     }
 
     @Test
@@ -305,6 +305,6 @@ class TestClientFileDataTest {
 
         val profit = emulateClient.emulate()
 
-        println(profit)
+        println(profit.first)
     }
 }

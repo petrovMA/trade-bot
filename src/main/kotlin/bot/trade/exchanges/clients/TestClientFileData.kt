@@ -56,8 +56,16 @@ class TestClientFileData(
     private var clientOrderId = 0
 
     private lateinit var candlestick: Candlestick
+    private var historyFile: File? = null
 
-    fun emulate(): TestBalance {
+    fun emulate(isWriteOrdersToLog: Boolean = false): Pair<TestBalance, File?> {
+
+        historyFile = if (isWriteOrdersToLog)
+            File("exchange/emulate/results/${System.currentTimeMillis()}_${params.botParams.pair}_${from}_$to.csv")
+        else
+            null
+
+        historyFile?.appendText("time;order side;amountWithFee;secondBalance;firstBalance;feesSum;tradeVolume")
 
         fileData.forEachLine { line ->
             if (line.isNotBlank()) {
@@ -88,7 +96,7 @@ class TestClientFileData(
         profit.feesSum = profit.feesSum.round()
         profit.secondBalance = profit.secondBalance.round()
 
-        return profit
+        return profit to historyFile
     }
 
     override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> = TODO("not implemented")
@@ -222,6 +230,8 @@ class TestClientFileData(
                     profit.tradeVolume += (price * amount)
                     profit.ordersAmount++
 
+                    write(amountWithFee, "BUY")
+
                 } else {
                     positionLong = if (side == SIDE.BUY) {
                         val newAmount = positionLong.size + amount
@@ -234,6 +244,8 @@ class TestClientFileData(
                         profit.feesSum += ((price * amount) - amountWithFee).abs()
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
+
+                        write(amountWithFee, "BUY")
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -258,6 +270,8 @@ class TestClientFileData(
                         profit.feesSum += ((price * amount) - amountWithFee).abs()
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
+
+                        write(amountWithFee, "BUY")
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -312,6 +326,8 @@ class TestClientFileData(
                     profit.tradeVolume += (price * amount)
                     profit.ordersAmount++
 
+                    write(amountWithFee, "SELL")
+
                 } else {
                     positionShort = if (side == SIDE.SELL) {
                         val newAmount = positionShort.size + amount
@@ -324,6 +340,8 @@ class TestClientFileData(
                         profit.feesSum += ((price * amount) - amountWithFee).abs()
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
+
+                        write(amountWithFee, "SELL")
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -346,6 +364,8 @@ class TestClientFileData(
                         profit.feesSum += ((price * amount) - amountWithFee).abs()
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
+
+                        write(amountWithFee, "SELL")
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -379,4 +399,14 @@ class TestClientFileData(
             }
         }
     }
+
+    private fun write(amountWithFee: BigDecimal, side: String) = historyFile?.appendText(
+        "\n${System.currentTimeMillis().toZonedTime()};" +
+                "$side;" +
+                "${amountWithFee.round()};" +
+                "${profit.secondBalance.round()};" +
+                "${profit.firstBalance.round()};" +
+                "${profit.feesSum.round()};" +
+                "${profit.tradeVolume.round()}"
+    )
 }

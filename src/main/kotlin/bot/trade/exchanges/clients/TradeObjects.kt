@@ -462,7 +462,8 @@ data class Candlestick(
 class BotEmulateParams(
     @SerializedName("from") val from: String?,
     @SerializedName("to") val to: String?,
-    @SerializedName("bot_params") val botParams: BotSettingsTrader
+    @SerializedName("bot_params") val botParams: BotSettingsTrader,
+    @SerializedName("is_write_orders_to_log") val isWriteOrdersToLog: Boolean?
 )
 
 abstract class BotSettings(

@@ -46,6 +46,6 @@ class CommunicatorTest {
 
         val result = bot.emulate(botParams)
 
-        println(result)
+        println(result.first)
     }
 }
