@@ -251,7 +251,7 @@ class AlgorithmTrader(
 
 
                 //todo:: COMPARE POSITION WITH OPEN ORDERS (DEBUGGING)
-                val pLong = positionLong
+                /*val pLong = positionLong
                 val openLong = activeOrdersService
                     .getOrdersBySide(settings.name, DIRECTION.LONG, SIDE.SELL)
 
@@ -276,7 +276,7 @@ class AlgorithmTrader(
                 ) {
                     println(pShort)
                     println(openShort)
-                }
+                }*/
             }
 
             is Position -> {

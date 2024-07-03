@@ -10,7 +10,6 @@ import org.knowm.xchange.ExchangeFactory
 import org.knowm.xchange.binance.BinanceExchange
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.marketdata.KlineInterval
-import org.knowm.xchange.binance.dto.meta.exchangeinfo.BinanceExchangeInfo
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.Currency
 import org.knowm.xchange.currency.CurrencyPair
@@ -36,8 +35,6 @@ class ClientBinanceFutures(
         .exchangeMetaData
         .instruments
         .map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
-
-    fun getFutureExchangeInfo(): BinanceExchangeInfo = accountService.futureExchangeInfo
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
         marketDataService.klines(

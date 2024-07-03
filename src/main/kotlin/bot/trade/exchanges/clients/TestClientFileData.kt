@@ -15,7 +15,7 @@ class TestClientFileData(
     val params: BotEmulateParams,
     private val activeOrdersService: ActiveOrdersService? = null,
     private val fileData: File = File("database/${params.botParams.pair}_klines.csv"),
-    private val fee: BigDecimal = BigDecimal(0.1),
+    private val fee: BigDecimal = params.fee ?: BigDecimal(0.1),
     val from: ZonedDateTime = params.from?.let { ZonedDateTime.parse(it) }!!,
     val to: ZonedDateTime = params.to?.let { ZonedDateTime.parse(it) }!!
 ) : ClientFutures {
@@ -65,29 +65,35 @@ class TestClientFileData(
         else
             null
 
-        historyFile?.appendText("time;order side;amountWithFee;secondBalance;firstBalance;feesSum;tradeVolume")
+        historyFile?.appendText("time;order side;amountWithFee;secondBalance;firstBalance;feesSum;tradeVolume;currPrice;currBalanceCalcByCurrPrice")
+
+        var prevKline: Candlestick? = null
 
         fileData.forEachLine { line ->
             if (line.isNotBlank()) {
                 candlestick = Candlestick(line.split(';'), 1.m())
-                if (candlestick.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
-                    if (candlestick.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) }) {
 
-                        handler(candlestick)
+                if (params.failIfKlineGaps != true && prevKline?.let { prev -> candlestick.openTime > prev.closeTime + 1 } == true) {
+                    do {
+                        val currentKline = Candlestick(
+                            openTime = prevKline!!.openTime + 60_000,
+                            closeTime = prevKline!!.closeTime + 60_000,
+                            open = prevKline!!.close,
+                            high = prevKline!!.close,
+                            low = prevKline!!.close,
+                            close = prevKline!!.close,
+                            volume = BigDecimal(0)
+                        )
 
-                        activeOrdersService?.run {
-                            count(params.botParams.name, DIRECTION.LONG, SIDE.SELL).let {
-                                if (it > profit.maxLongOpenOrdersAmount)
-                                    profit.maxLongOpenOrdersAmount = it.toInt()
-                            }
-                            count(params.botParams.name, DIRECTION.SHORT, SIDE.BUY).let {
-                                if (it > profit.maxShortOpenOrdersAmount)
-                                    profit.maxShortOpenOrdersAmount = it.toInt()
-                            }
-                        }
+                        handle(currentKline)
 
-                    }
+                        prevKline = currentKline
+
+                    } while (candlestick.openTime > currentKline.closeTime + 1)
                 }
+
+                handle(candlestick)
+                prevKline = candlestick
             }
         }
 
@@ -97,6 +103,26 @@ class TestClientFileData(
         profit.secondBalance = profit.secondBalance.round()
 
         return profit to historyFile
+    }
+
+    private fun handle(kline: Candlestick) {
+        if (candlestick.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
+            if (candlestick.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) }) {
+
+                handler(kline)
+
+                activeOrdersService?.run {
+                    count(params.botParams.name, DIRECTION.LONG, SIDE.SELL).let {
+                        if (it > profit.maxLongOpenOrdersAmount)
+                            profit.maxLongOpenOrdersAmount = it.toInt()
+                    }
+                    count(params.botParams.name, DIRECTION.SHORT, SIDE.BUY).let {
+                        if (it > profit.maxShortOpenOrdersAmount)
+                            profit.maxShortOpenOrdersAmount = it.toInt()
+                    }
+                }
+            }
+        }
     }
 
     override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> = TODO("not implemented")
@@ -230,7 +256,7 @@ class TestClientFileData(
                     profit.tradeVolume += (price * amount)
                     profit.ordersAmount++
 
-                    write(amountWithFee, "BUY")
+                    write(amountWithFee, "BUY", price)
 
                 } else {
                     positionLong = if (side == SIDE.BUY) {
@@ -245,7 +271,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "BUY")
+                        write(amountWithFee, "BUY", price)
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -271,7 +297,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "BUY")
+                        write(amountWithFee, "BUY", price)
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -326,7 +352,7 @@ class TestClientFileData(
                     profit.tradeVolume += (price * amount)
                     profit.ordersAmount++
 
-                    write(amountWithFee, "SELL")
+                    write(amountWithFee, "SELL", price)
 
                 } else {
                     positionShort = if (side == SIDE.SELL) {
@@ -341,7 +367,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "SELL")
+                        write(amountWithFee, "SELL", price)
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -365,7 +391,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "SELL")
+                        write(amountWithFee, "SELL", price)
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -400,13 +426,15 @@ class TestClientFileData(
         }
     }
 
-    private fun write(amountWithFee: BigDecimal, side: String) = historyFile?.appendText(
+    private fun write(amountWithFee: BigDecimal, side: String, price: BigDecimal) = historyFile?.appendText(
         "\n${System.currentTimeMillis().toZonedTime()};" +
                 "$side;" +
                 "${amountWithFee.round()};" +
                 "${profit.secondBalance.round()};" +
                 "${profit.firstBalance.round()};" +
                 "${profit.feesSum.round()};" +
-                "${profit.tradeVolume.round()}"
+                "${profit.tradeVolume.round()}" +
+                "${price.round()}" +
+                "${(profit.firstBalance * price + profit.secondBalance).round()}"
     )
 }
