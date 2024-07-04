@@ -694,9 +694,7 @@ class Communicator(
         algorithm.setup()
         test.handler = { botMessage -> algorithm.handle(botMessage) }
 
-        val result = test.emulate(isWriteOrdersToLog = params.isWriteOrdersToLog ?: false)
-
-        return result
+        return test.emulate(isWriteOrdersToLog = params.isWriteOrdersToLog ?: false)
     }
 
     private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)

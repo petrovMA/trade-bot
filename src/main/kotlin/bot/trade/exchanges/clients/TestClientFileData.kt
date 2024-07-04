@@ -61,7 +61,11 @@ class TestClientFileData(
     fun emulate(isWriteOrdersToLog: Boolean = false): Pair<TestBalance, File?> {
 
         historyFile = if (isWriteOrdersToLog)
-            File("exchange/emulate/results/${System.currentTimeMillis()}_${params.botParams.pair}_${from}_$to.csv")
+            File(
+                "exchange/emulate/results/${System.currentTimeMillis()}_${params.botParams.pair}_" +
+                        "${from.toString().replace(':', '_')}_" +
+                        "${to.toString().replace(':', '_')}.csv"
+            )
         else
             null
 
@@ -71,9 +75,9 @@ class TestClientFileData(
 
         fileData.forEachLine { line ->
             if (line.isNotBlank()) {
-                candlestick = Candlestick(line.split(';'), 1.m())
+                val currKline = Candlestick(line.split(';'), 1.m())
 
-                if (params.failIfKlineGaps != true && prevKline?.let { prev -> candlestick.openTime > prev.closeTime + 1 } == true) {
+                if (params.failIfKlineGaps != true && prevKline?.let { prev -> currKline.openTime > prev.closeTime + 1 } == true) {
                     do {
                         val currentKline = Candlestick(
                             openTime = prevKline!!.openTime + 60_000,
@@ -89,11 +93,11 @@ class TestClientFileData(
 
                         prevKline = currentKline
 
-                    } while (candlestick.openTime > currentKline.closeTime + 1)
+                    } while (currKline.openTime > currentKline.closeTime + 1)
                 }
 
-                handle(candlestick)
-                prevKline = candlestick
+                handle(currKline)
+                prevKline = currKline
             }
         }
 
@@ -106,8 +110,10 @@ class TestClientFileData(
     }
 
     private fun handle(kline: Candlestick) {
-        if (candlestick.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
-            if (candlestick.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) }) {
+        if (kline.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
+            if (kline.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) }) {
+
+                candlestick = kline
 
                 handler(kline)
 
@@ -427,14 +433,14 @@ class TestClientFileData(
     }
 
     private fun write(amountWithFee: BigDecimal, side: String, price: BigDecimal) = historyFile?.appendText(
-        "\n${System.currentTimeMillis().toZonedTime()};" +
+        "\n${candlestick.openTime.toZonedTime()};" +
                 "$side;" +
                 "${amountWithFee.round()};" +
                 "${profit.secondBalance.round()};" +
                 "${profit.firstBalance.round()};" +
                 "${profit.feesSum.round()};" +
-                "${profit.tradeVolume.round()}" +
-                "${price.round()}" +
+                "${profit.tradeVolume.round()};" +
+                "${price.round()};" +
                 "${(profit.firstBalance * price + profit.secondBalance).round()}"
     )
 }
