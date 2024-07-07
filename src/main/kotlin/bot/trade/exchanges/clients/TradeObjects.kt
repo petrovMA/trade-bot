@@ -551,8 +551,7 @@ class BotSettingsTrader(
         ) {
             class TradingRange(
                 @SerializedName("lower_bound") val lowerBound: BigDecimal,
-                @SerializedName("upper_bound") val upperBound: BigDecimal,
-                @SerializedName("use_percent") val usePercent: Boolean = false
+                @SerializedName("upper_bound") val upperBound: BigDecimal
             )
 
             class InOrderQuantity(
@@ -640,3 +639,36 @@ class BotSettingsBobblesIndicator(
     countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
     countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
 )
+
+class BotSettingsGrid(
+    @SerializedName("flow_name") override val name: String,
+    @SerializedName("symbol") override val pair: TradePair,
+    @SerializedName("exchange_type") override val exchange: String,
+    orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
+    countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
+    countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
+    @SerializedName("parameters") val parameters: Parameters,
+    @SerializedName("trend_detector") val trendDetector: BotSettingsTrader.TrendDetector? = null,
+    @SerializedName("min_order_amount") val minOrderAmount: BotSettingsTrader.MinOrderAmount? = null,
+    @SerializedName("market_type") val marketType: String,
+    @SerializedName("market_type_comment") val marketTypeComment: String,
+    @SerializedName("strategy_type_comment") val strategyTypeComment: String,
+    @SerializedName("auto_balance") val autoBalance: Boolean = false
+) : BotSettings(
+    name = name,
+    pair = pair,
+    exchange = exchange.uppercase(),
+    orderBalanceType = orderBalanceType,
+    countOfDigitsAfterDotForAmount = countOfDigitsAfterDotForAmount,
+    countOfDigitsAfterDotForPrice = countOfDigitsAfterDotForPrice
+) {
+
+    class Parameters(
+        @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
+    ) {
+        class TradingRange(
+            @SerializedName("lower_bound") val lowerBound: BigDecimal,
+            @SerializedName("upper_bound") val upperBound: BigDecimal
+        )
+    }
+}
