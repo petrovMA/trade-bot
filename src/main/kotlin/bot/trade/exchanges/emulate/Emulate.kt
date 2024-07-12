@@ -4,6 +4,7 @@ import bot.trade.exchanges.CandlestickListsIterator
 import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.connect
 import bot.trade.exchanges.emulate.libs.writeIntoExcelNew
+import bot.trade.exchanges.params.BotSettings
 import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File

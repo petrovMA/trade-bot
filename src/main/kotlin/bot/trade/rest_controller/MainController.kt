@@ -7,6 +7,8 @@ import bot.trade.libs.readConf
 import bot.telegram.TelegramBot
 import bot.trade.database.service.ActiveOrdersService
 import bot.trade.exchanges.emulate.TestBalance
+import bot.trade.exchanges.params.BotEmulateParams
+import bot.trade.exchanges.params.BotSettings
 import bot.trade.libs.CustomFileLoggingProcessor
 import bot.trade.libs.deserialize
 import mu.KLogger

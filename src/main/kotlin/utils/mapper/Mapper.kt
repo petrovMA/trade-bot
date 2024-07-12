@@ -1,8 +1,8 @@
 package utils.mapper
 
-import bot.trade.exchanges.clients.BotSettings
-import bot.trade.exchanges.clients.BotSettingsBobblesIndicator
-import bot.trade.exchanges.clients.BotSettingsTrader
+import bot.trade.exchanges.params.BotSettings
+import bot.trade.exchanges.params.BotSettingsBobblesIndicator
+import bot.trade.exchanges.params.BotSettingsTrader
 import com.google.gson.*
 import java.io.File
 import java.io.FileReader

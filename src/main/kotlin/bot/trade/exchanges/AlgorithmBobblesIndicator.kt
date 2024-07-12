@@ -4,6 +4,7 @@ import bot.trade.database.data.entities.NotificationType
 import bot.trade.database.service.OrderService
 import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
+import bot.trade.exchanges.params.BotSettings
 import bot.trade.rest_controller.Notification
 import com.typesafe.config.Config
 import mu.KotlinLogging
@@ -15,6 +16,7 @@ import java.nio.file.Paths
 import java.sql.Timestamp
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
+import bot.trade.exchanges.params.BotSettingsBobblesIndicator
 import kotlin.collections.HashMap
 import kotlin.math.abs
 

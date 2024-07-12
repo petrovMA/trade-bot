@@ -6,6 +6,8 @@ import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.libs.TrendCalculator
 import bot.trade.exchanges.libs.TrendCalculator.Trend.TREND
+import bot.trade.exchanges.params.BotSettings
+import bot.trade.exchanges.params.BotSettingsTrader
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
@@ -142,9 +144,9 @@ class AlgorithmTrader(
                             )
 
                             val entireTpDistance = if (entireTp.tpDistance.usePercent)
-                                positionLong!!.entryPrice.percent(entireTp.tpDistance.distance)
+                                positionLong!!.entryPrice.percent(entireTp.tpDistance.value)
                             else
-                                entireTp.tpDistance.distance
+                                entireTp.tpDistance.value
 
                             if (
                                 currentTpDistance > entireTpDistance
@@ -179,9 +181,9 @@ class AlgorithmTrader(
                             )
 
                             val entireTpDistance = if (entireTp.tpDistance.usePercent)
-                                positionShort!!.entryPrice.percent(entireTp.tpDistance.distance)
+                                positionShort!!.entryPrice.percent(entireTp.tpDistance.value)
                             else
-                                entireTp.tpDistance.distance
+                                entireTp.tpDistance.value
 
                             if (
                                 currentTpDistance > entireTpDistance
@@ -701,7 +703,7 @@ class AlgorithmTrader(
                     )
                 }
 
-                price += params.orderDistance().distance
+                price += params.orderDistance().value
             }
         }
     }
@@ -715,13 +717,13 @@ class AlgorithmTrader(
     ): BigDecimal {
         val distance = if (params.orderDistance().usePercent) {
             if (isStepDown)
-                params.orderDistance().distance.let {
+                params.orderDistance().value.let {
                     prevPrice.round() / (BigDecimal(100).round() + it.round()) * it.round()
                 }
             else
-                prevPrice.round() / BigDecimal(100).round() * params.orderDistance().distance.round()
+                prevPrice.round() / BigDecimal(100).round() * params.orderDistance().value.round()
 
-        } else params.orderDistance().distance
+        } else params.orderDistance().value
 
         val step = if (hedgeModule == null || hedgeModule.direction == currentDirection)
             distance

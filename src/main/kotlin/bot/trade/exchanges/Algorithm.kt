@@ -3,6 +3,7 @@ package bot.trade.exchanges
 import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.clients.stream.Stream
+import bot.trade.exchanges.params.BotSettings
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import org.knowm.xchange.exceptions.ExchangeException
@@ -191,6 +192,40 @@ abstract class Algorithm(
             }
         } while (--retryCount > 0)
         throw Exception("Can't get Order! retry = $retryGetOrderCount; interval = $retryGetOrderInterval")
+    }
+
+    fun cancelOrder(symbols: TradePair, order: Order, isStaticUpdate: Boolean) {
+        val tryTimes = 5
+        var trying = 0
+        do {
+            try {
+                client.cancelOrder(symbols, order.orderId, isStaticUpdate)
+                log?.debug("{} Cancelled order: {}", symbols, order)
+                break
+            } catch (e: Exception) {
+                ++trying
+                e.printStackTrace()
+                log?.warn("$symbols ${e.stackTrace}", e)
+                send("#Warn_$symbols: $\n${printTrace(e)}")
+
+                if (trying > tryTimes) {
+                    log?.error("$symbols can't cancel order ${e.stackTrace}", e)
+                    send("#Error_cannot_cancel_order_$symbols:\n${printTrace(e)}")
+                    stopThread = true
+                    throw e
+                } else {
+                    sleep(1.m().toMillis())
+                    client = newClient(exchangeEnum, api, sec)
+                    val status = getOrder(botSettings.pair, order.orderId)?.status
+                    if (status != STATUS.NEW && status != STATUS.PARTIALLY_FILLED) {
+                        log?.warn("$symbols Order already cancelled: $order")
+                        send("#Order_already_cancelled_$symbols: $order")
+                        break
+                    } else
+                        log?.debug("{} Trying {} to cancel order: {}", symbols, trying, order)
+                }
+            }
+        } while (true)
     }
 
     fun isUnknown(order: Order?): Boolean =

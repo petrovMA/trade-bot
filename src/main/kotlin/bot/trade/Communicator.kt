@@ -7,6 +7,9 @@ import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.emulate.EmulateFromFile
 import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.exchanges.libs.TrendCalculator
+import bot.trade.exchanges.params.BotEmulateParams
+import bot.trade.exchanges.params.BotSettings
+import bot.trade.exchanges.params.BotSettingsTrader
 import bot.trade.libs.*
 import bot.trade.rest_controller.Notification
 import com.typesafe.config.Config

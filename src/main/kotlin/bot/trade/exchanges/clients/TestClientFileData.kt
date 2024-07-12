@@ -4,6 +4,7 @@ import bot.trade.database.service.ActiveOrdersService
 import bot.trade.exchanges.BotEvent
 import bot.trade.exchanges.clients.stream.StreamThreadStub
 import bot.trade.exchanges.emulate.TestBalance
+import bot.trade.exchanges.params.BotEmulateParams
 import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File
