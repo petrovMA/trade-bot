@@ -2,6 +2,7 @@ package utils.mapper
 
 import bot.trade.exchanges.params.BotSettings
 import bot.trade.exchanges.params.BotSettingsBobblesIndicator
+import bot.trade.exchanges.params.BotSettingsGrid
 import bot.trade.exchanges.params.BotSettingsTrader
 import com.google.gson.*
 import java.io.File
@@ -56,6 +57,7 @@ object Mapper {
 
             return when (jsonObject.get("type")?.asString) {
                 "bobbles" -> context.deserialize(json, BotSettingsBobblesIndicator::class.java)
+                "AlgorithmGrid" -> context.deserialize(json, BotSettingsGrid::class.java)
                 else -> context.deserialize(json, BotSettingsTrader::class.java)
             }
         }

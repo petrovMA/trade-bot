@@ -35,7 +35,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
     ): List<Candlestick> =
         client.getKline(
             symbol = pair.first + pair.second,
-            category = "linear",
+            category = "spot",
             interval = interval.toByBitInterval(),
             limit = countCandles.toLong(),
             start = start,
@@ -47,7 +47,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
 
     override fun getOpenOrders(pair: TradePair): List<Order> =
         client.getOpenOrders(
-            category = "linear", // linear -> for perpetual contracts
+            category = "spot", // linear -> for perpetual contracts
             symbol = pair.first + pair.second
         )
             .list
@@ -87,7 +87,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
 
 
     override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> =
-        client.getOpenOrders(category = "linear") // linear -> for perpetual contracts
+        client.getOpenOrders() // linear -> for perpetual contracts
             .list
             .filter {
                 val pair = try {
@@ -165,7 +165,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
 
     override fun getOrder(pair: TradePair, orderId: String): Order = client.getOpenOrders(
         symbol = pair.first + pair.second,
-        category = "linear", // linear -> for perpetual contracts
+        category = "spot", // linear -> for perpetual contracts
         orderId = orderId
     ).list.first().run {
         Order(
@@ -203,7 +203,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
     ): Order {
         val resp = client.newOrder(
             symbol = order.pair.first + order.pair.second,
-            category = "linear", // linear -> for perpetual contracts
+            category = "spot", // linear -> for perpetual contracts
             side = when (order.side) {
                 SIDE.BUY -> "Buy"
                 SIDE.SELL -> "Sell"

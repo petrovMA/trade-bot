@@ -300,6 +300,12 @@ enum class SIDE {
         SELL -> org.knowm.xchange.dto.Order.OrderType.ASK
         else -> throw UnknownOrderSide("Error, side: $this")
     }
+
+    fun reverse(): SIDE = when (this) {
+        BUY -> SELL
+        SELL -> BUY
+        else -> throw UnknownOrderSide("Error, side: $this")
+    }
 }
 
 enum class TYPE { LIMIT, MARKET, UNSUPPORTED }

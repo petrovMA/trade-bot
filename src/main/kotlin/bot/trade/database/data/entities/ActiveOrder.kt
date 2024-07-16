@@ -6,10 +6,12 @@ import bot.trade.exchanges.clients.SIDE
 import bot.trade.libs.round
 import jakarta.persistence.*
 import java.math.BigDecimal
-import java.util.*
 
 @Entity
-@Table(name = "ACTIVE_ORDERS")
+@Table(
+    name = "ACTIVE_ORDERS",
+    uniqueConstraints = [UniqueConstraint(columnNames = ["BOT_NAME", "ORDER_ID"])]
+)
 data class ActiveOrder(
 
     @Id
@@ -18,7 +20,7 @@ data class ActiveOrder(
 
     @Column(name = "BOT_NAME") val botName: String? = null,
 
-    @Column(name = "ORDER_ID", unique = true) val orderId: UUID? = null,
+    @Column(name = "ORDER_ID") val orderId: String? = null,
 
     @Column(name = "TRADE_PAIR") val tradePair: String? = null,
 
@@ -55,7 +57,7 @@ data class ActiveOrder(
 
     constructor(order: Order, botName: String) : this(
         botName = botName,
-        orderId = UUID.randomUUID(),
+        orderId = order.orderId,
         tradePair = order.pair.toString(),
         amount = order.origQty,
         orderSide = order.side,

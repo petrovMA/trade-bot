@@ -19,6 +19,7 @@ data class TestBalance(
     var maxLongOpenOrdersAmount: Int = 0,
     var maxShortOpenOrdersAmount: Int = 0,
     var secondBalance: BigDecimal = 0.toBigDecimal(),
+    var secondBalanceSum: BigDecimal = 0.toBigDecimal(),
     var balanceTrade: BigDecimal = 0.toBigDecimal(),
     var correctAverageHigh: BigDecimal = 0.toBigDecimal(),
     var correctAverageLow: BigDecimal = 0.toBigDecimal(),

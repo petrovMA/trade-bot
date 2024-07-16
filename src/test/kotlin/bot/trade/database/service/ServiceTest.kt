@@ -31,7 +31,7 @@ class ServiceTest {
         val order1 = ActiveOrder(
             id = null,
             botName = "test",
-            orderId = UUID.randomUUID(),
+            orderId = UUID.randomUUID().toString(),
             tradePair = "BTC_USDT",
             amount = BigDecimal(0.001),
             orderSide = SIDE.SELL,
@@ -44,7 +44,7 @@ class ServiceTest {
         val order2 = ActiveOrder(
             id = null,
             botName = "test",
-            orderId = UUID.randomUUID(),
+            orderId = UUID.randomUUID().toString(),
             tradePair = "BTC_USDT",
             amount = BigDecimal(0.001),
             orderSide = SIDE.SELL,
@@ -74,7 +74,7 @@ class ServiceTest {
         val order3 = ActiveOrder(
             id = null,
             botName = "test",
-            orderId = UUID.randomUUID(),
+            orderId = UUID.randomUUID().toString(),
             tradePair = "BTC_USDT",
             amount = BigDecimal(0.001),
             orderSide = SIDE.SELL,

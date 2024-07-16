@@ -9,6 +9,7 @@ import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.exchanges.libs.TrendCalculator
 import bot.trade.exchanges.params.BotEmulateParams
 import bot.trade.exchanges.params.BotSettings
+import bot.trade.exchanges.params.BotSettingsGrid
 import bot.trade.exchanges.params.BotSettingsTrader
 import bot.trade.libs.*
 import bot.trade.rest_controller.Notification
@@ -188,10 +189,18 @@ class Communicator(
                     readObjectFromFile(File("$exchangeBotsFiles/${params[1]}/settings.json"), BotSettings::class.java)
 
                 tradeBots[tradeBotSettings.name] = when (tradeBotSettings.type) {
-                    "bobbles" -> AlgorithmBobblesIndicator(
+                    "AlgorithmBobblesIndicator" -> AlgorithmBobblesIndicator(
                         tradeBotSettings,
                         exchangeBotsFiles,
                         orderService,
+                        sendMessage = sendMessage
+                    )
+
+                    "AlgorithmGrid" -> AlgorithmGrid(
+                        tradeBotSettings,
+                        exchangeBotsFiles,
+                        activeOrdersService,
+                        logMessageQueue = logMessageQueue,
                         sendMessage = sendMessage
                     )
 
@@ -649,50 +658,61 @@ class Communicator(
 
         val test = TestClientFileData(params, activeOrdersService)
 
-
-        val trendCalculator: TrendCalculator? = params.botParams.trendDetector?.run {
-            TrendCalculator(
+        val algorithm = when (params.botParams) {
+            is BotSettingsGrid -> AlgorithmGrid(
+                params.botParams,
+                "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
+                activeOrdersService,
+                isEmulate = true,
                 client = test,
-                pair = params.botParams.pair,
-                hma1 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma1Period,
-                hma2 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma2Period,
-                hma3 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
-                rsi1 = rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
-                rsi2 = rsi2.timeFrame.toDuration() to rsi2.rsiPeriod,
-                inputKlineInterval = inputKlineInterval?.let { it.toDuration() to it.toInterval() }
-                    ?: (5.m() to INTERVAL.FIVE_MINUTES)
-            ).also {
+                sendMessage = { _, _ -> }
+            )
+            is BotSettingsTrader -> {
+                val trendCalculator: TrendCalculator? = params.botParams.trendDetector?.run {
+                    TrendCalculator(
+                        client = test,
+                        pair = params.botParams.pair,
+                        hma1 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma1Period,
+                        hma2 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma2Period,
+                        hma3 = hmaParameters.timeFrame.toDuration() to hmaParameters.hma3Period,
+                        rsi1 = rsi1.timeFrame.toDuration() to rsi1.rsiPeriod,
+                        rsi2 = rsi2.timeFrame.toDuration() to rsi2.rsiPeriod,
+                        inputKlineInterval = inputKlineInterval?.let { it.toDuration() to it.toInterval() }
+                            ?: (5.m() to INTERVAL.FIVE_MINUTES)
+                    ).also {
 
-                val maxConverterTime = it.getMaxConverterTime()
+                        val maxConverterTime = it.getMaxConverterTime()
 
-                val from: ZonedDateTime? = params.from?.let { time ->
-                    ZonedDateTime.parse(time).minusSeconds(maxConverterTime.ms().toSeconds())
-                }
-                val to: ZonedDateTime? = params.from.let { time -> ZonedDateTime.parse(time) }
+                        val from: ZonedDateTime? = params.from?.let { time ->
+                            ZonedDateTime.parse(time).minusSeconds(maxConverterTime.ms().toSeconds())
+                        }
+                        val to: ZonedDateTime? = params.from.let { time -> ZonedDateTime.parse(time) }
 
-                File("database/${params.botParams.pair}_klines.csv").forEachLine { line ->
-                    if (line.isNotBlank()) {
-                        val candlestick = Candlestick(line.split(';'), 1.m())
-                        if (from == null || from.isBefore(candlestick.openTime.toZonedTime())) {
-                            if (to == null || to.isAfter(candlestick.openTime.toZonedTime()))
-                                it.addCandlesticks(candlestick)
+                        File("database/${params.botParams.pair}_klines.csv").forEachLine { line ->
+                            if (line.isNotBlank()) {
+                                val candlestick = Candlestick(line.split(';'), 1.m())
+                                if (from == null || from.isBefore(candlestick.openTime.toZonedTime())) {
+                                    if (to == null || to.isAfter(candlestick.openTime.toZonedTime()))
+                                        it.addCandlesticks(candlestick)
+                                }
+                            }
                         }
                     }
                 }
+
+                AlgorithmTrader(
+                    params.botParams,
+                    "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
+                    activeOrdersService,
+                    isEmulate = true,
+                    endTimeForTrendCalculator = test.from.toInstant().toEpochMilli(),
+                    trendCalculator = trendCalculator,
+                    client = test,
+                    sendMessage = { _, _ -> }
+                )
             }
+            else -> throw RuntimeException("Unsupported bot settings type!")
         }
-
-
-        val algorithm = AlgorithmTrader(
-            params.botParams,
-            "$exchangeBotsFiles/emulate/${params.botParams.pair}/settings.json",
-            activeOrdersService,
-            isEmulate = true,
-            endTimeForTrendCalculator = test.from.toInstant().toEpochMilli(),
-            trendCalculator = trendCalculator,
-            client = test,
-            sendMessage = { _, _ -> }
-        )
 
         algorithm.setup()
         test.handler = { botMessage -> algorithm.handle(botMessage) }

@@ -1,6 +1,7 @@
 package bot.trade.exchanges.clients
 
 import bot.trade.exchanges.assertPosition
+import bot.trade.exchanges.params.BotEmulateParams
 import bot.trade.libs.deserialize
 import bot.trade.libs.m
 import bot.trade.libs.toZonedTime

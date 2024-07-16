@@ -4,6 +4,7 @@ import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.clients.stream.Stream
 import bot.trade.exchanges.params.BotSettings
+import bot.trade.exchanges.params.Param
 import com.typesafe.config.Config
 import mu.KotlinLogging
 import org.knowm.xchange.exceptions.ExchangeException
@@ -194,7 +195,7 @@ abstract class Algorithm(
         throw Exception("Can't get Order! retry = $retryGetOrderCount; interval = $retryGetOrderInterval")
     }
 
-    fun cancelOrder(symbols: TradePair, order: Order, isStaticUpdate: Boolean) {
+    fun cancelOrder(symbols: TradePair, order: Order, isStaticUpdate: Boolean = false) {
         val tryTimes = 5
         var trying = 0
         do {
@@ -250,6 +251,10 @@ abstract class Algorithm(
     fun price(price: BigDecimal) = price.round(botSettings.countOfDigitsAfterDotForPrice)
 
     fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
+
+    fun orderDistance(currPrice: BigDecimal, orderDistance: Param): BigDecimal =
+        if (orderDistance.usePercent) currPrice.percent(orderDistance.value)
+        else orderDistance.value
 
     override fun toString(): String = "status = $state, settings = $botSettings"
 

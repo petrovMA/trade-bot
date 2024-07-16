@@ -19,27 +19,27 @@
         "use_percent": false
       },
       "in_order_distance": {
-        "distance": 1.0,
+        "value": 1.0,
         "use_percent": false
       },
       "trailing_in_order_distance": {
-        "distance": 3.0,
+        "value": 3.0,
         "use_percent": false
       },
       "trigger_in_order_distance": {
-        "distance": 3.0,
+        "value": 3.0,
         "use_percent": false
       },
       "trigger_distance": {
-        "distance": 8.0,
+        "value": 8.0,
         "use_percent": false
       },
       "min_tp_distance": {
-        "distance": 5.0,
+        "value": 5.0,
         "use_percent": false
       },
       "max_tp_distance": {
-        "distance": 5.0,
+        "value": 5.0,
         "use_percent": false
       },
       "max_trigger_count": 150,

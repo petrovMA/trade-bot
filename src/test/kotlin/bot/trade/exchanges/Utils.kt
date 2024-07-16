@@ -4,6 +4,7 @@ import bot.trade.database.data.entities.ActiveOrder
 import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.database.service.impl.ActiveOrdersServiceImpl
 import bot.trade.exchanges.clients.*
+import bot.trade.exchanges.params.BotSettingsTrader
 import bot.trade.libs.compareBigDecimal
 import bot.trade.libs.json
 import bot.trade.libs.readConf

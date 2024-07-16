@@ -8,8 +8,10 @@ import java.util.*
 
 interface ActiveOrdersService {
     fun saveOrder(order: ActiveOrder): ActiveOrder
+    fun updateOrder(order: ActiveOrder): ActiveOrder
     fun getOrderById(id: Long): ActiveOrder?
-    fun getOrderByOrderId(botName: String, orderId: UUID): ActiveOrder?
+    fun getOrderByOrderId(botName: String, orderId: String): ActiveOrder?
+    fun getOrderByOrderId(orderId: String): ActiveOrder?
     fun getOrders(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
     fun getOrderWithMaxPrice(botName: String, direction: DIRECTION, maxPrice: BigDecimal): ActiveOrder?
     fun getOrderWithMinPrice(botName: String, direction: DIRECTION, minPrice: BigDecimal): ActiveOrder?
@@ -20,6 +22,7 @@ interface ActiveOrdersService {
     fun deleteByDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
     fun deleteByBotName(botName: String): Iterable<ActiveOrder>
     fun count(botName: String, direction: DIRECTION, side: SIDE): Long
+    fun count(botName: String): Long
     fun deleteById(id: Long)
-    fun deleteByOrderId(orderId: UUID)
+    fun deleteByOrderId(orderId: String)
 }

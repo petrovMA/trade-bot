@@ -2,7 +2,7 @@ package bot.trade
 
 import bot.trade.database.service.impl.ActiveOrdersServiceImpl
 import bot.trade.database.repositories.ActiveOrdersRepository
-import bot.trade.exchanges.clients.BotEmulateParams
+import bot.trade.exchanges.params.BotEmulateParams
 import bot.trade.libs.CustomFileLoggingProcessor
 import bot.trade.libs.deserialize
 import org.junit.jupiter.api.Test

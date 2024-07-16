@@ -1,6 +1,7 @@
 package bot.trade.database.service.impl
 
 import bot.trade.database.data.entities.ActiveOrder
+import bot.trade.exchanges.clients.Order
 import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.database.service.ActiveOrdersService
 import bot.trade.exchanges.clients.DIRECTION
@@ -19,17 +20,31 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
     override fun saveOrder(order: ActiveOrder): ActiveOrder = activeOrdersRepository.save(order)
 
     @Transactional
+    override fun updateOrder(order: ActiveOrder): ActiveOrder {
+        if (order.id == null)
+            throw RuntimeException("Can't update order without ID, order = $order")
+
+        order.orderId?.let { deleteByOrderId(it) }
+
+        return saveOrder(order)
+    }
+
+    @Transactional
     override fun getOrderById(id: Long): ActiveOrder? = activeOrdersRepository.findOrderById(id)
 
     @Transactional
-    override fun getOrderByOrderId(botName: String, orderId: UUID): ActiveOrder? =
+    override fun getOrderByOrderId(botName: String, orderId: String): ActiveOrder? =
         activeOrdersRepository.findByBotNameAndOrderId(botName, orderId)
+
+    @Transactional
+    override fun getOrderByOrderId(orderId: String): ActiveOrder? =
+        activeOrdersRepository.findByOrderId(orderId)
 
     @Transactional
     override fun deleteById(id: Long) = activeOrdersRepository.deleteById(id)
 
     @Transactional
-    override fun deleteByOrderId(orderId: UUID) = activeOrdersRepository.deleteByOrderId(orderId)
+    override fun deleteByOrderId(orderId: String) = activeOrdersRepository.deleteByOrderId(orderId)
 
     @Transactional
     override fun getOrders(botName: String, direction: DIRECTION): Iterable<ActiveOrder> =
@@ -41,15 +56,26 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
 
     @Transactional
     override fun getOrderWithMaxPrice(botName: String, direction: DIRECTION, maxPrice: BigDecimal): ActiveOrder? =
-        activeOrdersRepository.findTopByBotNameAndDirectionAndPriceLessThanEqualOrderByPriceDesc(botName, direction, maxPrice)
+        activeOrdersRepository.findTopByBotNameAndDirectionAndPriceLessThanEqualOrderByPriceDesc(
+            botName,
+            direction,
+            maxPrice
+        )
 
     @Transactional
     override fun getOrderWithMinPrice(botName: String, direction: DIRECTION, minPrice: BigDecimal): ActiveOrder? =
-        activeOrdersRepository.findTopByBotNameAndDirectionAndPriceGreaterThanEqualOrderByPriceAsc(botName, direction, minPrice)
+        activeOrdersRepository.findTopByBotNameAndDirectionAndPriceGreaterThanEqualOrderByPriceAsc(
+            botName,
+            direction,
+            minPrice
+        )
 
     @Transactional
     override fun count(botName: String, direction: DIRECTION, side: SIDE): Long =
         activeOrdersRepository.countByBotNameAndDirectionAndOrderSide(botName, direction, side)
+
+    @Transactional
+    override fun count(botName: String): Long = activeOrdersRepository.countByBotName(botName)
 
     @Transactional
     override fun deleteByDirectionAndSide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder> =

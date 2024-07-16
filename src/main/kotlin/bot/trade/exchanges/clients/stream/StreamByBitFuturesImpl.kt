@@ -12,7 +12,7 @@ class StreamByBitFuturesImpl(
     private val queue: BlockingQueue<CommonExchangeData>,
     private val api: String?,
     private val sec: String?,
-    private val isFuture: Boolean = true,
+    private val isFuture: Boolean = false,
     private val timeout: Int = 600000
 ) : Stream() {
 
@@ -29,14 +29,22 @@ class StreamByBitFuturesImpl(
             keepConnection = true,
             pingTimeInterval = 50.s(),
             reconnectIfNoMessagesDuring = 2.m(),
-            WebSocketMsg("subscribe", listOf("kline.5.${pair.first}${pair.second}"))
+            //WebSocketMsg("subscribe", listOf("kline.5.${pair.first}${pair.second}"))
+            WebSocketMsg("subscribe", listOf("publicTrade.${pair.first}${pair.second}"))
         )
 
-        publicStream?.setKlineCallback {
+        /*publicStream?.setKlineCallback {
             it.data
                 .map { kline -> Candlestick(kline) }
                 .sortedBy { kline -> kline.closeTime }
                 .forEach { kline -> queue.add(kline) }
+        }*/
+
+        publicStream?.setTradeCallback {
+            it.data
+                .map { trade -> Trade(trade.price.toBigDecimal(), trade.volume.toBigDecimal(), trade.timestamp) }
+                .sortedBy { trade -> trade.time }
+                .forEach { trade -> queue.add(trade) }
         }
 
         if (api != null && sec != null) {
@@ -51,7 +59,7 @@ class StreamByBitFuturesImpl(
             )
 
             privateStream?.setOrderCallback { queue.addAll(it.data.map { order -> Order(order) }) }
-            privateStream?.setPositionCallback { queue.addAll(it.data.map { position -> Position(position) }) }
+            if (isFuture) privateStream?.setPositionCallback { queue.addAll(it.data.map { position -> Position(position) }) }
         }
     }
 

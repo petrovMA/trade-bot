@@ -295,7 +295,7 @@ class AlgorithmTrader(
                 if (msg.pair == botSettings.pair) {
                     if (msg.status == STATUS.FILLED) {
                         if (msg.type == TYPE.LIMIT) {
-                            activeOrdersService.getOrderByOrderId(settings.name, UUID.fromString(msg.orderId))
+                            activeOrdersService.getOrderByOrderId(settings.name, msg.orderId)
                                 ?.let { orderForUpdate ->
                                     activeOrdersService.saveOrder(orderForUpdate.also { it.lastBorderPrice = null })
                                 }
@@ -837,7 +837,7 @@ class AlgorithmTrader(
         direction: DIRECTION,
         params: BotSettingsTrader.TradeParameters.Parameters
     ) = ActiveOrder(
-        orderId = UUID.randomUUID(),
+        orderId = UUID.randomUUID().toString(),
         botName = settings.name,
         tradePair = botSettings.pair.toString(),
         price = price,

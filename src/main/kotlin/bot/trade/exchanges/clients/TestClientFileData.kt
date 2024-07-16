@@ -9,6 +9,7 @@ import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.concurrent.BlockingQueue
 
@@ -58,6 +59,7 @@ class TestClientFileData(
 
     private lateinit var candlestick: Candlestick
     private var historyFile: File? = null
+    private var currentEmulateDate = from.plusDays(1)
 
     fun emulate(isWriteOrdersToLog: Boolean = false): Pair<TestBalance, File?> {
 
@@ -106,6 +108,7 @@ class TestClientFileData(
 
         profit.feesSum = profit.feesSum.round()
         profit.secondBalance = profit.secondBalance.round()
+        profit.secondBalanceSum = (profit.firstBalance * candlestick.close + profit.secondBalance).round()
 
         return profit to historyFile
     }
@@ -114,9 +117,24 @@ class TestClientFileData(
         if (kline.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
             if (kline.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) }) {
 
+                if (currentEmulateDate.isBefore(kline.openTime.toZonedTime())) {
+                    val totalDuration = Duration.between(from, to).toMillis().toDouble()
+                    val currentDuration = Duration.between(from, currentEmulateDate).toMillis().toDouble()
+
+                    val percent = ((currentDuration / totalDuration) * 100).toBigDecimal().round(2)
+
+                    log.info("EMULATE $percent%, currentDate = $currentEmulateDate, from = $from, to = $to")
+
+                    currentEmulateDate = currentEmulateDate.plusDays(1)
+                }
+
                 candlestick = kline
 
+                checkOrderExecuted(kline.close)
+
                 handler(kline)
+                handler(Trade(kline.open, kline.volume, kline.openTime))
+                handler(Trade(kline.open, kline.volume, kline.closeTime))
 
                 activeOrdersService?.run {
                     count(params.botParams.name, DIRECTION.LONG, SIDE.SELL).let {
@@ -204,7 +222,22 @@ class TestClientFileData(
                 return order
             }
 
-            TYPE.LIMIT -> TODO("not implemented")
+            TYPE.LIMIT -> {
+                val newOrder = Order(
+                    pair = order.pair,
+                    side = order.side,
+                    type = order.type,
+                    origQty = order.origQty,
+                    price = order.price,
+                    executedQty = BigDecimal(0),
+                    status = STATUS.NEW,
+                    orderId = clientOrderId.toString()
+                )
+
+                orders[newOrder.orderId] = newOrder
+
+                return newOrder
+            }
 
             else -> return order
         }
@@ -215,10 +248,10 @@ class TestClientFileData(
             if (order.status != STATUS.NEW) return true
             order.status = STATUS.CANCELED
 
-            if (order.side == SIDE.SELL)
-                profit.firstBalance += order.origQty
-            else if (order.side == SIDE.BUY)
-                profit.secondBalance += order.origQty * (order.price ?: 0.0.toBigDecimal())
+//            if (order.side == SIDE.SELL)
+//                 profit.firstBalance += order.origQty
+//            else if (order.side == SIDE.BUY)
+//                 profit.secondBalance += order.origQty * (order.price ?: 0.0.toBigDecimal())
         } ?: log.info("Order: id = $orderId Not found!")
         return true
     }
@@ -234,9 +267,8 @@ class TestClientFileData(
 
     override fun switchMode(category: String, mode: Int, pair: TradePair?, coin: String?) {}
 
-
-    private fun updatePosition(direction: DIRECTION, side: SIDE, amount: BigDecimal) {
-        val price = if (side == SIDE.BUY) candlestick.high else candlestick.low
+    private fun updatePosition(direction: DIRECTION, side: SIDE, amount: BigDecimal, currentPrice: BigDecimal? = null) {
+        val price = currentPrice ?: if (side == SIDE.BUY) candlestick.high else candlestick.low
 
         val priceWithFee = if (side == SIDE.BUY) price + price.percent(fee) else price - price.percent(fee)
 
@@ -263,7 +295,7 @@ class TestClientFileData(
                     profit.tradeVolume += (price * amount)
                     profit.ordersAmount++
 
-                    write(amountWithFee, "BUY", price)
+                    write(amountWithFee, side, price)
 
                 } else {
                     positionLong = if (side == SIDE.BUY) {
@@ -278,7 +310,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "BUY", price)
+                        write(amountWithFee, side, price)
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -295,7 +327,9 @@ class TestClientFileData(
                     } else {
                         val newAmount = positionLong.size - amount
 
-                        val priceChange = (price - positionLong.breakEvenPrice) / (positionLong.size / amount)
+                        val priceChange = if (!compareBigDecimal(positionLong.size, BigDecimal(0)))
+                            (price - positionLong.breakEvenPrice) / (positionLong.size / amount)
+                        else BigDecimal(0)
 
                         val amountWithFee = (amount * priceWithFee)
                         profit.secondBalance += amountWithFee
@@ -304,7 +338,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "BUY", price)
+                        write(amountWithFee, side, price)
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -359,7 +393,7 @@ class TestClientFileData(
                     profit.tradeVolume += (price * amount)
                     profit.ordersAmount++
 
-                    write(amountWithFee, "SELL", price)
+                    write(amountWithFee, side, price)
 
                 } else {
                     positionShort = if (side == SIDE.SELL) {
@@ -374,7 +408,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "SELL", price)
+                        write(amountWithFee, side, price)
 
                         Position(
                             pair = TradePair("TEST_PAIR"),
@@ -398,7 +432,7 @@ class TestClientFileData(
                         profit.tradeVolume += (price * amount)
                         profit.ordersAmount++
 
-                        write(amountWithFee, "SELL", price)
+                        write(amountWithFee, side, price)
 
                         if (newAmount > BigDecimal(0.0)) {
                             Position(
@@ -433,7 +467,47 @@ class TestClientFileData(
         }
     }
 
-    private fun write(amountWithFee: BigDecimal, side: String, price: BigDecimal) = historyFile?.appendText(
+
+    private fun checkOrderExecuted(price: BigDecimal) {
+        val updatedOrders = orders.map { (key, order) ->
+            if (order.status == STATUS.NEW && order.price != null) {
+                when {
+                    order.price > price -> {
+                        if (order.side == SIDE.BUY) {
+                            order.status = STATUS.FILLED
+                            order.executedQty = order.origQty
+                            updatePosition(DIRECTION.LONG, order.side, order.origQty, order.price)
+                        }
+
+                        key to order
+                    }
+
+                    order.price < price -> {
+                        if (order.side == SIDE.SELL) {
+                            order.status = STATUS.FILLED
+                            order.executedQty = order.origQty
+                            updatePosition(DIRECTION.LONG, order.side, order.origQty, order.price)
+                        }
+
+                        key to order
+                    }
+
+                    else -> key to order
+                }
+            } else key to order
+        }
+
+        orders = updatedOrders
+            .toMap()
+            .filter { it.value.status != STATUS.FILLED }
+            .toMutableMap()
+
+        updatedOrders
+            .filter { (_, order) -> order.status == STATUS.FILLED }
+            .forEach { (_, order) -> handler(order) }
+    }
+
+    private fun write(amountWithFee: BigDecimal, side: SIDE, price: BigDecimal) = historyFile?.appendText(
         "\n${candlestick.openTime.toZonedTime()};" +
                 "$side;" +
                 "${amountWithFee.round()};" +

@@ -10,9 +10,10 @@ import java.util.*
 
 interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
     fun findOrderById(id: Long): ActiveOrder?
-    fun deleteByOrderId(orderId: UUID)
+    fun deleteByOrderId(orderId: String)
+    fun findByOrderId(orderId: String): ActiveOrder?
     fun findAllByBotNameAndDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
-    fun findByBotNameAndOrderId(botName: String, orderId: UUID): ActiveOrder?
+    fun findByBotNameAndOrderId(botName: String, orderId: String): ActiveOrder?
     fun findAllByBotNameAndDirectionAndOrderSide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun deleteByBotNameAndDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
     fun deleteByBotName(botName: String): Iterable<ActiveOrder>
@@ -45,4 +46,5 @@ interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
     ): ActiveOrder?
 
     fun countByBotNameAndDirectionAndOrderSide(botName: String, direction: DIRECTION, side: SIDE): Long
+    fun countByBotName(botName: String): Long
 }

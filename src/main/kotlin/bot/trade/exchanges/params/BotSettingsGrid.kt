@@ -14,13 +14,7 @@ class BotSettingsGrid(
     orderBalanceType: String = "first", // if first => BTC balance, else second => USDT balance (default = second)
     countOfDigitsAfterDotForAmount: Int, // number of characters after the dot for amount
     countOfDigitsAfterDotForPrice: Int, // number of characters after the dot for price
-    @SerializedName("parameters") val parameters: Parameters,
-    @SerializedName("trend_detector") val trendDetector: BotSettingsTrader.TrendDetector? = null,
-    @SerializedName("min_order_amount") val minOrderAmount: BotSettingsTrader.MinOrderAmount? = null,
-    @SerializedName("market_type") val marketType: String,
-    @SerializedName("market_type_comment") val marketTypeComment: String,
-    @SerializedName("strategy_type_comment") val strategyTypeComment: String,
-    @SerializedName("auto_balance") val autoBalance: Boolean = false
+    @SerializedName("parameters") val parameters: Parameters
 ) : BotSettings(
     name = name,
     pair = pair,
@@ -33,7 +27,7 @@ class BotSettingsGrid(
         @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
         @SerializedName("order_quantity") val orderQuantity: Param, // Order Quantity:: order size
         @SerializedName("order_distance") val orderDistance: Param, // Order Distance:: distance between every order
-        @SerializedName("trigger_distance") val triggerDistance: Param, // Order Distance:: distance between every order
+        @SerializedName("profit_distance") val profitDistance: Param, // Order Distance:: distance between first order and next order
         @SerializedName("order_max_quantity") val orderMaxQuantity: Int = Int.MAX_VALUE
     )
 }
