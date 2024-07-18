@@ -25,7 +25,7 @@ class ByBitApiWebSocketListener {
     /**
      * patterns to determine type of message
      */
-    private val orderPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"order")
+    private val orderPattern = Regex("\\s*\\{\\s*\"id\"\\s*:\\s*\".*\",\\s*\"topic\"\\s*:\\s*\"order\".+")
     private val orderBookPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"orderBook")
     private val orderBookSnapshotPattern = Regex("\\s*\"type\"\\s*:\\s*\"snapshot\"")
     private val tradePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"publicTrade\\.")
@@ -35,7 +35,7 @@ class ByBitApiWebSocketListener {
     private val liquidationPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"liquidation")
     private val positionPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"position")
     private val pongPattern = Regex(".+\"ret_msg\"\\s*:\\s*\"pong\".+\"op\"\\s*:\\s*\"ping\".+")
-    private val subscribePattern = Regex(".+\"success\"\\s*:\\s*true.+\"ret_msg\"\\s*:\\s*\"\".+\"op\"\\s*:\\s*\"subscribe\".+")
+    private val subscribePattern = Regex(".+\"success\"\\s*:\\s*true.+\"ret_msg\"\\s*:\\s*\".*\".+\"op\"\\s*:\\s*\"subscribe\".+")
     private val authPattern = Regex(".+\"success\"\\s*:\\s*true.+\"ret_msg\"\\s*:\\s*\"\".+\"op\"\\s*:\\s*\"auth\".+")
 
     /**

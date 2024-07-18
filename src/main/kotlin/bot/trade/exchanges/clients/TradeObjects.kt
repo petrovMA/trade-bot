@@ -293,6 +293,12 @@ enum class SIDE {
             OrderSide.SELL -> SELL
             else -> throw UnknownOrderSide("Error, side: $side")
         }
+
+        fun fromString(side: String) = when {
+            "BUY".equals(side, true) -> BUY
+            "SELL".equals(side, true) -> SELL
+            else -> throw UnknownOrderSide("Error, side: $side")
+        }
     }
 
     fun toType() = when (this) {

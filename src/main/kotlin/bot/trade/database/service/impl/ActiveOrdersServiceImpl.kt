@@ -26,7 +26,7 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
 
         order.orderId?.let { deleteByOrderId(it) }
 
-        return saveOrder(order)
+        return activeOrdersRepository.save(order)
     }
 
     @Transactional

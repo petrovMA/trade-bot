@@ -29,7 +29,7 @@ interface Client {
         isReduceOnly: Boolean = false
     ): Order
 
-    fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean
+    fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean = false): Boolean
 
     /**
      * @return socket with thread (process for income messages)

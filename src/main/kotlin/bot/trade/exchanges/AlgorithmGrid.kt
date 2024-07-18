@@ -59,9 +59,7 @@ class AlgorithmGrid(
     var from: Long = Long.MAX_VALUE
     var to: Long = Long.MIN_VALUE
 
-    override fun setup() {
-        synchronizeOrders()
-    }
+    override fun setup() {}
 
     override fun handle(msg: CommonExchangeData?) {
         when (msg) {
@@ -136,12 +134,18 @@ class AlgorithmGrid(
                                             getOrder(settings.pair, nearSellOrder.orderId!!)?.let {
                                                 if (it.status == STATUS.FILLED)
                                                     createSecondOrder(nearSellOrder)
+                                            } ?: run {
+                                                log?.warn("Order with ID = ${nearSellOrder.orderId} Not found")
+                                                activeOrdersService.deleteByOrderId(nearSellOrder.orderId)
                                             }
                                         }
                                         if (currentPrice < nearBuyOrder.price) {
                                             getOrder(settings.pair, nearBuyOrder.orderId!!)?.let {
                                                 if (it.status == STATUS.FILLED)
                                                     createSecondOrder(nearBuyOrder)
+                                            } ?: run {
+                                                log?.warn("Order with ID = ${nearBuyOrder.orderId} Not found")
+                                                activeOrdersService.deleteByOrderId(nearBuyOrder.orderId)
                                             }
                                         }
                                     }
@@ -204,10 +208,12 @@ class AlgorithmGrid(
 
                 distanceBuy = orderDistance(priceBuy, settings.parameters.orderDistance)
 
+                val minPrice = priceBuy - distanceBuy
+
                 val buyOrders = activeOrdersService.getOrderByPriceBetween(
                     botName = settings.name,
                     direction = settings.direction,
-                    minPrice = priceBuy - distanceBuy,
+                    minPrice = minPrice,
                     maxPrice = prevPriceBuy
                 ).toList()
 
@@ -234,11 +240,13 @@ class AlgorithmGrid(
 
                 distanceSell = orderDistance(priceSell, settings.parameters.orderDistance)
 
+                val maxPrice = priceSell + distanceSell
+
                 val sellOrders = activeOrdersService.getOrderByPriceBetween(
                     botName = settings.name,
                     direction = settings.direction,
                     minPrice = prevPriceSell,
-                    maxPrice = priceSell + distanceSell
+                    maxPrice = maxPrice
                 ).toList()
 
                 if (sellOrders.isEmpty()) {
@@ -309,7 +317,7 @@ class AlgorithmGrid(
                 ?: cancelOrder(settings.pair, order)
         }
 
-        val openOrdersKeys = openOrders.map { it.orderId }
+        val openOrdersKeys = client.getOpenOrders(settings.pair).map { it.orderId }
 
         activeOrdersService.getOrders(settings.name, settings.direction)
             .mapNotNull { it.orderId }

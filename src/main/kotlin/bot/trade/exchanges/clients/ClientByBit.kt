@@ -4,6 +4,7 @@ import bot.trade.exchanges.clients.stream.StreamByBitFuturesImpl
 import bot.trade.libs.UnknownOrderSide
 import bot.trade.libs.UnsupportedOrderTypeException
 import io.bybit.api.rest.client.ByBitRestApiClient
+import io.bybit.api.rest.response.OpenOrders
 import mu.KotlinLogging
 import org.knowm.xchange.binance.dto.marketdata.KlineInterval
 import org.knowm.xchange.binance.dto.trade.OrderSide
@@ -45,19 +46,29 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
             .map { asCandlestick(it, interval) }
 
 
-    override fun getOpenOrders(pair: TradePair): List<Order> =
-        client.getOpenOrders(
-            category = "spot", // linear -> for perpetual contracts
-            symbol = pair.first + pair.second
-        )
-            .list
+    override fun getOpenOrders(pair: TradePair): List<Order> {
+        val result: ArrayList<OpenOrders.Result.ByBitOrder> = ArrayList()
+        var cursor: String? = null
+        var list: List<OpenOrders.Result.ByBitOrder> = emptyList()
+
+        do {
+            val response = client.getOpenOrders(
+                category = "spot", // linear -> for perpetual contracts
+                symbol = pair.first + pair.second,
+                cursor = cursor,
+                limit = 50
+            )
+
+            list = response.list
+            cursor = response.nextPageCursor
+            result += list
+        } while (cursor.isNullOrBlank().not() || list.isNotEmpty())
+
+        return result
             .filter {
-                pair == try {
-                    TradePair(it.symbol.substring(0, 3), it.symbol.substring(3))
-                } catch (t: Throwable) {
-                    log.warn("Can't convert to pair ${it.symbol} error: ${t.message}")
-                    null
-                }
+                it.symbol.startsWith(pair.first)
+                        && it.symbol.endsWith(pair.second)
+                        && it.symbol.length == (pair.first + pair.second).length
             }
             .map {
                 Order(
@@ -84,6 +95,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
                     }
                 )
             }
+    }
 
 
     override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> =
@@ -163,35 +175,61 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
         })
 
 
-    override fun getOrder(pair: TradePair, orderId: String): Order = client.getOpenOrders(
-        symbol = pair.first + pair.second,
-        category = "spot", // linear -> for perpetual contracts
-        orderId = orderId
-    ).list.first().run {
-        Order(
-            price = price.toBigDecimal(),
-            pair = pair,
-            orderId = orderId,
-            origQty = qty.toBigDecimal(),
-            executedQty = cumExecQty.toBigDecimal(),
-            side = SIDE.valueOf(side),
-            type = TYPE.LIMIT,
-            status = when (orderStatus) {
-                "Created" -> STATUS.NEW
-                "New" -> STATUS.NEW
-                "Rejected" -> STATUS.REJECTED
-                "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
-                "PartiallyFilledCanceled" -> STATUS.CANCELED
-                "Filled" -> STATUS.FILLED
-                "Cancelled" -> STATUS.CANCELED
-                "Untriggered" -> STATUS.UNSUPPORTED
-                "Triggered" -> STATUS.UNSUPPORTED
-                "Deactivated" -> STATUS.UNSUPPORTED
-                "Active" -> STATUS.UNSUPPORTED
-                else -> STATUS.UNSUPPORTED
-            }
-        )
-    }
+    override fun getOrder(pair: TradePair, orderId: String): Order? = client.getOpenOrders(orderId = orderId)
+        .list
+        .firstOrNull()
+        ?.run {
+            Order(
+                price = price.toBigDecimal(),
+                pair = pair,
+                orderId = orderId,
+                origQty = qty.toBigDecimal(),
+                executedQty = cumExecQty.toBigDecimal(),
+                side = SIDE.fromString(side),
+                type = TYPE.LIMIT,
+                status = when (orderStatus) {
+                    "Created" -> STATUS.NEW
+                    "New" -> STATUS.NEW
+                    "Rejected" -> STATUS.REJECTED
+                    "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
+                    "PartiallyFilledCanceled" -> STATUS.CANCELED
+                    "Filled" -> STATUS.FILLED
+                    "Cancelled" -> STATUS.CANCELED
+                    "Untriggered" -> STATUS.UNSUPPORTED
+                    "Triggered" -> STATUS.UNSUPPORTED
+                    "Deactivated" -> STATUS.UNSUPPORTED
+                    "Active" -> STATUS.UNSUPPORTED
+                    else -> STATUS.UNSUPPORTED
+                }
+            )
+        } ?: client.getOrdersHistory(orderId = orderId)
+        .list
+        .firstOrNull()
+        ?.run {
+            Order(
+                price = price.toBigDecimal(),
+                pair = pair,
+                orderId = orderId,
+                origQty = qty.toBigDecimal(),
+                executedQty = cumExecQty.toBigDecimal(),
+                side = SIDE.fromString(side),
+                type = TYPE.LIMIT,
+                status = when (orderStatus) {
+                    "Created" -> STATUS.NEW
+                    "New" -> STATUS.NEW
+                    "Rejected" -> STATUS.REJECTED
+                    "PartiallyFilled" -> STATUS.PARTIALLY_FILLED
+                    "PartiallyFilledCanceled" -> STATUS.CANCELED
+                    "Filled" -> STATUS.FILLED
+                    "Cancelled" -> STATUS.CANCELED
+                    "Untriggered" -> STATUS.UNSUPPORTED
+                    "Triggered" -> STATUS.UNSUPPORTED
+                    "Deactivated" -> STATUS.UNSUPPORTED
+                    "Active" -> STATUS.UNSUPPORTED
+                    else -> STATUS.UNSUPPORTED
+                }
+            )
+        }
 
     override fun newOrder(
         order: Order,
@@ -216,7 +254,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
             },
             qty = qty,
             price = price,
-            positionIdx = when(positionSide) {
+            positionIdx = when (positionSide) {
                 DIRECTION.LONG -> 1
                 DIRECTION.SHORT -> 2
                 else -> 0
@@ -236,8 +274,20 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
     }
 
 
-    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean =
-        TODO("cancelOrder NOT IMPLEMENTED")
+    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {
+        try {
+            client.orderCancel(
+                symbol = pair.first + pair.second,
+                orderId = orderId,
+                category = "spot"
+            )
+            return true
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            log.error("Can't cancel order with ID = $orderId", t)
+            return false
+        }
+    }
 
     /*try {
     tradeService.cancelOrder(pair.toCurrencyPair(), orderId.toLong(), null, null)

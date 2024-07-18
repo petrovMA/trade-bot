@@ -44,7 +44,12 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         symbol: String? = null,
         baseCoin: String? = null,
         settleCoin: String? = null,
-        orderId: String? = null
+        orderId: String? = null,
+        orderLinkId: String? = null,
+        cursor: String? = null,
+        orderFilter: String? = null,
+        openOnly: Int? = null,
+        limit: Int? = null
     ): OpenOrders.Result {
 
         val params = TreeMap<String, String>().apply {
@@ -53,6 +58,11 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             baseCoin?.let { put("baseCoin", it) }
             settleCoin?.let { put("settleCoin", it) }
             orderId?.let { put("orderId", it) }
+            orderLinkId?.let { put("orderLinkId", it) }
+            cursor?.let { put("cursor", it) }
+            orderFilter?.let { put("orderFilter", it) }
+            openOnly?.let { put("openOnly", it.toString()) }
+            limit?.let { put("limit", it.toString()) }
         }
 
         val builder = builder().apply {
@@ -67,6 +77,46 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
             .build()
 
         return executeRequest<OpenOrders>(request)!!.result
+    }
+
+    fun getOrdersHistory(
+        category: String = "spot",
+        symbol: String? = null,
+        baseCoin: String? = null,
+        settleCoin: String? = null,
+        orderId: String? = null,
+        orderLinkId: String? = null,
+        cursor: String? = null,
+        orderFilter: String? = null,
+        openOnly: Int? = null,
+        limit: Int? = null
+    ): OrdersHistory.Result {
+
+        val params = TreeMap<String, String>().apply {
+            put("category", category)
+            symbol?.let { put("symbol", it) }
+            baseCoin?.let { put("baseCoin", it) }
+            settleCoin?.let { put("settleCoin", it) }
+            orderId?.let { put("orderId", it) }
+            orderLinkId?.let { put("orderLinkId", it) }
+            cursor?.let { put("cursor", it) }
+            orderFilter?.let { put("orderFilter", it) }
+            openOnly?.let { put("openOnly", it.toString()) }
+            limit?.let { put("limit", it.toString()) }
+        }
+
+        val builder = builder().apply {
+            addPathSegment("order")
+            addPathSegment("history")
+            params.forEach(::addQueryParameter)
+        }
+            .build()
+
+        val request: Request = Request.Builder().url(builder)
+            .apply { headers(params).forEach(::addHeader) }
+            .build()
+
+        return executeRequest<OrdersHistory>(request)!!.result
     }
 
     fun getKline(
