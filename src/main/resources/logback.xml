@@ -33,5 +33,5 @@
     </root>
 
     <!-- Set log levels for specific packages if necessary -->
-    <logger name="com.your.package" level="debug" />
+    <logger name="bot.trade" level="debug" />
 </configuration>
