@@ -135,7 +135,7 @@ class AlgorithmGrid(
                                                 if (it.status == STATUS.FILLED)
                                                     createSecondOrder(nearSellOrder)
                                             } ?: run {
-                                                log?.warn("Order with ID = ${nearSellOrder.orderId} Not found")
+                                                log?.warn("Order not found, delete order: $nearSellOrder")
                                                 activeOrdersService.deleteByOrderId(nearSellOrder.orderId)
                                             }
                                         }
@@ -144,7 +144,7 @@ class AlgorithmGrid(
                                                 if (it.status == STATUS.FILLED)
                                                     createSecondOrder(nearBuyOrder)
                                             } ?: run {
-                                                log?.warn("Order with ID = ${nearBuyOrder.orderId} Not found")
+                                                log?.warn("Order not found, delete order: $nearBuyOrder")
                                                 activeOrdersService.deleteByOrderId(nearBuyOrder.orderId)
                                             }
                                         }
@@ -180,7 +180,11 @@ class AlgorithmGrid(
 
                         STATUS.NEW -> log("${settings.name} NEW order: $msg")
                         STATUS.PARTIALLY_FILLED -> log("${settings.name} PARTIALLY_FILLED order: $msg")
-                        STATUS.CANCELED, STATUS.REJECTED -> activeOrdersService.deleteByOrderId(msg.orderId)
+                        STATUS.CANCELED, STATUS.REJECTED -> {
+                            log("Order inactive, delete order: $msg")
+                            activeOrdersService.deleteByOrderId(msg.orderId)
+                        }
+
                         else -> log("${settings.name} Unsupported order status: ${msg.status}")
                     }
                 }
@@ -228,6 +232,7 @@ class AlgorithmGrid(
                     )
 
                     activeOrdersService.saveOrder(ActiveOrder(orderBuy, settings.name))
+                    log("Save new order: $orderBuy")
 
                 } else priceBuy = buyOrders.sortedBy { it.price }.first().price!!
 
@@ -259,6 +264,7 @@ class AlgorithmGrid(
                     )
 
                     activeOrdersService.saveOrder(ActiveOrder(orderSell, settings.name))
+                    log("Save new order: $orderSell")
 
                 } else priceSell = sellOrders.sortedBy { it.price }.last().price!!
 
@@ -292,7 +298,7 @@ class AlgorithmGrid(
             positionSide = settings.direction
         )
 
-        activeOrdersService.updateOrder(
+        val updatedOrder = activeOrdersService.updateOrder(
             ActiveOrder(
                 id = it.id,
                 botName = settings.name,
@@ -306,6 +312,8 @@ class AlgorithmGrid(
             )
         )
 
+        log("Updated order: $updatedOrder")
+
         checkOrders()
     }
 
@@ -313,8 +321,13 @@ class AlgorithmGrid(
         val openOrders = client.getOpenOrders(settings.pair)
 
         openOrders.forEach { order ->
-            activeOrdersService.getOrderByOrderId(settings.name, order.orderId)
-                ?: cancelOrder(settings.pair, order)
+            val orderDB = activeOrdersService.getOrderByOrderId(settings.name, order.orderId)
+
+            if (orderDB == null) {
+                cancelOrder(settings.pair, order)
+                log("Sync - cancel order: $order")
+            } else
+                log("Sync - order is synchronized: $order")
         }
 
         val openOrdersKeys = client.getOpenOrders(settings.pair).map { it.orderId }
@@ -322,8 +335,10 @@ class AlgorithmGrid(
         activeOrdersService.getOrders(settings.name, settings.direction)
             .mapNotNull { it.orderId }
             .forEach {
-                if (!openOrdersKeys.contains(it))
+                if (!openOrdersKeys.contains(it)) {
                     activeOrdersService.deleteByOrderId(it)
+                    log("Sync - delete order: $it")
+                }
             }
     }
 

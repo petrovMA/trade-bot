@@ -2,6 +2,7 @@ package bot.trade.exchanges.clients
 
 import io.bybit.api.rest.response.PositionResponse.Result
 import io.bybit.api.websocket.messages.response.Position.Data
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -117,5 +118,14 @@ class TradeObjectsTest {
             ),
             position2
         )
+    }
+
+    @Test
+    fun tradePairTest() {
+        assertEquals(TradePair("MANA", "USDT"), TradePair("MANAUSDT"))
+        assertEquals(TradePair("POLYGON", "ETH"), TradePair("POLYGONETH"))
+        assertEquals(TradePair("ZK", "USDC"), TradePair("ZKUSDC"))
+        assertEquals(TradePair("ETH", "BTC"), TradePair("ETHBTC"))
+        Assertions.assertThrows(RuntimeException::class.java) { TradePair("TUSDDAI") }
     }
 }

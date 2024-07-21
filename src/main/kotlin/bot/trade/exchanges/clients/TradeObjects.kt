@@ -102,7 +102,7 @@ data class Order(
 
     constructor(data: io.bybit.api.websocket.messages.response.Order.Data) : this(
         orderId = data.orderId,
-        pair = data.symbol.run { TradePair(take(3), drop(3)) },
+        pair = TradePair(data.symbol),
         price = if (data.avgPrice.matches(Regex("\\d+\\.?\\d*")))
             data.avgPrice.toBigDecimal()
         else
@@ -247,8 +247,22 @@ data class Position(
 data class TradePair(val first: String, val second: String) {
 
     constructor(pair: String) : this(
-        first = pair.split("[_\\\\/\\-|\\s]".toRegex())[0],
-        second = pair.split("[_\\\\/\\-|\\s]".toRegex())[1]
+        first = if (pair.contains(Regex("[_\\\\/\\-|\\s]"))) pair.split("[_\\\\/\\-|\\s]".toRegex())[0]
+        else when {
+            pair.endsWith("USDT", true) -> pair.take(pair.length - 4)
+            pair.endsWith("USDC", true) -> pair.take(pair.length - 4)
+            pair.endsWith("ETH", true) -> pair.take(pair.length - 3)
+            pair.endsWith("BTC", true) -> pair.take(pair.length - 3)
+            else -> throw RuntimeException("Unsupported trade pair: $pair")
+        },
+        second = if (pair.contains(Regex("[_\\\\/\\-|\\s]"))) pair.split("[_\\\\/\\-|\\s]".toRegex())[1]
+        else when {
+            pair.endsWith("USDT", true) -> pair.drop(pair.length - 4)
+            pair.endsWith("USDC", true) -> pair.drop(pair.length - 4)
+            pair.endsWith("ETH", true) -> pair.drop(pair.length - 3)
+            pair.endsWith("BTC", true) -> pair.drop(pair.length - 3)
+            else -> throw RuntimeException("Unsupported trade pair: $pair")
+        }
     )
 
     constructor(pair: CurrencyPair) : this(pair.base.currencyCode, pair.counter.currencyCode)

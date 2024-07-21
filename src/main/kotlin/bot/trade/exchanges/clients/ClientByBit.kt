@@ -49,7 +49,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
     override fun getOpenOrders(pair: TradePair): List<Order> {
         val result: ArrayList<OpenOrders.Result.ByBitOrder> = ArrayList()
         var cursor: String? = null
-        var list: List<OpenOrders.Result.ByBitOrder> = emptyList()
+        var list: List<OpenOrders.Result.ByBitOrder>
 
         do {
             val response = client.getOpenOrders(
