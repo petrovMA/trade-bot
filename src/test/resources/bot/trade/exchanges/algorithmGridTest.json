@@ -1,0 +1,32 @@
+{
+  "flow_name": "5IREUSDT_GRID_TEST",
+  "symbol": {
+    "first": "5IRE",
+    "second": "USDT"
+  },
+  "exchange_type": "Bybit",
+  "order_type": "LIMIT",
+  "direction": "LONG",
+  "parameters": {
+    "trading_range": {
+      "lower_bound": 0.012,
+      "upper_bound": 0.038
+    },
+    "order_quantity": {
+      "value": 40,
+      "is_counter_balance": true
+    },
+    "order_distance": {
+      "value": 0.4,
+      "use_percent": true
+    },
+    "profit_distance": {
+      "value": 1.2,
+      "use_percent": true
+    },
+    "order_max_quantity": 2000
+  },
+  "type": "AlgorithmGrid",
+  "countOfDigitsAfterDotForAmount": 2,
+  "countOfDigitsAfterDotForPrice": 5
+}

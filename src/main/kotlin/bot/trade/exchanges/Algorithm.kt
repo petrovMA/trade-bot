@@ -246,8 +246,6 @@ abstract class Algorithm(
         }
     }
 
-    abstract fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal
-
     fun price(price: BigDecimal) = price.round(botSettings.countOfDigitsAfterDotForPrice)
 
     fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)

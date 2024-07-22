@@ -2,15 +2,13 @@ package bot.trade.exchanges.clients
 
 import bot.trade.exchanges.assertPosition
 import bot.trade.exchanges.params.BotEmulateParams
+import bot.trade.exchanges.setPrivateProperty
 import bot.trade.libs.deserialize
 import bot.trade.libs.m
 import bot.trade.libs.toZonedTime
 import org.junit.jupiter.api.Test
 import utils.resourceFile
 import java.math.BigDecimal
-import kotlin.reflect.KMutableProperty1
-import kotlin.reflect.full.memberProperties
-import kotlin.reflect.jvm.isAccessible
 
 
 class TestClientFileDataTest {
@@ -26,15 +24,7 @@ class TestClientFileDataTest {
                 .deserialize<BotEmulateParams>()
         )
 
-        // Finding the property by name
-        val property: KMutableProperty1<TestClientFileData, Any> =
-            (TestClientFileData::class.memberProperties.find { it.name == "candlestick" }
-                    as KMutableProperty1<TestClientFileData, Any>?)!!
-
-        // Making the property accessible
-        property.isAccessible = true
-
-        property.set(emulateClient, Candlestick("1;3000;3000;3000;3000;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3000;3000;3000;3000;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.LONG,
@@ -69,7 +59,7 @@ class TestClientFileDataTest {
             emulateClient.getPositions(TradePair("TEST_PAIR")).find { it.side == "BUY" }
         )
 
-        property.set(emulateClient, Candlestick("1;3200;3200;3200;3200;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3200;3200;3200;3200;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.LONG,
@@ -103,7 +93,7 @@ class TestClientFileDataTest {
             ), emulateClient.getPositions(TradePair("TEST_PAIR")).find { it.side == "BUY" }
         )
 
-        property.set(emulateClient, Candlestick("1;3000;3000;3000;3000;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3000;3000;3000;3000;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.LONG,
@@ -137,7 +127,7 @@ class TestClientFileDataTest {
             ), emulateClient.getPositions(TradePair("TEST_PAIR")).find { it.side == "BUY" }
         )
 
-        property.set(emulateClient, Candlestick("1;3300;3300;3300;3300;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3300;3300;3300;3300;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.LONG,
@@ -172,15 +162,7 @@ class TestClientFileDataTest {
                 .deserialize<BotEmulateParams>()
         )
 
-        // Finding the property by name
-        val property: KMutableProperty1<TestClientFileData, Any> =
-            (TestClientFileData::class.memberProperties.find { it.name == "candlestick" }
-                    as KMutableProperty1<TestClientFileData, Any>?)!!
-
-        // Making the property accessible
-        property.isAccessible = true
-
-        property.set(emulateClient, Candlestick("1;3600;3600;3600;3600;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3600;3600;3600;3600;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.SHORT,
@@ -215,7 +197,7 @@ class TestClientFileDataTest {
             emulateClient.getPositions(TradePair("TEST_PAIR")).find { it.side == "SELL" }
         )
 
-        property.set(emulateClient, Candlestick("1;3200;3200;3200;3200;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3200;3200;3200;3200;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.SHORT,
@@ -250,7 +232,7 @@ class TestClientFileDataTest {
             emulateClient.getPositions(TradePair("TEST_PAIR")).find { it.side == "SELL" }
         )
 
-        property.set(emulateClient, Candlestick("1;3100;3100;3100;3100;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3100;3100;3100;3100;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.SHORT,
@@ -285,7 +267,7 @@ class TestClientFileDataTest {
             emulateClient.getPositions(TradePair("TEST_PAIR")).find { it.side == "SELL" }
         )
 
-        property.set(emulateClient, Candlestick("1;3200;3200;3200;3200;20".split(';'), 1.m()))
+        emulateClient.setPrivateProperty("candlestick", Candlestick("1;3200;3200;3200;3200;20".split(';'), 1.m()))
 
         emulateClient.newOrder(
             positionSide = DIRECTION.SHORT,

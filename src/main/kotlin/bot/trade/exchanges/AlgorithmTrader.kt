@@ -941,8 +941,6 @@ class AlgorithmTrader(
 
     data class HedgeModule(val module: BigDecimal, val direction: DIRECTION)
 
-    override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal = TODO("Not yet implemented")
-
     private fun ordersLong() = activeOrdersService.getOrders(settings.name, DIRECTION.LONG)
     private fun ordersShort() = activeOrdersService.getOrders(settings.name, DIRECTION.SHORT)
 }

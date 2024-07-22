@@ -16,6 +16,10 @@ import java.io.File
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
+import kotlin.reflect.KMutableProperty1
+import kotlin.reflect.full.declaredMemberFunctions
+import kotlin.reflect.full.memberProperties
+import kotlin.reflect.jvm.isAccessible
 
 fun assertOrders(expected: Map<String, Order>, actual: Map<String, Order>) {
     assert(expected.size == actual.size) { "expected.size != actual.size" }
@@ -121,3 +125,29 @@ fun assertPosition(expected: Position?, actual: Position?) {
     assert(compareBigDecimal(expected?.liqPrice, actual?.liqPrice))
     assert(expected?.size == actual?.size)
 }
+
+inline fun <reified T> T.callPrivateFunc(name: String, vararg args: Any?): Any? =
+    T::class
+        .declaredMemberFunctions
+        .firstOrNull { it.name == name }
+        ?.apply { isAccessible = true }
+        ?.call(this, *args)
+
+fun <T : Any> T.setPrivateProperty(name: String, value: Any) = javaClass.getDeclaredField(name).let { field ->
+    field.isAccessible = true
+    field.set(this, value)
+}
+
+
+inline fun <reified T : Any, reified R> T.getPrivateProperty(name: String): R =
+    T::class
+        .memberProperties
+        .firstOrNull { it.name == name }
+        ?.apply { isAccessible = true }
+        ?.get(this)
+        .run {
+            when (this) {
+                is R -> this
+                else -> throw RuntimeException("Not correct Type")
+            }
+        }

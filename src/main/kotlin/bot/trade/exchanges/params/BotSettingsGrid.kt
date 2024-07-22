@@ -25,7 +25,7 @@ class BotSettingsGrid(
 ) {
     class Parameters(
         @SerializedName("trading_range") val tradingRange: TradingRange, // Trading Range:: range of price for orders
-        @SerializedName("order_quantity") val orderQuantity: Param, // Order Quantity:: order size
+        @SerializedName("order_quantity") val orderQuantity: OrderQuantity, // Order Quantity:: order size
         @SerializedName("order_distance") val orderDistance: Param, // Order Distance:: distance between every order
         @SerializedName("profit_distance") val profitDistance: Param, // Order Distance:: distance between first order and next order
         @SerializedName("order_max_quantity") val orderMaxQuantity: Int = Int.MAX_VALUE

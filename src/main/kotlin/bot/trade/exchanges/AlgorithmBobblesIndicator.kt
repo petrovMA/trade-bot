@@ -442,7 +442,7 @@ class AlgorithmBobblesIndicator(
         SIDE.UNSUPPORTED -> price
     }
 
-    override fun calcAmount(amount: BigDecimal, price: BigDecimal) =
+    private fun calcAmount(amount: BigDecimal, price: BigDecimal) =
         if (firstBalanceForOrderAmount) amount
         else amount.div8(price)
 }

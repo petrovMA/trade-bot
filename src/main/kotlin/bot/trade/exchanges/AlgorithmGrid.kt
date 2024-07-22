@@ -6,6 +6,7 @@ import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.clients.CommonExchangeData
 import bot.trade.exchanges.params.BotSettings
 import bot.trade.exchanges.params.BotSettingsGrid
+import bot.trade.exchanges.params.OrderQuantity
 import bot.trade.libs.*
 import com.typesafe.config.Config
 import mu.KotlinLogging
@@ -83,7 +84,7 @@ class AlgorithmGrid(
                                     ActiveOrder(
                                         botName = settings.name,
                                         order = sentOrder(
-                                            amount = settings.parameters.orderQuantity.value,
+                                            amount = calcAmount(settings.parameters.orderQuantity, currentPrice),
                                             orderSide = if (settings.direction == DIRECTION.LONG) SIDE.BUY
                                             else SIDE.SELL,
                                             orderType = settings.ordersType,
@@ -133,7 +134,7 @@ class AlgorithmGrid(
                                         if (currentPrice > nearSellOrder.price) {
                                             getOrder(settings.pair, nearSellOrder.orderId!!)?.let {
                                                 if (it.status == STATUS.FILLED)
-                                                    createSecondOrder(nearSellOrder)
+                                                    createOrder(nearSellOrder)
                                             } ?: run {
                                                 log?.warn("Order not found, delete order: $nearSellOrder")
                                                 activeOrdersService.deleteByOrderId(nearSellOrder.orderId)
@@ -142,7 +143,7 @@ class AlgorithmGrid(
                                         if (currentPrice < nearBuyOrder.price) {
                                             getOrder(settings.pair, nearBuyOrder.orderId!!)?.let {
                                                 if (it.status == STATUS.FILLED)
-                                                    createSecondOrder(nearBuyOrder)
+                                                    createOrder(nearBuyOrder)
                                             } ?: run {
                                                 log?.warn("Order not found, delete order: $nearBuyOrder")
                                                 activeOrdersService.deleteByOrderId(nearBuyOrder.orderId)
@@ -173,7 +174,7 @@ class AlgorithmGrid(
                             if (msg.type == TYPE.LIMIT) {
                                 activeOrdersService
                                     .getOrderByOrderId(settings.name, msg.orderId)
-                                    ?.let { createSecondOrder(it) }
+                                    ?.let { createOrder(it) }
                             }
                             log("${settings.name} FILLED order: $msg")
                         }
@@ -225,7 +226,7 @@ class AlgorithmGrid(
 
                     val orderBuy = sentOrder(
                         price = priceBuy,
-                        amount = settings.parameters.orderQuantity.value,
+                        amount = calcAmount(settings.parameters.orderQuantity, priceBuy),
                         orderSide = SIDE.BUY,
                         orderType = TYPE.LIMIT,
                         positionSide = settings.direction
@@ -257,7 +258,7 @@ class AlgorithmGrid(
                 if (sellOrders.isEmpty()) {
                     val orderSell = sentOrder(
                         price = priceSell,
-                        amount = settings.parameters.orderQuantity.value,
+                        amount = calcAmount(settings.parameters.orderQuantity, priceSell),
                         orderSide = SIDE.SELL,
                         orderType = TYPE.LIMIT,
                         positionSide = settings.direction
@@ -274,7 +275,7 @@ class AlgorithmGrid(
         }
     }
 
-    private fun createSecondOrder(it: ActiveOrder) {
+    private fun createOrder(it: ActiveOrder) {
         val order = sentOrder(
             price = if (it.stopPrice != null)
                 it.price!!
@@ -292,7 +293,10 @@ class AlgorithmGrid(
 
                     else -> throw UnknownOrderSide("Error, side: ${it.orderSide}")
                 },
-            amount = settings.parameters.orderQuantity.value,
+            amount = if (it.stopPrice != null)
+                calcAmount(settings.parameters.orderQuantity, it.price)
+            else
+                it.amount!!,
             orderSide = it.orderSide!!.reverse(),
             orderType = TYPE.LIMIT,
             positionSide = settings.direction
@@ -342,5 +346,9 @@ class AlgorithmGrid(
             }
     }
 
-    override fun calcAmount(amount: BigDecimal, price: BigDecimal): BigDecimal = TODO("Not yet implemented")
+    private fun calcAmount(orderQuantity: OrderQuantity, price: BigDecimal): BigDecimal =
+        if (orderQuantity.isCounterBalance)
+            orderQuantity.value.div8(price).round(botSettings.countOfDigitsAfterDotForAmount)
+        else
+            orderQuantity.value
 }
