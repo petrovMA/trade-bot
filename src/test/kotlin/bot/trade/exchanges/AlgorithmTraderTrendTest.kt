@@ -30,6 +30,7 @@ class AlgorithmTraderTrendTest {
         val streamData = "klines_stream.txt".file().readLines().map { asObject<Candlestick>(it) }
 
         val (algorithmTrader, exchange) = testExchange("testExecuteTrendSettings.json", repository, candlestickData.last().openTime)
+            .run { first as AlgorithmTrader to second }
 
         exchange.addKlineData(candlestickData)
 

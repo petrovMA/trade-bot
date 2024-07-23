@@ -3,13 +3,10 @@ package bot.trade.exchanges.counter_distance
 import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
-import bot.trade.libs.div8
-import com.google.gson.reflect.TypeToken
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
-import utils.mapper.Mapper
 import java.math.BigDecimal
 
 @DataJpaTest
@@ -22,6 +19,7 @@ class CounterDistanceTest {
     @Test
     fun testCounterDistanceShort() {
         val (algorithmTrader, exchange) = testExchange("counter_distance/shortSettings.json", repository)
+            .run { first as AlgorithmTrader to second }
 
         exchange.setPosition(
             Position(
@@ -103,6 +101,7 @@ class CounterDistanceTest {
     @Test
     fun testCounterDistanceLong() {
         val (algorithmTrader, exchange) = testExchange("counter_distance/longSettings.json", repository)
+            .run { first as AlgorithmTrader to second }
 
         exchange.setPosition(
             Position(

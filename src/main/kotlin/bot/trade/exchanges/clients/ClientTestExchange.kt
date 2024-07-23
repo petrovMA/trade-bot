@@ -8,6 +8,8 @@ import java.util.concurrent.BlockingQueue
 class ClientTestExchange : ClientFutures {
 
     val orders: MutableList<Order> = mutableListOf()
+    private var orderIds = 1
+
     private var position: Position = Position(
         pair = TradePair("BTC_USDT"),
         marketPrice = BigDecimal(20000),
@@ -69,8 +71,20 @@ class ClientTestExchange : ClientFutures {
         positionSide: DIRECTION?,
         isReduceOnly: Boolean
     ): Order {
-        orders.add(order)
-        return order
+        val newOrder = Order(
+            orderId = (++orderIds).toString(),
+            pair = order.pair,
+            price = order.price,
+            origQty = order.origQty,
+            executedQty = order.executedQty,
+            side = order.side,
+            type = order.type,
+            status = order.status,
+            stopPrice = order.stopPrice,
+        )
+
+        orders.add(newOrder)
+        return newOrder
     }
 
     override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {

@@ -134,7 +134,7 @@ class AlgorithmGrid(
                                         if (currentPrice > nearSellOrder.price) {
                                             getOrder(settings.pair, nearSellOrder.orderId!!)?.let {
                                                 if (it.status == STATUS.FILLED)
-                                                    createOrder(nearSellOrder)
+                                                    createNextOrderFor(nearSellOrder)
                                             } ?: run {
                                                 log?.warn("Order not found, delete order: $nearSellOrder")
                                                 activeOrdersService.deleteByOrderId(nearSellOrder.orderId)
@@ -143,7 +143,7 @@ class AlgorithmGrid(
                                         if (currentPrice < nearBuyOrder.price) {
                                             getOrder(settings.pair, nearBuyOrder.orderId!!)?.let {
                                                 if (it.status == STATUS.FILLED)
-                                                    createOrder(nearBuyOrder)
+                                                    createNextOrderFor(nearBuyOrder)
                                             } ?: run {
                                                 log?.warn("Order not found, delete order: $nearBuyOrder")
                                                 activeOrdersService.deleteByOrderId(nearBuyOrder.orderId)
@@ -167,16 +167,14 @@ class AlgorithmGrid(
             is Balance -> balances[msg.asset] = msg
 
             is Order -> {
-                log("${settings.name} Order update: $msg")
+                log("${settings.name} Order update (STATUS = ${msg.status}): $msg")
                 if (msg.pair == settings.pair) {
                     when (msg.status) {
                         STATUS.FILLED -> {
                             if (msg.type == TYPE.LIMIT) {
-                                activeOrdersService
-                                    .getOrderByOrderId(settings.name, msg.orderId)
-                                    ?.let { createOrder(it) }
+                                activeOrdersService.getOrderByOrderId(settings.name, msg.orderId)
+                                    ?.let { createNextOrderFor(it) }
                             }
-                            log("${settings.name} FILLED order: $msg")
                         }
 
                         STATUS.NEW -> log("${settings.name} NEW order: $msg")
@@ -207,7 +205,7 @@ class AlgorithmGrid(
 
         while (
             activeOrdersService.count(settings.name) < settings.parameters.orderMaxQuantity &&
-            (priceBuy > minRange && priceSell < maxRange)
+            (priceBuy > minRange || priceSell < maxRange)
         ) {
             if (priceBuy > minRange) {
 
@@ -275,43 +273,44 @@ class AlgorithmGrid(
         }
     }
 
-    private fun createOrder(it: ActiveOrder) {
+    private fun createNextOrderFor(prevOrder: ActiveOrder) {
+        log("Order for update: $prevOrder")
         val order = sentOrder(
-            price = if (it.stopPrice != null)
-                it.price!!
+            price = if (prevOrder.stopPrice != null)
+                prevOrder.price!!
             else
-                when (it.orderSide) {
-                    SIDE.BUY -> it.price!! + orderDistance(
-                        it.price,
+                when (prevOrder.orderSide) {
+                    SIDE.BUY -> prevOrder.price!! + orderDistance(
+                        prevOrder.price,
                         settings.parameters.profitDistance
                     )
 
-                    SIDE.SELL -> it.price!! - orderDistance(
-                        it.price,
+                    SIDE.SELL -> prevOrder.price!! - orderDistance(
+                        prevOrder.price,
                         settings.parameters.profitDistance
                     )
 
-                    else -> throw UnknownOrderSide("Error, side: ${it.orderSide}")
+                    else -> throw UnknownOrderSide("Error, side: ${prevOrder.orderSide}")
                 },
-            amount = if (it.stopPrice != null)
-                calcAmount(settings.parameters.orderQuantity, it.price)
+            amount = if (prevOrder.stopPrice != null)
+                calcAmount(settings.parameters.orderQuantity, prevOrder.price)
             else
-                it.amount!!,
-            orderSide = it.orderSide!!.reverse(),
+                prevOrder.amount!!,
+            orderSide = prevOrder.orderSide!!.reverse(),
             orderType = TYPE.LIMIT,
             positionSide = settings.direction
         )
 
         val updatedOrder = activeOrdersService.updateOrder(
             ActiveOrder(
-                id = it.id,
+                id = prevOrder.id,
                 botName = settings.name,
                 orderId = order.orderId,
                 tradePair = settings.pair.toString(),
                 amount = order.origQty,
                 orderSide = order.side,
-                price = it.price,
-                stopPrice = if (it.stopPrice != null) null else order.price,
+                price = prevOrder.price,
+                stopPrice = if (prevOrder.stopPrice != null) null else order.price,
                 direction = settings.direction
             )
         )

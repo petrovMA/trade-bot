@@ -22,6 +22,7 @@ class AlgorithmTraderTest {
     @Test
     fun testExecuteInOrdersWithMinOrderAmount() {
         val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersWithMinOrderAmountSettings.json", repository)
+            .run { first as AlgorithmTrader to second }
 
         repository.deleteByBotNameAndDirection(algorithmTrader.botSettings.name, DIRECTION.LONG)
 
@@ -67,6 +68,7 @@ class AlgorithmTraderTest {
     @Test
     fun testCheckLongStrategy() {
         val (algorithmTrader, exchange) = testExchange("testCheckLongStrategySettings.json", repository)
+            .run { first as AlgorithmTrader to second }
 
         val expectedOrder1 = Order(
             orderId = "",
@@ -151,6 +153,7 @@ class AlgorithmTraderTest {
     @Test
     fun testCheckShortStrategy() {
         val (algorithmTrader, exchange) = testExchange("testCheckShortStrategy/testCheckShortStrategySettings.json", repository)
+            .run { first as AlgorithmTrader to second }
 
         val expectedOrder1 = Order(
             orderId = "",
@@ -334,6 +337,7 @@ class AlgorithmTraderTest {
     @Test
     fun testInOrdersShortWithPercentInOrderDistance() {
         val (algorithmTrader, exchange) = testExchange("testExecuteInOrdersShortWithPercentOrderDistanceSettings.json", repository)
+            .run { first as AlgorithmTrader to second }
 
         algorithmTrader.handle(Trade(1500.toBigDecimal(), 1.toBigDecimal(), 0).toKline())
         algorithmTrader.handle(Trade(1499.toBigDecimal(), 1.toBigDecimal(), 1).toKline())

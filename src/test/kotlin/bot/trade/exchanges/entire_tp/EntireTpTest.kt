@@ -22,6 +22,7 @@ class EntireTpTest {
     @Test
     fun testCheckTpDistance() {
         val (algorithmTrader, exchange) = testExchange("entire_tp/checkTpDistanceLongSettings.json", repository)
+            .run { first as AlgorithmTrader to second }
 
         exchange.setPosition(
             Position(

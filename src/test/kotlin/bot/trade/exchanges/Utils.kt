@@ -4,8 +4,9 @@ import bot.trade.database.data.entities.ActiveOrder
 import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.database.service.impl.ActiveOrdersServiceImpl
 import bot.trade.exchanges.clients.*
-import bot.trade.exchanges.params.BotSettingsTrader
+import bot.trade.exchanges.params.BotSettings
 import bot.trade.libs.compareBigDecimal
+import bot.trade.libs.deserialize
 import bot.trade.libs.json
 import bot.trade.libs.readConf
 import com.google.gson.reflect.TypeToken
@@ -16,7 +17,6 @@ import java.io.File
 import java.math.BigDecimal
 import java.util.*
 import java.util.concurrent.LinkedBlockingDeque
-import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.jvm.isAccessible
@@ -76,23 +76,50 @@ fun assertCandlesticks(expected: List<Candlestick>, actual: List<Candlestick>, m
 }
 
 
-fun testExchange(settingsFile: String, repository: ActiveOrdersRepository, endTime: Long? = null) =
-    ClientTestExchange().let { exchange ->
-        AlgorithmTrader(
-            botSettings = Mapper.asObject<BotSettingsTrader>(settingsFile.file().readText()),
-            exchangeBotsFiles = "",
-            activeOrdersService = ActiveOrdersServiceImpl(repository),
-            queue = LinkedBlockingDeque<CommonExchangeData>(),
-            exchangeEnum = ExchangeEnum.TEST,
-            conf = readConf("TEST.conf".file().path)!!,
-            api = "",
-            sec = "",
-            client = exchange,
-            isLog = false,
-            isEmulate = true,
-            endTimeForTrendCalculator = endTime,
-        ) { _, _ -> } to exchange
+fun testExchange(
+    settingsFile: String,
+    repository: ActiveOrdersRepository,
+    endTime: Long? = null
+): Pair<Algorithm, ClientTestExchange> {
+    val settings = settingsFile.file().readText().deserialize<BotSettings>()
+
+    return when (settings.type) {
+
+        "AlgorithmGrid" -> ClientTestExchange().let { exchange ->
+            AlgorithmGrid(
+                botSettings = settings,
+                exchangeBotsFiles = "",
+                activeOrdersService = ActiveOrdersServiceImpl(repository),
+                queue = LinkedBlockingDeque<CommonExchangeData>(),
+                exchangeEnum = ExchangeEnum.TEST,
+                conf = readConf("TEST.conf".file().path)!!,
+                api = "",
+                sec = "",
+                client = exchange,
+                isLog = false,
+                isEmulate = true
+            ) { _, _ -> } to exchange
+        }
+
+        else ->
+            ClientTestExchange().let { exchange ->
+                AlgorithmTrader(
+                    botSettings = settings,
+                    exchangeBotsFiles = "",
+                    activeOrdersService = ActiveOrdersServiceImpl(repository),
+                    queue = LinkedBlockingDeque<CommonExchangeData>(),
+                    exchangeEnum = ExchangeEnum.TEST,
+                    conf = readConf("TEST.conf".file().path)!!,
+                    api = "",
+                    sec = "",
+                    client = exchange,
+                    isLog = false,
+                    isEmulate = true,
+                    endTimeForTrendCalculator = endTime,
+                ) { _, _ -> } to exchange
+            }
     }
+}
 
 fun Trade.toKline() = Candlestick(
     openTime = time,
@@ -126,12 +153,12 @@ fun assertPosition(expected: Position?, actual: Position?) {
     assert(expected?.size == actual?.size)
 }
 
-inline fun <reified T> T.callPrivateFunc(name: String, vararg args: Any?): Any? =
+inline fun <reified T> T.callPrivateFunc(name: String, args: Any): Any? =
     T::class
         .declaredMemberFunctions
         .firstOrNull { it.name == name }
         ?.apply { isAccessible = true }
-        ?.call(this, *args)
+        ?.call(this, args)
 
 fun <T : Any> T.setPrivateProperty(name: String, value: Any) = javaClass.getDeclaredField(name).let { field ->
     field.isAccessible = true
