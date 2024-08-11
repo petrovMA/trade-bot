@@ -1,5 +1,6 @@
 package bot.trade.exchanges.clients
 
+import bot.trade.exchanges.clients.stream.StreamGateImpl
 import bot.trade.libs.UnknownIntervalException
 import bot.trade.libs.UnknownOrderStatus
 import mu.KotlinLogging
@@ -226,14 +227,12 @@ class ClientGate(
 //    }
 
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
-        TODO("09.04.2021 IMPLEMENT IT")
-//        SocketThreadHuobiImpl(
-//            pair = pair.toCurrencyPair(),
-//            queue = queue,
-//            sec = sec,
-//            api = api
-//        )
+    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) = StreamGateImpl(
+        pair = pair,
+        queue = queue,
+        sec = sec,
+        api = api
+    )
 
     override fun close() {}
 

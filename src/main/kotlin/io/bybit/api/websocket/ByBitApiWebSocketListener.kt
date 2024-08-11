@@ -26,7 +26,7 @@ class ByBitApiWebSocketListener {
      * patterns to determine type of message
      */
     private val orderPattern = Regex("\\s*\\{\\s*\"id\"\\s*:\\s*\".*\",\\s*\"topic\"\\s*:\\s*\"order\".+")
-    private val orderBookPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"orderBook")
+    private val orderBookPattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"order[Bb]ook")
     private val orderBookSnapshotPattern = Regex("\\s*\"type\"\\s*:\\s*\"snapshot\"")
     private val tradePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"publicTrade\\.")
     private val insurancePattern = Regex("\\s*\\{\\s*\"topic\"\\s*:\\s*\"insurance")
@@ -209,24 +209,7 @@ class ByBitApiWebSocketListener {
                 tradePattern.containsMatchIn(message) -> tradeCallback?.invoke(asObject(message))
                 orderPattern.containsMatchIn(message) -> orderCallback?.invoke(asObject(message))
                 positionPattern.containsMatchIn(message) -> positionCallback?.invoke(asObject(message))
-                orderBookPattern.containsMatchIn(message) ->
-                    if (orderBookSnapshotPattern.containsMatchIn(message)) {
-                        asObject<OrderBookSnapshot>(message).run {
-                            OrderBook(
-                                cross_seq = cross_seq,
-                                timestamp_e6 = timestamp_e6,
-                                topic = topic,
-                                type = type,
-                                data = OrderBook.Data(
-                                    insert = data,
-                                    update = emptyList(),
-                                    delete = emptyList(),
-                                    transactTimeE6 = timestamp_e6
-                                )
-                            ).let { orderBookCallback?.invoke(it) }
-                        }
-                    } else orderBookCallback?.invoke(asObject(message))
-
+                orderBookPattern.containsMatchIn(message) -> orderBookCallback?.invoke(asObject(message))
                 insurancePattern.containsMatchIn(message) -> insuranceCallback?.invoke(asObject(message))
                 instrumentInfoPattern.containsMatchIn(message) -> instrumentInfoCallback?.invoke(asObject(message))
                 klinePattern.containsMatchIn(message) -> klineCallback?.invoke(asObject(message))

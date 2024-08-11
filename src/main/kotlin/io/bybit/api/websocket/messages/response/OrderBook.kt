@@ -1,16 +1,19 @@
 package io.bybit.api.websocket.messages.response
 
+import java.math.BigDecimal
+
 data class OrderBook(
-    val cross_seq: Long,
-    val timestamp_e6: Long,
+    val cts: Long,
+    val ts: Long,
     val topic: String,
     val type: String,
     val `data`: Data
 ) {
     data class Data(
-        val delete: List<Order>,
-        val insert: List<Order>,
-        val transactTimeE6: Long,
-        val update: List<Order>
+        val s: String,
+        val seq: Long,
+        val u: Long,
+        val b: List<List<BigDecimal>>,
+        val a: List<List<BigDecimal>>
     )
 }

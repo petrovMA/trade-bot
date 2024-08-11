@@ -5,6 +5,7 @@ import bot.trade.libs.m
 import bot.trade.libs.s
 import io.bybit.api.websocket.ByBitApiWebSocketListener
 import io.bybit.api.websocket.messages.requests.WebSocketMsg
+import java.math.BigDecimal
 import java.util.concurrent.BlockingQueue
 
 class StreamByBitFuturesImpl(
@@ -23,6 +24,9 @@ class StreamByBitFuturesImpl(
         val publicUrl = if (isFuture) "wss://stream.bybit.com/v5/public/linear"
         else "wss://stream.bybit.com/v5/public/spot"
 
+        var currBid: Offer? = null
+        var currAsk: Offer? = null
+
         publicStream = ByBitApiWebSocketListener(
             url = publicUrl,
             timeout = timeout,
@@ -30,7 +34,10 @@ class StreamByBitFuturesImpl(
             pingTimeInterval = 50.s(),
             reconnectIfNoMessagesDuring = 2.m(),
             //WebSocketMsg("subscribe", listOf("kline.5.${pair.first}${pair.second}"))
-            WebSocketMsg("subscribe", listOf("publicTrade.${pair.first}${pair.second}"))
+            WebSocketMsg(
+                "subscribe",
+                listOf(/*"publicTrade.${pair.first}${pair.second}", */"orderbook.1.${pair.first}${pair.second}")
+            )
         )
 
         /*publicStream?.setKlineCallback {
@@ -40,11 +47,34 @@ class StreamByBitFuturesImpl(
                 .forEach { kline -> queue.add(kline) }
         }*/
 
-        publicStream?.setTradeCallback {
+        /*publicStream?.setTradeCallback {
             it.data
                 .map { trade -> Trade(trade.price.toBigDecimal(), trade.volume.toBigDecimal(), trade.timestamp) }
                 .sortedBy { trade -> trade.time }
                 .forEach { trade -> queue.add(trade) }
+        }*/
+
+
+
+        publicStream?.setOrderBookCallback {
+
+            val newAsk = if (it.data.a.isNotEmpty())
+                it.data.a.map { o -> Offer(o.first(), o.last()) }
+                    .filter { o -> o.qty > BigDecimal(0) }
+                    .minByOrNull { o -> o.price }!!
+            else null
+
+            currAsk = newAsk ?: currAsk
+
+            val newBid = if (it.data.b.isNotEmpty())
+                it.data.b.map { o -> Offer(o.first(), o.last()) }
+                    .filter { o -> o.qty > BigDecimal(0) }
+                    .maxByOrNull { o -> o.price }!!
+            else null
+
+            currBid = newBid ?: currBid
+
+            if (currAsk != null && currBid != null) queue.add(DepthEventOrders(currAsk!!, currBid!!))
         }
 
         if (api != null && sec != null) {
@@ -58,8 +88,8 @@ class StreamByBitFuturesImpl(
                 WebSocketMsg("subscribe", listOf("order", "position"))
             )
 
-            privateStream?.setOrderCallback { queue.addAll(it.data.map { order -> Order(order) }) }
-            if (isFuture) privateStream?.setPositionCallback { queue.addAll(it.data.map { position -> Position(position) }) }
+//            privateStream?.setOrderCallback { queue.addAll(it.data.map { order -> Order(order) }) }
+//            if (isFuture) privateStream?.setPositionCallback { queue.addAll(it.data.map { position -> Position(position) }) }
         }
     }
 
