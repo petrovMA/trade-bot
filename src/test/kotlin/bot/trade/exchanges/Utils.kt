@@ -32,7 +32,7 @@ fun assertOrders(expected: Map<String, Order>, actual: Map<String, Order>) {
 fun assertOrders(expected: List<Order>, actual: List<Order>) {
     assert(expected.size == actual.size) { "expected.size != actual.size, (${expected.size} != ${actual.size})" }
     expected.forEachIndexed { index, v ->
-        assert(v == actual[index]) { "Expected:\n${json(v)}\n\nActual:\n${json(actual[index])}" }
+        assert(v.isEquals(actual[index])) { "Expected:\n${json(v)}\n\nActual:\n${json(actual[index])}" }
     }
 }
 

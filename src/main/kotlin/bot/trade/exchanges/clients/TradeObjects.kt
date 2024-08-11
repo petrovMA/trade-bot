@@ -154,6 +154,18 @@ data class Order(
             && compareBigDecimal(lastBorderPrice, other.lastBorderPrice)
             && compareBigDecimal(fee, other.fee)
 
+    fun isEquals(other: Any?) = other is Order
+            && pair == other.pair
+            && compareBigDecimal(price, other.price)
+            && compareBigDecimal(origQty, other.origQty)
+            && compareBigDecimal(executedQty, other.executedQty)
+            && side == other.side
+            && type == other.type
+            && status == other.status
+            && compareBigDecimal(stopPrice, other.stopPrice)
+            && compareBigDecimal(lastBorderPrice, other.lastBorderPrice)
+            && compareBigDecimal(fee, other.fee)
+
     fun equalsWithoutId(other: Any?) = other is Order
             && pair == other.pair
             && compareBigDecimal(price, other.price)
