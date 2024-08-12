@@ -33,11 +33,11 @@ interface Client {
 
     /**
      * @return socket with thread (process for income messages)
-     * @param pair trading pair
+     * @param pairs trading pairs
      * @param interval time interval for candlestick events
      * @param queue container for all income events
      * */
-    fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream
+    fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream
 
     /**
      * close OkHttpClient

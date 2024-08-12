@@ -265,7 +265,7 @@ class TestClient(
         }
     }
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamThreadStub()
 
     private fun check(prev: Candlestick, current: Candlestick) {

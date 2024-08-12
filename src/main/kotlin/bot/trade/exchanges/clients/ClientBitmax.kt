@@ -190,22 +190,22 @@ class ClientBitmax(
             throw RuntimeException("Error placeOrderResponse: $resp")
     }
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream {
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream {
 
         val url = "wss://ascendex.com/$accountGroup/api/pro/v1/stream"
 
-        val book = getOrderBook(pair, 10)
+        val book = getOrderBook(pairs.first(), 10)
 
         api ?: throw UnauthorizedException("Api-Key is NULL!")
 
         val authMsg = Authorization(api, sec).getAuthSocketMsg(System.currentTimeMillis())
 
         return StreamBitmaxImpl(
-            pair = pair,
+            pair = pairs.first(),
             client = BitMaxApiWebSocketListener(
                 authMsg, url, 5000, true,
-                WebSocketMsg(op = "sub", ch = "trades:${pair.first}/${pair.second}"),
-                WebSocketMsg(op = "sub", ch = "depth:${pair.first}/${pair.second}"),
+                WebSocketMsg(op = "sub", ch = "trades:${pairs.first().first}/${pairs.first().second}"),
+                WebSocketMsg(op = "sub", ch = "depth:${pairs.first().first}/${pairs.first().second}"),
                 WebSocketMsg(op = "sub", ch = "order:cash")
             ),
             interval = interval,

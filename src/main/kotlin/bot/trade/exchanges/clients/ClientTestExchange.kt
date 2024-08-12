@@ -91,7 +91,7 @@ class ClientTestExchange : ClientFutures {
         TODO("Not yet implemented")
     }
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
         StreamThreadStub()
 
     override fun close() {

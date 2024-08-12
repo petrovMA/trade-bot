@@ -36,14 +36,14 @@ dependencies {
     implementation("org.apache.poi:poi:5.2.2") // exel table
 
     // exchanges
-    implementation("org.knowm.xchange:xchange-core:5.1.1-SNAPSHOT")
-    implementation("org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT")
-    implementation("org.knowm.xchange:xchange-stream-binance:5.1.1-SNAPSHOT")
-    implementation("org.knowm.xchange:xchange-huobi:5.1.1-SNAPSHOT")
-    implementation("org.knowm.xchange:xchange-gateio:5.1.1-SNAPSHOT")
+    implementation("org.knowm.xchange:xchange-core:5.2.0")
+    implementation("org.knowm.xchange:xchange-binance:5.2.0")
+    implementation("org.knowm.xchange:xchange-stream-binance:5.2.0")
+    implementation("org.knowm.xchange:xchange-huobi:5.2.0")
+    implementation("org.knowm.xchange:xchange-gateio:5.2.0")
 //    implementation("org.knowm.xchange:xchange-bybit:5.0.12")
-    implementation("org.knowm.xchange:xchange-stream-huobi:5.1.1-SNAPSHOT")
-    implementation("org.knowm.xchange:xchange-stream-gateio:5.1.1-SNAPSHOT")
+    implementation("org.knowm.xchange:xchange-stream-huobi:5.2.0")
+    implementation("org.knowm.xchange:xchange-stream-gateio:5.2.0")
 
     // https://mvnrepository.com/artifact/org.ta4j/ta4j-core
     implementation("org.ta4j:ta4j-core:0.15")

@@ -256,7 +256,7 @@ class TestClientFileData(
         return true
     }
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamThreadStub()
 
     override fun getAllPairs(): List<TradePair> = TODO("not implemented")

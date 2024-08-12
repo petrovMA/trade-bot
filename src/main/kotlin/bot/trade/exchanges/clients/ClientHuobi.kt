@@ -226,7 +226,7 @@ class ClientHuobi(
 //    }
 
 
-        override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+        override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
             TODO("09.04.2021 IMPLEMENT IT")
 //        SocketThreadHuobiImpl(
 //            pair = pair.toCurrencyPair(),

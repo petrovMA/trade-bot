@@ -276,9 +276,9 @@ class ClientBinanceFutures(
     }
 
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamBinanceFuturesImpl(
-            pair = FuturesContract(pair.toCurrencyPair(), "PERP"),
+            pair = FuturesContract(pairs.first().toCurrencyPair(), "PERP"),
             queue = queue,
             sec = sec,
             api = api

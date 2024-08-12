@@ -276,9 +276,9 @@ open class ClientBinance(
     }
 
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>): Stream =
         StreamBinanceImpl(
-            pair = pair.toCurrencyPair(),
+            pair = pairs.first().toCurrencyPair(),
             queue = queue,
             sec = sec,
             api = api

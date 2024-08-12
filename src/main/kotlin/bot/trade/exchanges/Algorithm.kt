@@ -52,7 +52,7 @@ abstract class Algorithm(
     var currentPrice: BigDecimal = 0.toBigDecimal()
     var prevPrice: BigDecimal = 0.toBigDecimal()
 
-    var stream: Stream = client.stream(botSettings.pair, interval, queue)
+    var stream: Stream = client.stream(listOf(botSettings.pair), interval, queue)
 
     /**
      * custom actions before start thread

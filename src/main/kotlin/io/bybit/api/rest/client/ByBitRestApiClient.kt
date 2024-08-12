@@ -142,6 +142,41 @@ class ByBitRestApiClient(private val apikey: String, private val secret: String)
         return executeRequest<KlineResponse>(request)!!.result
     }
 
+    fun getCoinInfo(coin: String? = null): CoinInfoResponse.Result {
+        val builder = builder().apply {
+            addPathSegment("asset")
+            addPathSegment("coin")
+            addPathSegment("query-info")
+            coin?.let { addQueryParameter("coin", it) }
+        }.build()
+
+        val request: Request = Request.Builder().url(builder).build()
+        return executeRequest<CoinInfoResponse>(request)!!.result
+    }
+
+    fun getInstrumentsInfo(
+        category: String = "spot",
+        symbol: String? = null,
+        status: String? = null,
+        baseCoin: String? = null,
+        limit: Int? = 1000,
+        cursor: String? = null
+    ): InstrumentsInfoResponse.Result {
+        val builder = builder().apply {
+            addPathSegment("market")
+            addPathSegment("instruments-info")
+            addQueryParameter("category", category)
+            symbol?.let { addQueryParameter("symbol", it) }
+            status?.let { addQueryParameter("status", it) }
+            baseCoin?.let { addQueryParameter("baseCoin", it) }
+            limit?.let { addQueryParameter("limit", it.toString()) }
+            cursor?.let { addQueryParameter("cursor", it) }
+        }.build()
+
+        val request: Request = Request.Builder().url(builder).build()
+        return executeRequest<InstrumentsInfoResponse>(request)!!.result
+    }
+
     fun getBalance(
         accountType: String = "SPOT",
         coin: String? = null,

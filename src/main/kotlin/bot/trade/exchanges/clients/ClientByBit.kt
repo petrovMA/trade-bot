@@ -20,9 +20,7 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
     private val log = KotlinLogging.logger {}
 
     override fun getAllPairs(): List<TradePair> =
-        TODO("getAllPairs NOT IMPLEMENTED")
-//        instance.exchangeSymbols.map { TradePair(it.base.currencyCode, it.counter.currencyCode) }
-
+        client.getInstrumentsInfo().list.map { TradePair(it.baseCoin, it.quoteCoin) }
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
         getCandlestickBars(pair, interval, countCandles, null, null)
@@ -307,10 +305,9 @@ class ClientByBit(private val api: String? = null, private val sec: String? = nu
 }*/
 
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamByBitFuturesImpl(
-            pair = pair,
-            queue = queue,
+            pairsQueues = pairs.associateWith { queue },
             sec = sec,
             api = api
         )

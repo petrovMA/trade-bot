@@ -36,7 +36,7 @@ class ClientGate(
     private val log = KotlinLogging.logger {}
 
     override fun getAllPairs(): List<TradePair> =
-        instance.exchangeMetaData.instruments.map { TradePair(it.key.base.currencyCode, it.key.base.currencyCode) }
+        instance.exchangeMetaData.instruments.map { TradePair(it.key.base.currencyCode, it.key.counter.currencyCode) }
 
 
     override fun getCandlestickBars(pair: TradePair, interval: INTERVAL, countCandles: Int): List<Candlestick> =
@@ -227,9 +227,8 @@ class ClientGate(
 //    }
 
 
-    override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) = StreamGateImpl(
-        pair = pair,
-        queue = queue,
+    override fun stream(pairs: List<TradePair>, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) = StreamGateImpl(
+        pairsQueues = pairs.associateWith { queue },
         sec = sec,
         api = api
     )
