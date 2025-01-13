@@ -11,6 +11,7 @@ import java.io.File
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.ZonedDateTime
+import java.util.*
 import java.util.concurrent.BlockingQueue
 
 class TestClientFileData(
@@ -60,6 +61,7 @@ class TestClientFileData(
     private lateinit var candlestick: Candlestick
     private var historyFile: File? = null
     private var currentEmulateDate = from.plusDays(1)
+    private var currEmulateDate: Long = 0
 
     fun emulate(isWriteOrdersToLog: Boolean = false): Pair<TestBalance, File?> {
 
@@ -116,6 +118,11 @@ class TestClientFileData(
     private fun handle(kline: Candlestick) {
         if (kline.openTime.toZonedTime().let { from.isBefore(it) || from.isEqual(it) }) {
             if (kline.openTime.toZonedTime().let { to.isAfter(it) || to.isEqual(it) }) {
+
+                if ((currEmulateDate / (1000 * 60 * 60)) < kline.openTime / (1000 * 60 * 60)) {
+                    currEmulateDate = kline.openTime
+                    log.info("New date = ${Date(kline.openTime)}")
+                }
 
                 if (currentEmulateDate.isBefore(kline.openTime.toZonedTime())) {
                     val totalDuration = Duration.between(from, to).toMillis().toDouble()

@@ -5,7 +5,6 @@ import bot.trade.exchanges.clients.DIRECTION
 import bot.trade.exchanges.clients.SIDE
 import org.springframework.data.repository.CrudRepository
 import java.math.BigDecimal
-import java.util.*
 
 
 interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
@@ -13,6 +12,7 @@ interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
     fun deleteByOrderId(orderId: String)
     fun findByOrderId(orderId: String): ActiveOrder?
     fun findAllByBotNameAndDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
+    fun findAllByBotNameAndTradePair(botName: String, tradePair: String): Iterable<ActiveOrder>
     fun findByBotNameAndOrderId(botName: String, orderId: String): ActiveOrder?
     fun findAllByBotNameAndDirectionAndOrderSide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun deleteByBotNameAndDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
@@ -44,6 +44,18 @@ interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
         direction: DIRECTION,
         minPrice: BigDecimal
     ): ActiveOrder?
+
+    fun findAllByBotNameAndOrderSideAndPriceLessThanEqualOrderByPriceDesc(
+        botName: String,
+        side: SIDE,
+        maxPrice: BigDecimal
+    ): Iterable<ActiveOrder>
+
+    fun findAllByBotNameAndOrderSideAndPriceGreaterThanEqualOrderByPriceAsc(
+        botName: String,
+        side: SIDE,
+        minPrice: BigDecimal
+    ): Iterable<ActiveOrder>
 
     fun countByBotNameAndDirectionAndOrderSide(botName: String, direction: DIRECTION, side: SIDE): Long
     fun countByBotName(botName: String): Long

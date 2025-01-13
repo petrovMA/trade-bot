@@ -116,8 +116,6 @@ abstract class Algorithm(
 
         var retryCount = retrySentOrderCount
 
-        log?.info("${botSettings.name} Send $orderType order with params: price = $price; amount = $amount; side = $orderSide")
-
         var order = Order(
             orderId = "",
             pair = botSettings.pair,
@@ -138,7 +136,7 @@ abstract class Algorithm(
                 val priceStr = String.format(formatPrice, order.price).replace(",", ".")
                 order = client.newOrder(order, isStaticUpdate, qtyStr, priceStr, positionSide, isReduceOnly)
                 val after = System.currentTimeMillis()
-                log?.info("{}, request time = {}ms, Order sent: {}", botSettings.name, after - before, order)
+                log?.info("{}, request time = {}ms, Order sent: price = {}; amount = {} side = {}", botSettings.name, after - before, order.price, order.origQty, order.side)
                 return order
             } catch (be: ExchangeException) {
                 throw be

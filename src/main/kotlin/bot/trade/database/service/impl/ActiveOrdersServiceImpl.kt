@@ -51,6 +51,10 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
         activeOrdersRepository.findAllByBotNameAndDirection(botName, direction)
 
     @Transactional
+    override fun getOrdersByPair(botName: String, tradePair: String): Iterable<ActiveOrder> =
+        activeOrdersRepository.findAllByBotNameAndTradePair(botName, tradePair)
+
+    @Transactional
     override fun getOrdersBySide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder> =
         activeOrdersRepository.findAllByBotNameAndDirectionAndOrderSide(botName, direction, side)
 
@@ -67,6 +71,22 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
         activeOrdersRepository.findTopByBotNameAndDirectionAndPriceGreaterThanEqualOrderByPriceAsc(
             botName,
             direction,
+            minPrice
+        )
+
+    @Transactional
+    override fun getOrdersWithMaxPriceBySide(botName: String, side: SIDE, maxPrice: BigDecimal): Iterable<ActiveOrder> =
+        activeOrdersRepository.findAllByBotNameAndOrderSideAndPriceLessThanEqualOrderByPriceDesc(
+            botName,
+            side,
+            maxPrice
+        )
+
+    @Transactional
+    override fun getOrdersWithMinPriceBySide(botName: String, side: SIDE, minPrice: BigDecimal): Iterable<ActiveOrder> =
+        activeOrdersRepository.findAllByBotNameAndOrderSideAndPriceGreaterThanEqualOrderByPriceAsc(
+            botName,
+            side,
             minPrice
         )
 
