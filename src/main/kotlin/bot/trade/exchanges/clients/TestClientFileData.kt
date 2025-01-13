@@ -24,7 +24,8 @@ class TestClientFileData(
 ) : ClientFutures {
     var handler: (CommonExchangeData?) -> Unit = {}
     private val log = KotlinLogging.logger {}
-    private var orders: MutableMap<String, Order> = HashMap()
+
+    //private var orders: MutableMap<String, Order> = HashMap()
     var lastSellPrice: BigDecimal = BigDecimal(0)
         private set
     private var lastBuyPrice: BigDecimal = BigDecimal(0)
@@ -159,7 +160,9 @@ class TestClientFileData(
 
     override fun getAllOpenOrders(pairs: List<TradePair>): Map<TradePair, List<Order>> = TODO("not implemented")
 
-    override fun getOpenOrders(pair: TradePair): List<Order> = orders.map { it.value }
+    override fun getOpenOrders(pair: TradePair): List<Order> = activeOrdersService
+        ?.getOrdersByPair(params.botParams.name, pair.toString())
+        ?.map { Order(it) }!!
 
     override fun getBalances(): Map<String, List<Balance>> = TODO("not implemented")
 
@@ -230,7 +233,7 @@ class TestClientFileData(
             }
 
             TYPE.LIMIT -> {
-                val newOrder = Order(
+                return Order(
                     pair = order.pair,
                     side = order.side,
                     type = order.type,
@@ -240,28 +243,13 @@ class TestClientFileData(
                     status = STATUS.NEW,
                     orderId = clientOrderId.toString()
                 )
-
-                orders[newOrder.orderId] = newOrder
-
-                return newOrder
             }
 
             else -> return order
         }
     }
 
-    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean {
-        orders[orderId]?.let { order ->
-            if (order.status != STATUS.NEW) return true
-            order.status = STATUS.CANCELED
-
-//            if (order.side == SIDE.SELL)
-//                 profit.firstBalance += order.origQty
-//            else if (order.side == SIDE.BUY)
-//                 profit.secondBalance += order.origQty * (order.price ?: 0.0.toBigDecimal())
-        } ?: log.info("Order: id = $orderId Not found!")
-        return true
-    }
+    override fun cancelOrder(pair: TradePair, orderId: String, isStaticUpdate: Boolean): Boolean = true
 
     override fun stream(pair: TradePair, interval: INTERVAL, queue: BlockingQueue<CommonExchangeData>) =
         StreamThreadStub()
@@ -476,42 +464,58 @@ class TestClientFileData(
 
 
     private fun checkOrderExecuted(price: BigDecimal) {
-        val updatedOrders = orders.map { (key, order) ->
-            if (order.status == STATUS.NEW && order.price != null) {
-                when {
-                    order.price > price -> {
-                        if (order.side == SIDE.BUY) {
-                            order.status = STATUS.FILLED
-                            order.executedQty = order.origQty
-                            updatePosition(DIRECTION.LONG, order.side, order.origQty, order.price)
-                        }
+//        val updatedOrders =
+//            orders.map { (key, order) -> // FIXME TOO LONG for call this cycle many times!!! [replace 'orders' to sqlDataTable]
+//                if (order.status == STATUS.NEW && order.price != null) {
+//                    when {
+//                        order.price > price -> {
+//                            if (order.side == SIDE.BUY) {
+//                                order.status = STATUS.FILLED
+//                                order.executedQty = order.origQty
+//                                updatePosition(DIRECTION.LONG, order.side, order.origQty, order.price)
+//                            }
+//
+//                            key to order
+//                        }
+//
+//                        order.price < price -> {
+//                            if (order.side == SIDE.SELL) {
+//                                order.status = STATUS.FILLED
+//                                order.executedQty = order.origQty
+//                                updatePosition(DIRECTION.LONG, order.side, order.origQty, order.price)
+//                            }
+//
+//                            key to order
+//                        }
+//
+//                        else -> key to order
+//                    }
+//                } else key to order
+//            }
+        /* get allFilledOrders list */
+        /* call updatePosition() for every filledOrder
+        *  call handler(order) for every filledOrder */
 
-                        key to order
-                    }
+        val executedBuyOrder = activeOrdersService?.getOrdersWithMinPriceBySide(
+            botName = params.botParams.name,
+            side = SIDE.BUY,
+            minPrice = price
+        )
 
-                    order.price < price -> {
-                        if (order.side == SIDE.SELL) {
-                            order.status = STATUS.FILLED
-                            order.executedQty = order.origQty
-                            updatePosition(DIRECTION.LONG, order.side, order.origQty, order.price)
-                        }
+        val executedSellOrder = activeOrdersService?.getOrdersWithMaxPriceBySide(
+            botName = params.botParams.name,
+            side = SIDE.SELL,
+            maxPrice = price
+        )
 
-                        key to order
-                    }
-
-                    else -> key to order
-                }
-            } else key to order
+        (executedBuyOrder!! + executedSellOrder!!).forEach {
+            val order = Order(it).apply {
+                status = STATUS.FILLED
+                type = TYPE.LIMIT
+            }
+            handler(order)
+            updatePosition(DIRECTION.LONG, order.side, order.origQty, order.price)
         }
-
-        orders = updatedOrders
-            .toMap()
-            .filter { it.value.status != STATUS.FILLED }
-            .toMutableMap()
-
-        updatedOrders
-            .filter { (_, order) -> order.status == STATUS.FILLED }
-            .forEach { (_, order) -> handler(order) }
     }
 
     private fun write(amountWithFee: BigDecimal, side: SIDE, price: BigDecimal) = historyFile?.appendText(
