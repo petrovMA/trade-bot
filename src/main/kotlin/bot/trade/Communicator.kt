@@ -272,13 +272,13 @@ class Communicator(
                     taskQueue?.put(
                         WriteCandlestickToCsv(
                             exchangeEnum = ExchangeEnum.BYBIT,
-                            pair = TradePair(params[0]),
+                            pair = TradePair(params[1]),
                             start = LocalDateTime
-                                .parse(params[1], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                                .parse(params[2], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                                 .toInstant(ZoneOffset.UTC)
                                 .toEpochMilli(),
                             end = LocalDateTime
-                                .parse(params[2], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                                .parse(params[3], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                                 .toInstant(ZoneOffset.UTC)
                                 .toEpochMilli(),
                             sendFile = sendFile
