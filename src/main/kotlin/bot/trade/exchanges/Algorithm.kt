@@ -2,6 +2,7 @@ package bot.trade.exchanges
 
 import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
+import bot.trade.exchanges.clients.ExchangeEnum.Companion.newClient
 import bot.trade.exchanges.clients.stream.Stream
 import bot.trade.exchanges.params.BotSettings
 import bot.trade.exchanges.params.Param
@@ -156,7 +157,7 @@ abstract class Algorithm(
                 log?.error("${botSettings.name} Can't send: $order", e)
 
                 e.printStackTrace()
-                client = newClient(exchangeEnum, api, sec)
+                client = exchangeEnum.newClient(api, sec)
                 synchronizeOrders()
             }
             try {
@@ -214,7 +215,7 @@ abstract class Algorithm(
                     throw e
                 } else {
                     sleep(1.m().toMillis())
-                    client = newClient(exchangeEnum, api, sec)
+                    client = exchangeEnum.newClient(api, sec)
                     val status = getOrder(botSettings.pair, order.orderId)?.status
                     if (status != STATUS.NEW && status != STATUS.PARTIALLY_FILLED) {
                         log?.warn("$symbols Order already cancelled: $order")

@@ -1,10 +1,11 @@
-package bot.trade.exchanges
+package bot.trade.exchanges.parallel_tasks
 
 import bot.trade.exchanges.clients.ExchangeEnum
 import bot.trade.libs.*
 import mu.KotlinLogging
 import java.io.File
 import java.lang.RuntimeException
+
 
 class DeleteOldCandlestickData(
     private val exchangeEnum: ExchangeEnum,

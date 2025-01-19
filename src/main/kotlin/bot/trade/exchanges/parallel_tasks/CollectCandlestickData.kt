@@ -1,33 +1,13 @@
-package bot.trade.exchanges
+package bot.trade.exchanges.parallel_tasks
 
+import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
 import bot.trade.libs.*
-import mu.KLogger
 import mu.KotlinLogging
 import java.math.BigDecimal
 import java.sql.Connection
-import java.sql.DriverManager
-import java.sql.ResultSet
 import java.sql.Timestamp
-import java.time.*
-
-
-fun main() {
-
-    CollectCandlestickData(
-        command = Command.WRITE,
-//            command = Command.WRITE,
-//            command = Command.CHECK,
-        exchangeEnum = ExchangeEnum.BINANCE
-    ) { _, _ -> }.run()
-
-
-//        .fromTextToDataBase(
-//            "/home/asus/Blockchain/CandlestickData/BITMAX.db",
-//            "/home/asus/Blockchain/CandlestickData/BITMAX/BTT_BTC/2021_01"
-//        )
-
-}
+import java.time.LocalDate
 
 class CollectCandlestickData(
     private val command: Command,
@@ -328,128 +308,4 @@ class CollectCandlestickData(
     }
 
     private fun send(message: String, isMarkDown: Boolean = false) = sendMessage(message, isMarkDown)
-}
-
-
-class CandlestickListsIterator(
-    connect: Connection,
-    private val tableName: String,
-    private val listSize: Int,
-    startDateTime: Timestamp,
-    endDateTime: Timestamp,
-    private val fillGaps: Boolean,
-    private val interval: INTERVAL
-) : Iterator<List<Candlestick>> {
-
-    private val stmt = connect.createStatement()
-    private val resultSet: ResultSet = stmt.executeQuery(
-        """SELECT * FROM $tableName WHERE 
-          ID_OPEN_TIME > ${startDateTime.time} AND
-          ID_OPEN_TIME < ${endDateTime.time} ORDER BY ID_OPEN_TIME"""
-    )
-    private val log = KotlinLogging.logger {}
-    private var hasNext = true
-    private var current: Candlestick? = null
-    private var previous: Candlestick? = null
-    private var next = true
-
-    override fun hasNext(): Boolean = hasNext
-
-    override fun next(): List<Candlestick> {
-        val resultList = ArrayList<Candlestick>()
-        try {
-
-            if (fillGaps && previous?.let { it.closeTime + 1 != current!!.openTime } == true) {
-                next = resultSet.next()
-                current = getCandle(resultSet).toCandlestick()
-            }
-
-            while (resultList.size < listSize) {
-
-                if (fillGaps && previous?.let { it.closeTime + 1 != current!!.openTime } == true) {
-                    previous = nextEmptyCandlestick(previous!!, interval)
-                    resultList.add(previous!!)
-
-                } else {
-                    current?.let { resultList.add(it) }
-
-                    if (resultSet.next().apply { next = this }.not()) break
-                    else {
-                        previous = current
-                        current = getCandle(resultSet).toCandlestick()
-                    }
-                }
-            }
-
-            if (!next) {
-                stmt.close()
-                hasNext = false
-            }
-
-        } catch (t: Throwable) {
-            log.error("Table: $tableName can't read!", t)
-            throw t
-        }
-
-        return resultList
-    }
-
-
-    private fun nextEmptyCandlestick(previous: Candlestick, interval: INTERVAL): Candlestick = Candlestick(
-        openTime = previous.openTime + interval.toMillsTime(),
-        closeTime = previous.closeTime + interval.toMillsTime(),
-        open = previous.close,
-        close = previous.close,
-        high = previous.close,
-        low = previous.close,
-        volume = BigDecimal.ZERO
-    )
-}
-
-
-private fun getCandle(result: ResultSet) = CandlestickDB(
-    openTime = result.getLong("ID_OPEN_TIME"),
-    open = result.getBigDecimal("OPEN"),
-    close = result.getBigDecimal("CLOSE"),
-    high = result.getBigDecimal("HIGH"),
-    low = result.getBigDecimal("LOW"),
-    volume = result.getBigDecimal("VOLUME")
-)
-
-
-fun connect(pathDB: String, log: KLogger): Connection = try {
-    Class.forName("org.sqlite.JDBC")
-    DriverManager.getConnection("jdbc:sqlite:$pathDB")
-} catch (t: Throwable) {
-    log.error("Connect Error:", t)
-    throw t
-}
-
-
-data class CandlestickDB(
-    val openTime: Long,
-    val open: BigDecimal,
-    val high: BigDecimal,
-    val low: BigDecimal,
-    val close: BigDecimal,
-    val volume: BigDecimal
-) {
-    fun toCandlestick(): Candlestick = Candlestick(
-        open = this.open,
-        close = this.close,
-        openTime = this.openTime,
-        closeTime = this.openTime + 299_999,
-        high = this.high,
-        low = this.low,
-        volume = this.volume
-    )
-}
-
-
-enum class Command {
-    CHECK,
-    WRITE,
-    WRITE_AND_CHECK,
-    CUSTOM,
-    NONE
 }

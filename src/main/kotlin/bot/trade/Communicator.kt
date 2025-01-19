@@ -4,9 +4,13 @@ import bot.trade.database.service.ActiveOrdersService
 import bot.trade.database.service.OrderService
 import bot.trade.exchanges.*
 import bot.trade.exchanges.clients.*
-import bot.trade.exchanges.emulate.EmulateFromFile
+import bot.trade.exchanges.clients.ExchangeEnum.Companion.newClient
 import bot.trade.exchanges.emulate.TestBalance
 import bot.trade.exchanges.libs.TrendCalculator
+import bot.trade.exchanges.parallel_tasks.CollectCandlestickData
+import bot.trade.exchanges.parallel_tasks.DeleteOldCandlestickData
+import bot.trade.exchanges.parallel_tasks.EmulateFromFile
+import bot.trade.exchanges.parallel_tasks.WriteCandlestickToCsv
 import bot.trade.exchanges.params.BotEmulateParams
 import bot.trade.exchanges.params.BotSettings
 import bot.trade.exchanges.params.BotSettingsGrid
@@ -18,6 +22,7 @@ import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
 import java.time.*
+import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingDeque
@@ -258,6 +263,37 @@ class Communicator(
                     )
                 )
                 msg = "Collect Data command accepted!"
+            }
+
+            cmd.writeCandlestickToCsv.matches(message) -> {
+                val params = message.split("\\n+".toRegex())
+
+                try {
+                    taskQueue?.put(
+                        WriteCandlestickToCsv(
+                            exchangeEnum = ExchangeEnum.BYBIT,
+                            pair = TradePair(params[0]),
+                            start = LocalDateTime
+                                .parse(params[1], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                                .toInstant(ZoneOffset.UTC)
+                                .toEpochMilli(),
+                            end = LocalDateTime
+                                .parse(params[2], DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                                .toInstant(ZoneOffset.UTC)
+                                .toEpochMilli(),
+                            sendFile = sendFile
+                        )
+                    )
+
+                    msg = "WriteCandlestickToCsv command accepted!"
+
+                } catch (t: Throwable) {
+                    msg = "Error reading Candlestick data!\n" +
+                            "check input message format, example:\n" +
+                            "BTC_USDT\n" +
+                            "2024-12-16 00:00:00\n" +
+                            "2024-12-18 00:00:00"
+                }
             }
 
             cmd.commandTradePairsInit.matches(message) -> {
@@ -628,8 +664,7 @@ class Communicator(
         }
     }
 
-    private fun getClient(conf: Config): Client = newClient(
-        exchangeEnum = conf.getEnum(ExchangeEnum::class.java, "exchange"),
+    private fun getClient(conf: Config): Client = conf.getEnum(ExchangeEnum::class.java, "exchange").newClient(
         api = conf.getString("api"),
         sec = conf.getString("sec")
     )
@@ -667,6 +702,7 @@ class Communicator(
                 client = test,
                 sendMessage = { _, _ -> }
             )
+
             is BotSettingsTrader -> {
                 val trendCalculator: TrendCalculator? = params.botParams.trendDetector?.run {
                     TrendCalculator(
@@ -711,6 +747,7 @@ class Communicator(
                     sendMessage = { _, _ -> }
                 )
             }
+
             else -> throw RuntimeException("Unsupported bot settings type!")
         }
 

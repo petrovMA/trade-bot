@@ -4,6 +4,7 @@ import bot.trade.database.data.entities.NotificationType
 import bot.trade.database.service.OrderService
 import bot.trade.libs.*
 import bot.trade.exchanges.clients.*
+import bot.trade.exchanges.clients.ExchangeEnum.Companion.newClient
 import bot.trade.exchanges.params.BotSettings
 import bot.trade.rest_controller.Notification
 import com.typesafe.config.Config
@@ -30,7 +31,7 @@ class AlgorithmBobblesIndicator(
     conf: Config = getConfigByExchange(exchangeEnum)!!,
     api: String = conf.getString("api"),
     sec: String = conf.getString("sec"),
-    client: Client = newClient(exchangeEnum, api, sec),
+    client: Client = exchangeEnum.newClient(api, sec),
     isLog: Boolean = true,
     isEmulate: Boolean = false,
     sendMessage: (String, Boolean) -> Unit

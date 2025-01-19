@@ -7,6 +7,7 @@ import bot.trade.libs.UnknownOrderStatus
 import com.google.gson.annotations.SerializedName
 //import info.bitrich.xchangestream.binancefuture.dto.BinanceFuturesPosition // todo: works only on org.knowm.xchange:xchange-binance:5.1.1-SNAPSHOT
 import io.bybit.api.websocket.messages.response.Kline
+import mu.KotlinLogging
 import org.knowm.xchange.binance.dto.marketdata.BinanceKline
 import org.knowm.xchange.binance.dto.trade.OrderSide
 import org.knowm.xchange.currency.CurrencyPair
@@ -16,6 +17,8 @@ import java.math.BigDecimal
 import java.time.Duration
 
 interface CommonExchangeData
+
+private val log = KotlinLogging.logger {}
 
 data class Balance(val asset: String, val total: BigDecimal, val free: BigDecimal, val locked: BigDecimal) :
     CommonExchangeData {
@@ -435,7 +438,43 @@ enum class ExchangeEnum {
     HUOBI,
     GATE,
     STUB_TEST,
-    TEST
+    TEST;
+
+    companion object {
+
+        // TODO:: IMPLEMENT ONE CLIENT INSTANCE FOR EVERY EXCHANGE, DON'T CREATE NEW CLIENT FOR EVERY ACTION!!!
+        fun ExchangeEnum.newClient(api: String? = null, sec: String? = null): Client =
+            when (this) {
+                BYBIT -> ClientByBit(api, sec).also { log.info(" !!! Connect: $it !!! ") }
+                BINANCE -> ClientBinance(api, sec).also { log.info(" !!! Connect: $it !!! ") }
+                BITMAX -> ClientBitmax(api, sec).also { log.info(" !!! Connect: $it !!! ") }
+                BINANCE_FUTURES -> ClientBinanceFutures(api, sec).also { log.info(" !!! Connect: $it !!! ") }
+                TEST -> ClientTestExchange()
+                else -> throw UnsupportedClientException()
+            }
+
+        // TODO:: IMPLEMENT ONE CLIENT INSTANCE FOR EVERY EXCHANGE, DON'T CREATE NEW CLIENT FOR EVERY ACTION!!!
+        fun ExchangeEnum.newClient(): Client = when (this) {
+            BYBIT -> readConf("exchangeConfigs/BYBIT.conf")!!.run {
+                ClientByBit(getString("api"), getString("sec"))
+                    .also { log.info(" !!! Connect: $it !!! ") }
+            }
+            BINANCE -> readConf("exchangeConfigs/BINANCE.conf")!!.run {
+                ClientBinance(getString("api"), getString("sec"))
+                    .also { log.info(" !!! Connect: $it !!! ") }
+            }
+            BITMAX -> readConf("exchangeConfigs/BITMAX.conf")!!.run {
+                ClientBitmax(getString("api"), getString("sec"))
+                    .also { log.info(" !!! Connect: $it !!! ") }
+            }
+            BINANCE_FUTURES -> readConf("exchangeConfigs/BINANCE_FUTURES.conf")!!.run {
+                ClientBinanceFutures(getString("api"), getString("sec"))
+                    .also { log.info(" !!! Connect: $it !!! ") }
+            }
+            TEST -> ClientTestExchange()
+            else -> throw UnsupportedClientException()
+        }
+    }
 }
 
 data class Candlestick(

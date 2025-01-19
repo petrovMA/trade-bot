@@ -1,7 +1,6 @@
-package bot.trade.exchanges.emulate
+package bot.trade.exchanges.parallel_tasks
 
 import bot.trade.Communicator
-import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.params.BotEmulateParams
 import bot.trade.libs.*
 import java.io.File

@@ -7,6 +7,7 @@ import bot.trade.libs.*
 import io.bitmax.api.Authorization
 import utils.mapper.Mapper
 import io.bitmax.api.rest.client.BitMaxRestApiClient
+import io.bitmax.api.rest.client.BitMaxRestApiClientAccount
 import io.bitmax.api.rest.client.BitmaxInterval
 import io.bitmax.api.rest.messages.requests.RestCancelOrderRequest
 import io.bitmax.api.rest.messages.requests.RestPlaceOrderRequest
@@ -22,7 +23,8 @@ import java.util.concurrent.BlockingQueue
 class ClientBitmax(
     private val api: String? = null,
     private val sec: String? = null,
-    private val instance: BitMaxRestApiClient = newBitmaxClient(api, sec)
+    private val instance: BitMaxRestApiClient = if (api != null && sec != null) BitMaxRestApiClientAccount(api, sec)
+    else BitMaxRestApiClient()
 ) : Client {
 
     private val client = OkHttpClient()
