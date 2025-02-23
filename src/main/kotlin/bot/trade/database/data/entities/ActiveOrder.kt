@@ -6,6 +6,7 @@ import bot.trade.exchanges.clients.SIDE
 import bot.trade.libs.round
 import jakarta.persistence.*
 import java.math.BigDecimal
+import java.sql.Timestamp
 
 @Entity
 @Table(
@@ -65,5 +66,15 @@ data class ActiveOrder(
         stopPrice = order.stopPrice,
         lastBorderPrice = order.lastBorderPrice,
         direction = DIRECTION.LONG
+    )
+
+    fun toDbOrder(dateTime: Timestamp = Timestamp(System.currentTimeMillis())) = Order(
+        botName = this.botName,
+        orderId = this.orderId,
+        tradePair = this.tradePair,
+        amount = this.amount,
+        orderSide = this.orderSide,
+        price = this.price,
+        dateTime = dateTime,
     )
 }

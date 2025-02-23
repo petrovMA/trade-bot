@@ -27,7 +27,7 @@ class WriteCandlestickToCsv(
             CustomFileLoggingProcessor(logMessageQueue)
 
             var minutes =
-                getCandlestickBars(pair, INTERVAL.ONE_MINUTE, 500, start = start + 1, end = end)
+                getCandlestickBars(pair, INTERVAL.ONE_MINUTE, 500, start = start + 1, end = null)
 
             minutes
                 .reversed()
@@ -59,7 +59,7 @@ class WriteCandlestickToCsv(
                         logMessageQueue.add(CustomFileLoggingProcessor.Message(resultFile, line, false))
                     }
 
-            } while (minutes.first().closeTime < System.currentTimeMillis())
+            } while (minutes.first().closeTime < end)
         }
 
         sendFile(resultFile)

@@ -34,4 +34,5 @@
 
     <!-- Set log levels for specific packages if necessary -->
     <logger name="bot.trade" level="debug" />
+    <logger name="bot.trade.exchanges.Algorithm" level="warn" />
 </configuration>

@@ -33,6 +33,20 @@ interface ActiveOrdersRepository : CrudRepository<ActiveOrder, Long> {
         maxPrice: BigDecimal
     ): Iterable<ActiveOrder>
 
+    fun findTopByBotNameAndDirectionAndPriceGreaterThanAndPriceLessThanEqualOrderByPriceAsc(
+        botName: String,
+        direction: DIRECTION,
+        minPrice: BigDecimal,
+        maxPrice: BigDecimal
+    ): ActiveOrder?
+
+    fun findTopByBotNameAndDirectionAndPriceGreaterThanEqualAndPriceLessThanOrderByPriceDesc(
+        botName: String,
+        direction: DIRECTION,
+        minPrice: BigDecimal,
+        maxPrice: BigDecimal
+    ): ActiveOrder?
+
     fun findTopByBotNameAndDirectionAndPriceLessThanEqualOrderByPriceDesc(
         botName: String,
         direction: DIRECTION,

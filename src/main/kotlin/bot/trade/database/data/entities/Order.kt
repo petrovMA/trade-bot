@@ -43,7 +43,6 @@ data class Order(
     override fun hashCode(): Int = javaClass.hashCode()
 
     @Override
-    override fun toString(): String {
-        return this::class.simpleName + "(id = $id , botName = $botName , amount = $amount , price = $price , dateTime = $dateTime , notificationType = $notificationType )"
-    }
+    override fun toString(): String =
+        this::class.simpleName + "(id = $id , botName = $botName , amount = $amount , price = $price , dateTime = $dateTime , notificationType = $notificationType )"
 }

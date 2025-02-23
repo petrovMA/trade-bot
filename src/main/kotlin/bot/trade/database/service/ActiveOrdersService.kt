@@ -20,6 +20,8 @@ interface ActiveOrdersService {
     fun getOrdersBySide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun getOrderByPrice(botName: String, direction: DIRECTION, price: BigDecimal): ActiveOrder?
     fun getOrderByPriceBetween(botName: String, direction: DIRECTION, minPrice: BigDecimal, maxPrice: BigDecimal): Iterable<ActiveOrder>
+    fun getTopOrderByPriceBetweenIncludeMaxPrice(botName: String, direction: DIRECTION, minPrice: BigDecimal, maxPrice: BigDecimal): ActiveOrder?
+    fun getTopOrderByPriceBetweenIncludeMinPrice(botName: String, direction: DIRECTION, minPrice: BigDecimal, maxPrice: BigDecimal): ActiveOrder?
     fun deleteByDirectionAndSide(botName: String, direction: DIRECTION, side: SIDE): Iterable<ActiveOrder>
     fun deleteByDirection(botName: String, direction: DIRECTION): Iterable<ActiveOrder>
     fun deleteByBotName(botName: String): Iterable<ActiveOrder>

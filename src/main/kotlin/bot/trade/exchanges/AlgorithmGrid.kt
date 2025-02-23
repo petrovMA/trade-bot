@@ -2,6 +2,7 @@ package bot.trade.exchanges
 
 import bot.trade.database.data.entities.ActiveOrder
 import bot.trade.database.service.ActiveOrdersService
+import bot.trade.database.service.OrderService
 import bot.trade.exchanges.clients.*
 import bot.trade.exchanges.clients.CommonExchangeData
 import bot.trade.exchanges.clients.ExchangeEnum.Companion.newClient
@@ -22,6 +23,7 @@ class AlgorithmGrid(
 
     // activeOrdersService.getOrders(settings.name, settings.direction).toList().sortedBy { it.price }
     private val activeOrdersService: ActiveOrdersService,
+    private val ordersService: OrderService? = null,
 
     queue: LinkedBlockingDeque<CommonExchangeData> = LinkedBlockingDeque(),
     exchangeEnum: ExchangeEnum = ExchangeEnum.valueOf(botSettings.exchange.uppercase(Locale.getDefault())),
@@ -134,8 +136,10 @@ class AlgorithmGrid(
 
                                         if (currentPrice > nearSellOrder.price) {
                                             getOrder(settings.pair, nearSellOrder.orderId!!)?.let {
-                                                if (it.status == STATUS.FILLED)
+                                                if (it.status == STATUS.FILLED) {
                                                     createNextOrderFor(nearSellOrder)
+                                                    ordersService?.saveOrder(nearSellOrder.toDbOrder())
+                                                }
                                             } ?: run {
                                                 log?.warn("Order not found, delete order: $nearSellOrder")
                                                 activeOrdersService.deleteByOrderId(nearSellOrder.orderId)
@@ -143,8 +147,10 @@ class AlgorithmGrid(
                                         }
                                         if (currentPrice < nearBuyOrder.price) {
                                             getOrder(settings.pair, nearBuyOrder.orderId!!)?.let {
-                                                if (it.status == STATUS.FILLED)
+                                                if (it.status == STATUS.FILLED) {
                                                     createNextOrderFor(nearBuyOrder)
+                                                    ordersService?.saveOrder(nearBuyOrder.toDbOrder())
+                                                }
                                             } ?: run {
                                                 log?.warn("Order not found, delete order: $nearBuyOrder")
                                                 activeOrdersService.deleteByOrderId(nearBuyOrder.orderId)
@@ -174,7 +180,9 @@ class AlgorithmGrid(
                         STATUS.FILLED -> {
                             if (msg.type == TYPE.LIMIT) {
                                 activeOrdersService.getOrderByOrderId(settings.name, msg.orderId)
-                                    ?.let { createNextOrderFor(it) }
+                                    ?.let {
+                                        createNextOrderFor(it)
+                                    }
                             }
                         }
 
@@ -206,69 +214,66 @@ class AlgorithmGrid(
 
         while (
             activeOrdersService.count(settings.name) < settings.parameters.orderMaxQuantity &&
-            (priceBuy > minRange || priceSell < maxRange)
+            ((minRange < priceBuy && priceBuy < maxRange) || (minRange < priceSell && priceSell < maxRange))
         ) {
-            if (priceBuy > minRange) {
+            if (minRange < priceBuy && priceBuy < maxRange) {
 
                 distanceBuy = orderDistance(priceBuy, settings.parameters.orderDistance)
 
                 val minPrice = priceBuy - distanceBuy
 
-                val buyOrders = activeOrdersService.getOrderByPriceBetween(
+                activeOrdersService.getTopOrderByPriceBetweenIncludeMaxPrice(
                     botName = settings.name,
                     direction = settings.direction,
                     minPrice = minPrice,
                     maxPrice = prevPriceBuy
-                ).toList()
+                )?.let { priceBuy = it.price!! }
+                    ?: run {
 
-                if (buyOrders.isEmpty()) {
+                        val orderBuy = sentOrder(
+                            price = priceBuy,
+                            amount = calcAmount(settings.parameters.orderQuantity, priceBuy),
+                            orderSide = SIDE.BUY,
+                            orderType = TYPE.LIMIT,
+                            positionSide = settings.direction
+                        )
 
-                    val orderBuy = sentOrder(
-                        price = priceBuy,
-                        amount = calcAmount(settings.parameters.orderQuantity, priceBuy),
-                        orderSide = SIDE.BUY,
-                        orderType = TYPE.LIMIT,
-                        positionSide = settings.direction
-                    )
+                        activeOrdersService.saveOrder(ActiveOrder(orderBuy, settings.name))
+                        log("Save new order: $orderBuy")
+                    }
 
-                    activeOrdersService.saveOrder(ActiveOrder(orderBuy, settings.name))
-                    log("Save new order: $orderBuy")
-
-                } else priceBuy = buyOrders.sortedBy { it.price }.first().price!!
-
-                prevPriceBuy = priceBuy
+                prevPriceBuy = minPrice
                 priceBuy -= distanceBuy
             }
 
 
-            if (priceSell < maxRange) {
+            if (minRange < priceSell && priceSell < maxRange) {
 
                 distanceSell = orderDistance(priceSell, settings.parameters.orderDistance)
 
                 val maxPrice = priceSell + distanceSell
 
-                val sellOrders = activeOrdersService.getOrderByPriceBetween(
+                activeOrdersService.getTopOrderByPriceBetweenIncludeMinPrice(
                     botName = settings.name,
                     direction = settings.direction,
                     minPrice = prevPriceSell,
                     maxPrice = maxPrice
-                ).toList()
+                )?.let { priceSell = it.price!! }
+                    ?: run {
+                        val orderSell = sentOrder(
+                            price = priceSell,
+                            amount = calcAmount(settings.parameters.orderQuantity, priceSell),
+                            orderSide = SIDE.SELL,
+                            orderType = TYPE.LIMIT,
+                            positionSide = settings.direction
+                        )
 
-                if (sellOrders.isEmpty()) {
-                    val orderSell = sentOrder(
-                        price = priceSell,
-                        amount = calcAmount(settings.parameters.orderQuantity, priceSell),
-                        orderSide = SIDE.SELL,
-                        orderType = TYPE.LIMIT,
-                        positionSide = settings.direction
-                    )
+                        activeOrdersService.saveOrder(ActiveOrder(orderSell, settings.name))
+                        log("Save new order: $orderSell")
 
-                    activeOrdersService.saveOrder(ActiveOrder(orderSell, settings.name))
-                    log("Save new order: $orderSell")
+                    }
 
-                } else priceSell = sellOrders.sortedBy { it.price }.last().price!!
-
-                prevPriceSell = priceSell
+                prevPriceSell = maxPrice
                 priceSell += distanceSell
             }
         }

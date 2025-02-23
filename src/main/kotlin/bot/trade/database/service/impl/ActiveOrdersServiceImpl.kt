@@ -1,7 +1,6 @@
 package bot.trade.database.service.impl
 
 import bot.trade.database.data.entities.ActiveOrder
-import bot.trade.exchanges.clients.Order
 import bot.trade.database.repositories.ActiveOrdersRepository
 import bot.trade.database.service.ActiveOrdersService
 import bot.trade.exchanges.clients.DIRECTION
@@ -10,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
-import java.util.*
 
 @Service
 class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: ActiveOrdersRepository) :
@@ -116,6 +114,32 @@ class ActiveOrdersServiceImpl(@Autowired open val activeOrdersRepository: Active
         minPrice: BigDecimal,
         maxPrice: BigDecimal
     ): Iterable<ActiveOrder> = activeOrdersRepository.findByBotNameAndDirectionAndPriceGreaterThanAndPriceLessThan(
+        botName,
+        direction,
+        minPrice,
+        maxPrice
+    )
+
+    @Transactional
+    override fun getTopOrderByPriceBetweenIncludeMaxPrice(
+        botName: String,
+        direction: DIRECTION,
+        minPrice: BigDecimal,
+        maxPrice: BigDecimal
+    ): ActiveOrder? = activeOrdersRepository.findTopByBotNameAndDirectionAndPriceGreaterThanAndPriceLessThanEqualOrderByPriceAsc(
+        botName,
+        direction,
+        minPrice,
+        maxPrice
+    )
+
+    @Transactional
+    override fun getTopOrderByPriceBetweenIncludeMinPrice(
+        botName: String,
+        direction: DIRECTION,
+        minPrice: BigDecimal,
+        maxPrice: BigDecimal
+    ): ActiveOrder? = activeOrdersRepository.findTopByBotNameAndDirectionAndPriceGreaterThanEqualAndPriceLessThanOrderByPriceDesc(
         botName,
         direction,
         minPrice,
