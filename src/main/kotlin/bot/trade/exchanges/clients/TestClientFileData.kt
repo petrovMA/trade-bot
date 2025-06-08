@@ -279,9 +279,17 @@ class TestClientFileData(
 
         val priceWithFee = if (side == SIDE.BUY) price + price.percent(fee) else price - price.percent(fee)
 
+        val positionLongBreakEvenPrice = positionLong.breakEvenPrice
+        val positionLongSize = positionLong.size
+        val positionLongEntryPrice = positionLong.entryPrice
+
+        val positionShortBreakEvenPrice = positionShort.breakEvenPrice
+        val positionShortSize = positionShort.size
+        val positionShortEntryPrice = positionShort.entryPrice
+
         when (direction) {
             DIRECTION.LONG -> {
-                if (compareBigDecimal(positionLong.size, BigDecimal(0)) && side == SIDE.BUY) {
+                if (compareBigDecimal(positionLongSize, BigDecimal(0)) && side == SIDE.BUY) {
                     positionLong = Position(
                         pair = TradePair("TEST_PAIR"),
                         marketPrice = price,
@@ -306,9 +314,9 @@ class TestClientFileData(
 
                 } else {
                     positionLong = if (side == SIDE.BUY) {
-                        val newAmount = positionLong.size + amount
+                        val newAmount = positionLongSize + amount
                         val newAveragePrice =
-                            ((positionLong.breakEvenPrice * positionLong.size) + (price * amount)) / newAmount
+                            ((positionLongBreakEvenPrice * positionLongSize) + (price * amount)).div8(newAmount)
 
                         val amountWithFee = (amount * priceWithFee)
                         profit.secondBalance -= amountWithFee
@@ -332,10 +340,10 @@ class TestClientFileData(
                             side = "BUY"
                         )
                     } else {
-                        val newAmount = positionLong.size - amount
+                        val newAmount = positionLongSize - amount
 
-                        val priceChange = if (!compareBigDecimal(positionLong.size, BigDecimal(0)))
-                            (price - positionLong.breakEvenPrice) / (positionLong.size / amount)
+                        val priceChange = if (!compareBigDecimal(positionLongSize, BigDecimal(0)))
+                            (price - positionLongBreakEvenPrice).div8(positionLongSize.div8(amount))
                         else BigDecimal(0)
 
                         val amountWithFee = (amount * priceWithFee)
@@ -353,8 +361,8 @@ class TestClientFileData(
                                 marketPrice = 0.0.toBigDecimal(),
                                 unrealisedPnl = 0.0.toBigDecimal(),
                                 realisedPnl = 0.0.toBigDecimal(),
-                                entryPrice = positionLong.entryPrice,
-                                breakEvenPrice = positionLong.breakEvenPrice + priceChange,
+                                entryPrice = positionLongEntryPrice,
+                                breakEvenPrice = positionLongBreakEvenPrice + priceChange,
                                 leverage = 0.0.toBigDecimal(),
                                 liqPrice = 0.0.toBigDecimal(),
                                 size = newAmount,
@@ -379,7 +387,7 @@ class TestClientFileData(
             }
 
             DIRECTION.SHORT -> {
-                if (compareBigDecimal(positionShort.size, BigDecimal(0)) && side == SIDE.SELL) {
+                if (compareBigDecimal(positionShortSize, BigDecimal(0)) && side == SIDE.SELL) {
                     positionShort = Position(
                         pair = TradePair("TEST_PAIR"),
                         marketPrice = price,
@@ -404,9 +412,9 @@ class TestClientFileData(
 
                 } else {
                     positionShort = if (side == SIDE.SELL) {
-                        val newAmount = positionShort.size + amount
+                        val newAmount = positionShortSize + amount
 
-                        val priceChange = (price - positionShort.breakEvenPrice) / newAmount
+                        val priceChange = (price - positionShortBreakEvenPrice).div8(newAmount)
 
                         val amountWithFee = (amount * priceWithFee)
                         profit.secondBalance += amountWithFee
@@ -422,15 +430,15 @@ class TestClientFileData(
                             marketPrice = price,
                             unrealisedPnl = 0.0.toBigDecimal(),
                             realisedPnl = 0.0.toBigDecimal(),
-                            entryPrice = positionShort.entryPrice,
-                            breakEvenPrice = positionShort.breakEvenPrice + priceChange,
+                            entryPrice = positionShortEntryPrice,
+                            breakEvenPrice = positionShortBreakEvenPrice + priceChange,
                             leverage = 0.0.toBigDecimal(),
                             liqPrice = 0.0.toBigDecimal(),
                             size = newAmount,
                             side = "SELL"
                         )
                     } else {
-                        val newAmount = positionShort.size - amount
+                        val newAmount = positionShortSize - amount
 
                         val amountWithFee = (amount * priceWithFee)
                         profit.secondBalance -= amountWithFee
@@ -447,8 +455,8 @@ class TestClientFileData(
                                 marketPrice = 0.0.toBigDecimal(),
                                 unrealisedPnl = 0.0.toBigDecimal(),
                                 realisedPnl = 0.0.toBigDecimal(),
-                                entryPrice = positionShort.entryPrice,
-                                breakEvenPrice = ((positionShort.breakEvenPrice * positionShort.size) + (price * amount)) / newAmount,
+                                entryPrice = positionShortEntryPrice,
+                                breakEvenPrice = ((positionShortBreakEvenPrice * positionShortSize) + (price * amount)).div8(newAmount),
                                 leverage = 0.0.toBigDecimal(),
                                 liqPrice = 0.0.toBigDecimal(),
                                 size = newAmount,
