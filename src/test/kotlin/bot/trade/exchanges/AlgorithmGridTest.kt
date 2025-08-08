@@ -28,8 +28,8 @@ class AlgorithmGridTest {
 
         val orders = exchange.orders.sortedBy { it.price }
 
-        assertEquals(284, orders.size)
-        assertEquals(128, orders.filter { it.side == SIDE.BUY }.size)
-        assertEquals(156, orders.filter { it.side == SIDE.SELL }.size)
+        assertEquals(288, orders.size)
+        assertEquals(130, orders.filter { it.side == SIDE.BUY }.size)
+        assertEquals(158, orders.filter { it.side == SIDE.SELL }.size)
     }
 }

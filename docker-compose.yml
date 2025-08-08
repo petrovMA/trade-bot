@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  trade-bot:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./exchangeConfigs:/app/exchangeConfigs
+      - ./database:/app/database
+      - ./logging:/app/logging
+      - ./results:/app/results
+      - ./collect_binance_candlestick.conf:/app/collect_binance_candlestick.conf
+      - ./collect_bitmax_candlestick.conf:/app/collect_bitmax_candlestick.conf
+      - ./collect_ftx_candlestick.conf:/app/collect_ftx_candlestick.conf
+      - ./collect_gate_candlestick.conf:/app/collect_gate_candlestick.conf
+      - ./collect_huobi_candlestick.conf:/app/collect_huobi_candlestick.conf
+      - ./common.conf:/app/common.conf
+      - ./flow_settings.json:/app/flow_settings.json
