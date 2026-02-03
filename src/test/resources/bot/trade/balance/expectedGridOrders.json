@@ -1,0 +1,808 @@
+[
+  {
+    "orderId": "2028615581389122816",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003169,
+    "origQty": 1625,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615581791776000",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003195,
+    "origQty": 1612,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615582202817792",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003144,
+    "origQty": 1638,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615582597082368",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.00322,
+    "origQty": 1599,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615583251393792",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003119,
+    "origQty": 1651,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615583637269760",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003246,
+    "origQty": 1587,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615584090254592",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003094,
+    "origQty": 1665,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615584501296384",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003272,
+    "origQty": 1574,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615585155607808",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003069,
+    "origQty": 1678,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615585541483776",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003298,
+    "origQty": 1561,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615586011245824",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003045,
+    "origQty": 1692,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615586497785088",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003325,
+    "origQty": 1549,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615586900438272",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.00302,
+    "origQty": 1705,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615587672190208",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003351,
+    "origQty": 1537,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615588116786432",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.002996,
+    "origQty": 1719,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615588787875072",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003378,
+    "origQty": 1525,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615589232471296",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.002972,
+    "origQty": 1733,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615589945502976",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003405,
+    "origQty": 1512,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615590364933376",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.002948,
+    "origQty": 1747,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615590750809344",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003432,
+    "origQty": 1500,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615591405120768",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.002925,
+    "origQty": 1761,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615591790996736",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.00346,
+    "origQty": 1489,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615592520805632",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.002901,
+    "origQty": 1775,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615592915070208",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003487,
+    "origQty": 1477,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615593611324672",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003515,
+    "origQty": 1465,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615594282413312",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003543,
+    "origQty": 1453,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615594768952576",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003572,
+    "origQty": 1442,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615595188382976",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.0036,
+    "origQty": 1430,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615595649756416",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003629,
+    "origQty": 1419,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615596060798208",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003658,
+    "origQty": 1408,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615596488617216",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003687,
+    "origQty": 1397,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615597193260288",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003717,
+    "origQty": 1386,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615597604302080",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003747,
+    "origQty": 1375,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615598468328704",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003777,
+    "origQty": 1364,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615599332355328",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003807,
+    "origQty": 1353,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615600162827520",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003837,
+    "origQty": 1342,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615600959745280",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003868,
+    "origQty": 1331,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615602075430144",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003899,
+    "origQty": 1321,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615602494860544",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.00393,
+    "origQty": 1310,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615602931068160",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003962,
+    "origQty": 1300,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615603375664384",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.003993,
+    "origQty": 1290,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615603803483392",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004025,
+    "origQty": 1279,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615604751396096",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004057,
+    "origQty": 1269,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615605145660672",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.00409,
+    "origQty": 1259,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615605841915136",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004123,
+    "origQty": 1249,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615606261345536",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004156,
+    "origQty": 1239,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615606714330368",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004189,
+    "origQty": 1229,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615607142149376",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004222,
+    "origQty": 1220,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615607569968384",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004256,
+    "origQty": 1210,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615608056507648",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.00429,
+    "origQty": 1200,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615608450772224",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004324,
+    "origQty": 1191,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615608861814016",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004359,
+    "origQty": 1181,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615609289633024",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004394,
+    "origQty": 1172,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615609709063424",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004429,
+    "origQty": 1163,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615610153659648",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004465,
+    "origQty": 1154,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615610598255872",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.0045,
+    "origQty": 1144,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615611034463488",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004536,
+    "origQty": 1135,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615611940433152",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004573,
+    "origQty": 1126,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615612443749632",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004609,
+    "origQty": 1117,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615613047729408",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004646,
+    "origQty": 1108,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615613509102848",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004683,
+    "origQty": 1100,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  },
+  {
+    "orderId": "2028615614113082624",
+    "pair": {
+      "first": "SUPRA",
+      "second": "USDT"
+    },
+    "price": 0.004721,
+    "origQty": 1091,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "LIMIT",
+    "status": "NEW"
+  }
+]

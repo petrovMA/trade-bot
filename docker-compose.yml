@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  trade-bot:
+    build: .
+    container_name: trade-bot-backend
+    # SECURITY: In production, remove port exposure - backend only via nginx
+    # For local development, you can uncomment this:
+    # ports:
+    #   - "8081:8080"
+    environment:
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-your-client-id}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-your-client-secret}
+      - ALLOWED_EMAILS=${ALLOWED_EMAILS:-}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+    volumes:
+      - ./database:/app/database
+      - ./exchangeBots:/app/exchangeBots
+      - ./exchangeConfigs:/app/exchangeConfigs
+      - ./logging:/app/logging
+      - ./results:/app/results
+      - ./collect_binance_candlestick.conf:/app/collect_binance_candlestick.conf
+      - ./collect_bitmax_candlestick.conf:/app/collect_bitmax_candlestick.conf
+      - ./collect_ftx_candlestick.conf:/app/collect_ftx_candlestick.conf
+      - ./collect_gate_candlestick.conf:/app/collect_gate_candlestick.conf
+      - ./collect_huobi_candlestick.conf:/app/collect_huobi_candlestick.conf
+      - ./common.conf:/app/common.conf
+      - ./flow_settings.json:/app/flow_settings.json
+      - ./logback.xml:/app/logback.xml
+    networks:
+      - trade-bot-network
+    healthcheck:
+      # NOTE: backend image (amazoncorretto) contains curl but not wget
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: nginx/Dockerfile  # Use Dockerfile.prebuilt for pre-built approach
+    container_name: trade-bot-frontend
+    ports:
+      - "8082:80"  # Changed from 80:80 to avoid conflict with AI-SIGNAL nginx
+    depends_on:
+      - trade-bot
+    networks:
+      - trade-bot-network
+    restart: unless-stopped
+
+networks:
+  trade-bot-network:
+    driver: bridge

@@ -1,0 +1,48 @@
+services:
+  trade-bot:
+    image: trade-bot-backend:latest
+    container_name: trade-bot-backend
+    # SECURITY: No ports exposed - only accessible via Python project's nginx
+    # Authentication is handled by Python project's Google OAuth
+    volumes:
+      - ./database:/app/database
+      - ./exchangeBots:/app/exchangeBots
+      - ./exchangeConfigs:/app/exchangeConfigs
+      - ./logging:/app/logging
+      - ./results:/app/results
+      - ./collect_binance_candlestick.conf:/app/collect_binance_candlestick.conf
+      - ./collect_bitmax_candlestick.conf:/app/collect_bitmax_candlestick.conf
+      - ./collect_ftx_candlestick.conf:/app/collect_ftx_candlestick.conf
+      - ./collect_gate_candlestick.conf:/app/collect_gate_candlestick.conf
+      - ./collect_huobi_candlestick.conf:/app/collect_huobi_candlestick.conf
+      - ./common.conf:/app/common.conf
+      - ./flow_settings.json:/app/flow_settings.json
+      - ./logback.xml:/app/logback.xml
+    networks:
+      - alpha-network
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  frontend:
+    image: trade-bot-frontend:latest
+    container_name: trade-bot-frontend
+    # SECURITY: No ports exposed - only accessible via Python project's nginx
+    volumes:
+      - ${LETSENCRYPT_PATH:-/home/asus/Python/_ai_signals/AI-SIGNAL/alpha_horizon_py_trading/certbot/conf}:/etc/letsencrypt:ro
+    depends_on:
+      - trade-bot
+    networks:
+      - alpha-network
+    restart: unless-stopped
+
+networks:
+  # Use external network from Python project (alpha_horizon_py_trading)
+  # This allows nginx from Python project to proxy requests to trade-bot
+  alpha-network:
+    external: true
+    name: alpha_horizon_py_trading_alpha-network

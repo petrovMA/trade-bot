@@ -1,0 +1,282 @@
+{
+  "2384.53700023": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2384.53700023,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2377.38
+  },
+  "2386.92153723": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2386.92153723,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2383.14
+  },
+  "2379.77269054": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2379.77269054,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2369.8
+  },
+  "2375.01789995": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2375.01789995,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2369.8
+  },
+  "2370.27260944": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2370.27260944,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2352.79
+  },
+  "2365.53680003": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2365.53680003,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2352.79
+  },
+  "2360.81045278": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2360.81045278,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2352.79
+  },
+  "2356.09354878": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2356.09354878,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2349.82
+  },
+  "2351.38606916": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2351.38606916,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2342.6
+  },
+  "2346.68799510": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2346.68799510,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2342.6
+  },
+  "2341.99930780": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2341.99930780,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2342.6
+  },
+  "2337.53055787": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2337.53055787,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2333.6
+  },
+  "2333.04698277": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2333.04698277,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2324.8
+  },
+  "2328.57200754": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2328.57200754,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2313.03
+  },
+  "2324.10561568": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2324.10561568,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2313.03
+  },
+  "2319.64779072": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2319.64779072,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2313.03
+  },
+  "2315.19851624": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2315.19851624,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2313.03
+  },
+  "2310.75777583": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2310.75777583,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2313.03
+  },
+  "2306.32555312": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2306.32555312,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "SELL",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2313.03
+  },
+  "2297.30262732": {
+    "orderId": "",
+    "pair": {
+      "first": "ETH",
+      "second": "USDT"
+    },
+    "price": 2297.30262732,
+    "origQty": 0.01,
+    "executedQty": 0,
+    "side": "BUY",
+    "type": "MARKET",
+    "status": "NEW",
+    "lastBorderPrice": 2297.30262732
+  }
+}

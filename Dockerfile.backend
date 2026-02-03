@@ -1,0 +1,24 @@
+FROM gradle:8.5-jdk17 AS builder
+
+WORKDIR /app
+
+# Copy Gradle wrapper and build files first for better caching
+COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts gradle.properties ./
+COPY gradle ./gradle
+
+# Copy source
+COPY src ./src
+
+# Build application
+RUN ./gradlew clean build -x test
+
+FROM eclipse-temurin:17-jre
+
+WORKDIR /app
+
+COPY --from=builder /app/build/libs/trade-bot-2.0-SNAPSHOT.jar ./trade-bot-2.0-SNAPSHOT.jar
+
+# HTML pages served by Spring Boot (grid-analysis, main, orders)
+COPY pages ./pages
+
+CMD ["java", "-jar", "trade-bot-2.0-SNAPSHOT.jar"]
