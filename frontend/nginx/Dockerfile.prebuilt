@@ -1,0 +1,21 @@
+# Simple Dockerfile for pre-built frontend
+# Use this if you build frontend locally and only want to serve it with nginx
+
+FROM nginx:1.25-alpine
+
+# Copy pre-built frontend from dist directory
+# Context is ./frontend, so dist is at ./dist relative to context
+COPY dist /usr/share/nginx/html/trade-bot
+
+# Copy nginx configuration
+# nginx.conf is at ./nginx/nginx.conf relative to context
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port 80
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
