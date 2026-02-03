@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Bot Analysis</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .summary-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .profit-positive {
+            color: #28a745;
+        }
+        .profit-negative {
+            color: #dc3545;
+        }
+        .trade-buy {
+            background-color: #d4edda !important;
+        }
+        .trade-sell {
+            background-color: #f8d7da !important;
+        }
+        .loading {
+            display: none;
+        }
+        .filter-section {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .grid-metrics-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .grid-metrics-card .metric-label {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        .grid-metrics-card .metric-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+        .price-range-bar {
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 30px;
+            position: relative;
+            margin: 10px 0;
+        }
+        .price-range-fill {
+            background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+            border-radius: 4px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+        }
+        .pair-item {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 0 4px 4px 0;
+        }
+        .pair-item.negative {
+            border-left-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Grid Bot Trade Analysis</h2>
+
+    <div class="filter-section">
+        <form id="analysisForm">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="exchange">Exchange</label>
+                        <select class="form-control" id="exchange" required>
+                            <option value="gate">Gate.io</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="symbol">Trading Pair</label>
+                        <input type="text" class="form-control" id="symbol" placeholder="e.g. REACT_USDT" required>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="fromDate">From Date</label>
+                        <input type="datetime-local" class="form-control" id="fromDate">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="toDate">To Date</label>
+                        <input type="datetime-local" class="form-control" id="toDate">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="minAmount">Min Order Size (USDT)</label>
+                        <input type="number" step="any" class="form-control" id="minAmount" placeholder="e.g. 3">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="maxAmount">Max Order Size (USDT)</label>
+                        <input type="number" step="any" class="form-control" id="maxAmount" placeholder="e.g. 5">
+                    </div>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-lg mr-2">Analyze Trades</button>
+                    <span id="loading" class="loading">
+                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                        Loading...
+                    </span>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div id="results" style="display: none;">
+        <div id="gridMetrics" class="grid-metrics-card" style="display: none;">
+            <h4>Grid Bot Metrics (Average Price Method)</h4>
+            <div class="row">
+                <div class="col-md-2">
+                    <div class="metric-label">Avg Buy Price</div>
+                    <div class="metric-value" id="gridAvgBuyPrice">-</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Avg Sell Price</div>
+                    <div class="metric-value" id="gridAvgSellPrice">-</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Price Spread</div>
+                    <div class="metric-value" id="avgPriceSpread">0%</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Net Profit</div>
+                    <div class="metric-value" id="gridNetProfit">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">ROI</div>
+                    <div class="metric-value" id="roi">0%</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Total Invested</div>
+                    <div class="metric-value" id="totalInvested">0</div>
+                </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.3);">
+            <div class="row">
+                <div class="col-md-2">
+                    <div class="metric-label">Buy Volume</div>
+                    <div class="metric-value" id="totalBuyVolume">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Sell Volume</div>
+                    <div class="metric-value" id="totalSellVolume">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Matched Volume</div>
+                    <div class="metric-value" id="matchedVolume">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">In Position</div>
+                    <div class="metric-value" id="unmatchedVolume">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Total Fees</div>
+                    <div class="metric-value" id="gridTotalFees">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Duration</div>
+                    <div class="metric-value" id="tradingDuration">-</div>
+                </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.3);">
+            <div class="row">
+                <div class="col-md-2">
+                    <div class="metric-label">Profit/Hour</div>
+                    <div class="metric-value" id="profitPerHour">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Profit/Day</div>
+                    <div class="metric-value" id="profitPerDay">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Trades/Hour</div>
+                    <div class="metric-value" id="tradesPerHour">0</div>
+                </div>
+                <div class="col-md-2">
+                    <div class="metric-label">Grid Step</div>
+                    <div class="metric-value" id="gridStep">-</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-label">Price Range</div>
+                    <div class="d-flex justify-content-between">
+                        <span id="minPrice">-</span>
+                        <span id="maxPrice">-</span>
+                    </div>
+                    <div class="price-range-bar">
+                        <div class="price-range-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-card">
+            <h4>Trade Summary</h4>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="text-muted">Total Trades</div>
+                    <div class="summary-value" id="totalTrades">0</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-muted">Buy / Sell</div>
+                    <div class="summary-value"><span id="buyTrades">0</span> / <span id="sellTrades">0</span></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-muted">Avg Buy Price</div>
+                    <div class="summary-value" id="avgBuyPrice">0</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-muted">Avg Sell Price</div>
+                    <div class="summary-value" id="avgSellPrice">0</div>
+                </div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="text-muted">Total Buy Volume</div>
+                    <div class="summary-value" id="totalBuyAmount">0</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-muted">Total Sell Volume</div>
+                    <div class="summary-value" id="totalSellAmount">0</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-muted">Total Fees</div>
+                    <div class="summary-value" id="totalFees">0</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-muted">Net Profit</div>
+                    <div class="summary-value" id="netProfit">0</div>
+                    <small id="profitPercentage" class="text-muted"></small>
+                </div>
+            </div>
+        </div>
+
+        <div id="matchedPairsSection" style="display: none;">
+            <h4>Matched BUY-SELL Pairs <small class="text-muted" id="pairsCount">(0 pairs)</small></h4>
+            <div id="pairsList" class="mb-4" style="max-height: 400px; overflow-y: auto;"></div>
+        </div>
+
+        <h4>Trade History</h4>
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Date/Time</th>
+                        <th>Side</th>
+                        <th>Price</th>
+                        <th>Amount</th>
+                        <th>Total</th>
+                        <th>Fee</th>
+                        <th>Role</th>
+                        <th>Order ID</th>
+                    </tr>
+                </thead>
+                <tbody id="tradesTable">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="error" class="alert alert-danger" style="display: none;"></div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Set default dates (last 30 days)
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    $('#toDate').val(formatDateForInput(now));
+    $('#fromDate').val(formatDateForInput(thirtyDaysAgo));
+
+    $('#analysisForm').submit(function(e) {
+        e.preventDefault();
+        fetchTrades();
+    });
+});
+
+function formatDateForInput(date) {
+    return date.toISOString().slice(0, 16);
+}
+
+function formatDate(timestamp) {
+    return new Date(timestamp).toLocaleString();
+}
+
+function formatNumber(num, decimals = 8) {
+    if (typeof num === 'string') num = parseFloat(num);
+    return num.toFixed(decimals).replace(/\.?0+$/, '');
+}
+
+function fetchTrades() {
+    $('#loading').show();
+    $('#error').hide();
+    $('#results').hide();
+
+    const fromDate = $('#fromDate').val();
+    const toDate = $('#toDate').val();
+
+    const request = {
+        exchange: $('#exchange').val(),
+        symbol: $('#symbol').val(),
+        from: fromDate ? Math.floor(new Date(fromDate).getTime() / 1000) : null,
+        to: toDate ? Math.floor(new Date(toDate).getTime() / 1000) : null,
+        minAmount: $('#minAmount').val() ? parseFloat($('#minAmount').val()) : null,
+        maxAmount: $('#maxAmount').val() ? parseFloat($('#maxAmount').val()) : null
+    };
+
+    // Determine API base path based on current URL context
+    // In production: /trade-bot/api (nginx strips /trade-bot/api/ prefix)
+    // In local dev: /api (vite proxy forwards /api/ to backend)
+    const apiBase = window.location.pathname.startsWith('/trade-bot/') ? '/trade-bot/api' : '';
+
+    // Fetch both trades and grid analytics in parallel
+    Promise.all([
+        $.ajax({
+            url: apiBase + '/trades',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(request)
+        }),
+        $.ajax({
+            url: apiBase + '/grid-analytics',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(request)
+        })
+    ]).then(function([tradesResponse, gridResponse]) {
+        $('#loading').hide();
+        displayResults(tradesResponse);
+        displayGridMetrics(gridResponse);
+    }).catch(function(error) {
+        $('#loading').hide();
+        let errorMsg = 'Error fetching data';
+        if (error.responseJSON) {
+            errorMsg = 'Server error: ' + JSON.stringify(error.responseJSON, null, 2);
+        } else if (error.statusText) {
+            errorMsg = 'Error: ' + error.statusText;
+        }
+        $('#error').html('<pre style="white-space: pre-wrap; word-wrap: break-word; margin: 0;">' + errorMsg + '</pre>').show();
+    });
+}
+
+function displayResults(data) {
+    const { trades, summary } = data;
+
+    // Update summary
+    $('#totalTrades').text(summary.totalTrades);
+    $('#buyTrades').text(summary.buyTrades);
+    $('#sellTrades').text(summary.sellTrades);
+    $('#avgBuyPrice').text(formatNumber(summary.avgBuyPrice));
+    $('#avgSellPrice').text(formatNumber(summary.avgSellPrice));
+    $('#totalBuyAmount').text(formatNumber(summary.totalBuyAmount));
+    $('#totalSellAmount').text(formatNumber(summary.totalSellAmount));
+    $('#totalFees').text(formatNumber(summary.totalFees));
+
+    const netProfit = parseFloat(summary.netProfit);
+    const profitClass = netProfit >= 0 ? 'profit-positive' : 'profit-negative';
+    $('#netProfit')
+        .text((netProfit >= 0 ? '+' : '') + formatNumber(netProfit, 4) + ' USDT')
+        .removeClass('profit-positive profit-negative')
+        .addClass(profitClass);
+
+    const profitPct = parseFloat(summary.profitPercentage);
+    $('#profitPercentage').text('(' + (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%)');
+
+    // Build trades table
+    let tableHtml = '';
+    trades.forEach((trade, index) => {
+        const rowClass = trade.side === 'Buy' ? 'trade-buy' : 'trade-sell';
+        tableHtml += `
+            <tr class="${rowClass}">
+                <td>${index + 1}</td>
+                <td>${formatDate(trade.timestamp)}</td>
+                <td><strong>${trade.side}</strong></td>
+                <td>${formatNumber(trade.price)}</td>
+                <td>${formatNumber(trade.amount)}</td>
+                <td>${formatNumber(trade.total, 4)}</td>
+                <td>${formatNumber(trade.fee)} ${trade.feeCurrency}</td>
+                <td>${trade.role}</td>
+                <td><small>${trade.orderId}</small></td>
+            </tr>
+        `;
+    });
+
+    $('#tradesTable').html(tableHtml);
+    $('#results').show();
+}
+
+function displayGridMetrics(data) {
+    if (!data || data.totalTrades === 0) {
+        $('#gridMetrics').hide();
+        $('#matchedPairsSection').hide();
+        return;
+    }
+
+    // Display average prices (new method)
+    const avgBuyPrice = parseFloat(data.avgBuyPrice) || 0;
+    const avgSellPrice = parseFloat(data.avgSellPrice) || 0;
+    $('#gridAvgBuyPrice').text(formatNumber(avgBuyPrice));
+    $('#gridAvgSellPrice').text(formatNumber(avgSellPrice));
+
+    // Display price spread percentage
+    const avgPriceSpread = parseFloat(data.avgPriceSpread) || 0;
+    $('#avgPriceSpread').text((avgPriceSpread >= 0 ? '+' : '') + avgPriceSpread.toFixed(3) + '%');
+
+    // Display volumes
+    const totalBuyVolume = parseFloat(data.totalBuyVolume) || 0;
+    const totalSellVolume = parseFloat(data.totalSellVolume) || 0;
+    const matchedVolume = parseFloat(data.matchedVolume) || 0;
+    const unmatchedVolume = parseFloat(data.unmatchedVolume) || 0;
+    $('#totalBuyVolume').text(formatNumber(totalBuyVolume, 2));
+    $('#totalSellVolume').text(formatNumber(totalSellVolume, 2));
+    $('#matchedVolume').text(formatNumber(matchedVolume, 2));
+    $('#unmatchedVolume').text(formatNumber(unmatchedVolume, 2));
+
+    // Display grid net profit
+    const gridNetProfit = parseFloat(data.netProfit);
+    $('#gridNetProfit').text((gridNetProfit >= 0 ? '+' : '') + formatNumber(gridNetProfit, 4) + ' USDT');
+
+    // Display fees
+    const gridTotalFees = parseFloat(data.totalFees) || 0;
+    $('#gridTotalFees').text(formatNumber(gridTotalFees, 4) + ' USDT');
+
+    // Display ROI
+    const roi = parseFloat(data.roi) || 0;
+    $('#roi').text((roi >= 0 ? '+' : '') + roi.toFixed(2) + '%');
+
+    const totalInvested = parseFloat(data.totalInvested) || 0;
+    $('#totalInvested').text(formatNumber(totalInvested, 2) + ' USDT');
+
+    // Display grid step
+    const gridStep = parseFloat(data.gridStep);
+    $('#gridStep').text(gridStep > 0 ? formatNumber(gridStep) : '-');
+
+    // Display price range
+    $('#minPrice').text(formatNumber(data.minPrice));
+    $('#maxPrice').text(formatNumber(data.maxPrice));
+
+    // Display rate metrics
+    const profitPerHour = parseFloat(data.profitPerHour) || 0;
+    $('#profitPerHour').text((profitPerHour >= 0 ? '+' : '') + formatNumber(profitPerHour, 4));
+
+    const profitPerDay = parseFloat(data.profitPerDay) || 0;
+    $('#profitPerDay').text((profitPerDay >= 0 ? '+' : '') + formatNumber(profitPerDay, 2));
+
+    const tradesPerHour = parseFloat(data.tradesPerHour) || 0;
+    $('#tradesPerHour').text(tradesPerHour.toFixed(1));
+
+    // Format trading duration
+    const durationHours = parseFloat(data.tradingDurationHours) || 0;
+    let durationText = '-';
+    if (durationHours > 0) {
+        if (durationHours < 24) {
+            durationText = durationHours.toFixed(1) + 'h';
+        } else {
+            const days = Math.floor(durationHours / 24);
+            const hours = Math.floor(durationHours % 24);
+            durationText = days + 'd ' + hours + 'h';
+        }
+    }
+    $('#tradingDuration').text(durationText);
+
+    $('#gridMetrics').show();
+
+    // Display matched pairs (from pair matching method - for reference)
+    if (data.pairs && data.pairs.length > 0) {
+        $('#pairsCount').text('(' + data.pairs.length + ' pairs)');
+        let pairsHtml = '';
+
+        data.pairs.forEach((pair, index) => {
+            const netProfit = parseFloat(pair.netProfit);
+            const profitClass = netProfit >= 0 ? '' : 'negative';
+
+            const buyInfo = pair.buyTrade ?
+                `BUY: ${formatNumber(pair.buyTrade.amount)} @ ${formatNumber(pair.buyTrade.price)}` : 'N/A';
+            const sellInfo = pair.sellTrade ?
+                `SELL: ${formatNumber(pair.sellTrade.amount)} @ ${formatNumber(pair.sellTrade.price)}` : 'N/A';
+
+            pairsHtml += `
+                <div class="pair-item ${profitClass}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>#${index + 1}</strong>
+                            <span class="ml-3 text-success">${buyInfo}</span>
+                            <span class="mx-2">&rarr;</span>
+                            <span class="text-danger">${sellInfo}</span>
+                        </div>
+                        <div>
+                            <span class="${netProfit >= 0 ? 'text-success' : 'text-danger'}">
+                                <strong>${(netProfit >= 0 ? '+' : '') + formatNumber(netProfit, 6)} USDT</strong>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        $('#pairsList').html(pairsHtml);
+        $('#matchedPairsSection').show();
+    } else {
+        $('#matchedPairsSection').hide();
+    }
+}
+</script>
+
+</body>
+</html>
