@@ -14,6 +14,7 @@ enum class ExchangeEnum {
     GATE,
     MEXC,
     ONEINCH,
+    EXTENDED,
     STUB_TEST,
     TEST;
 
@@ -37,6 +38,7 @@ enum class ExchangeEnum {
                     ClientOneInch(api ?: getString("api"), sec ?: getString("sec"), this)
                         .also { log.info(" !!! Connect: $it !!! ") }
                 }
+                EXTENDED -> ClientExtended(api!!, sec).also { log.info(" !!! Connect: $it !!! ") }
                 TEST -> ClientTestExchange()
                 else -> throw UnsupportedClientException()
             }
@@ -81,6 +83,12 @@ enum class ExchangeEnum {
             ONEINCH -> readConf("exchangeConfigs/ONEINCH.conf")!!.run {
                 ClientOneInch(getString("api"), getString("sec"), this)
                     .also { log.info(" !!! Connect: $it !!! ") }
+            }
+            EXTENDED -> readConf("exchangeConfigs/EXTENDED.conf")!!.run {
+                ClientExtended(
+                    getString("api"),
+                    if (hasPath("starkKey") && getString("starkKey").isNotBlank()) getString("starkKey") else null
+                ).also { log.info(" !!! Connect: $it !!! ") }
             }
             TEST -> ClientTestExchange()
             else -> throw UnsupportedClientException()

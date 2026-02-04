@@ -8,6 +8,33 @@
 
 ## Версии
 
+### v2.1.0 - Extended Exchange Integration (Starknet Perpetual Futures DEX) (2026-02-04)
+
+**Статус:** Реализовано
+
+**Описание:**
+
+Добавлена поддержка Extended Exchange — DEX на Starknet для торговли бессрочными фьючерсами (perpetual futures). Реализация `ClientFutures` интерфейса с REST API и WebSocket стримом.
+
+**Ключевые особенности:**
+- REST клиент через OkHttp3 с аутентификацией через `X-Api-Key` header
+- WebSocket стрим для trade/orderbook (публичный) и order/position обновлений (приватный)
+- Поддержка всех операций: ордера, позиции, баланс, свечи, книга ордеров
+- Формат пар: `BTC-USD` (dash-separated, совместим с TradePair regex-парсингом)
+- Stark-подпись (starkKey) опциональна, требуется только для создания ордеров
+
+**Новые файлы:**
+- `exchange_api/extended/rest/response/ExtendedResponses.kt` — DTO для Extended API
+- `exchange_api/extended/rest/client/ExtendedRestApiClient.kt` — REST клиент
+- `bot/trade/exchanges/clients/ClientExtended.kt` — имплементация ClientFutures
+- `bot/trade/exchanges/clients/stream/StreamExtendedImpl.kt` — WebSocket стрим (OkHttp3)
+- `exchangeConfigs/EXTENDED.conf` — конфигурация (API ключ, Stark ключ)
+
+**Изменяемые файлы:**
+- `ExchangeEnum.kt` — добавлен EXTENDED enum и factory методы
+
+---
+
 ### v2.0.2 - Fix nginx proxy_pass breaking static assets (2026-02-03)
 
 **Проблема:** JS/CSS файлы фронтенда не загружались — вместо JavaScript сервер возвращал index.html (658 байт) с Content-Type text/html. Причина: в конфиге внешнего nginx (Python-проект) `proxy_pass https://$variable/trade-bot/;` при использовании переменной заменяет оригинальный URI на `/trade-bot/` для ВСЕХ запросов (документированное поведение nginx).
