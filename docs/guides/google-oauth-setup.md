@@ -1,4 +1,16 @@
+---
+title: Google OAuth 2.0 Setup Guide
+description: Пошаговая инструкция по настройке Google OAuth 2.0 для Trade Bot (Spring Security, Google Cloud Console)
+tags: [security, oauth, google, spring-security, setup]
+status: deprecated
+related_files: [docs/guides/google-auth-setup.md, build.gradle.kts, src/main/resources/application.properties]
+---
+
 # Google OAuth 2.0 Setup Guide - Trade Bot
+
+> **DEPRECATED**: Этот документ описывает подход с прямым Spring Security OAuth на порту 8081.
+> Он **НЕ используется** в текущей архитектуре. Актуальная авторизация — через nginx `auth_request`,
+> см. `docs/guides/google-auth-setup.md`. Оставлен как справка на случай возврата к прямому OAuth.
 
 Пошаговая инструкция по настройке Google OAuth авторизации для Trade Bot.
 

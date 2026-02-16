@@ -1,7 +1,20 @@
+---
+title: Spike Aggregation Mode — Дизайн-документ
+description: Архитектура оптимизации Grid-бота для обработки ценовых спайков — буферизация, стабилизация цены, агрегированный откуп
+tags: [architecture, grid-bot, spike, trading-strategy, design]
+status: active
+related_files: [src/main/kotlin/bot/trade/exchanges/spike/SpikeDetector.kt, src/main/kotlin/bot/trade/exchanges/spike/PriceStabilizer.kt, src/main/kotlin/bot/trade/exchanges/spike/SpikeConfig.kt, src/main/kotlin/bot/trade/exchanges/AlgorithmGrid.kt]
+---
+
 # Spike Aggregation Mode - Дизайн-документ
 
+## Context
+
+Дизайн-документ для оптимизации `AlgorithmGrid`. Проблема: при ценовом спайке бот мгновенно откупает по завышенным ценам, теряя ~47% прибыли. Решение: буферизация + ожидание стабилизации + агрегированный откуп.
+Код реализации: `spike/SpikeDetector.kt`, `spike/PriceStabilizer.kt`, `spike/SpikeConfig.kt`. Интеграция: `AlgorithmGrid.kt`.
+
 ## Дата: 2026-01-31
-## Статус: Проектирование
+## Статус: Реализовано
 ## Версия: v1.9.0
 
 ---

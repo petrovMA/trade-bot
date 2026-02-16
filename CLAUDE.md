@@ -195,6 +195,10 @@ The project extends XChange's capabilities with custom implementations for excha
 - **IMPORTANT: After every code change, add a short description to `docs/VERSIONS.md`** following the existing format (version number, date, problem/solution, affected files)
 - **DO NOT run `./gradlew build` or `./gradlew clean build` after every completed task.** Gradle build is already included in all deploy scripts (`deploy_frontend.sh`, `quick_deploy_backend.sh`, `Dockerfile.backend`). Running it manually wastes time. Only run build explicitly when you need to verify compilation fixes or run specific tests with `./gradlew test --tests "..."`.
 
+## Documentation
+
+Карта документации, статусы (active/deprecated) и связи code↔docs: **`docs/map.md`**
+
 ### XChange Integration Guidelines
 - **New Exchange Support**: For exchanges supported by XChange, extend the existing Client interface and utilize XChange's standardized APIs
 - **Custom Exchange Implementation**: For exchanges not in XChange (like ByBit), implement custom REST and WebSocket clients following the project's patterns in `io.bybit.api.*`

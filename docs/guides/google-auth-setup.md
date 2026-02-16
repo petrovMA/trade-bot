@@ -1,4 +1,17 @@
+---
+title: Google OAuth Authentication Setup
+description: Настройка авторизации trade-bot через nginx auth_request и Python-проект (alpha_horizon_py_trading)
+tags: [security, oauth, nginx, docker, deployment]
+status: active
+related_files: [docs/guides/google-oauth-setup.md, docker-compose.prod.yml, frontend/nginx/nginx-ssl.conf]
+---
+
 # Google OAuth Authentication Setup
+
+## Context
+
+Это **актуальный** документ по авторизации. Trade-bot использует auth через nginx `auth_request` + Python-проект.
+Альтернативный подход (прямой Spring Security OAuth на порту 8081) описан в `google-oauth-setup.md`, но **НЕ используется**.
 
 ## Overview
 

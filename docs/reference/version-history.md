@@ -1,4 +1,17 @@
+---
+title: История версий Trade Bot
+description: Хронология всех изменений проекта — версии, проблемы, решения, затронутые файлы
+tags: [reference, changelog, versions]
+status: active
+related_files: [CLAUDE.md, docs/index.md]
+---
+
 # Trade Bot - История версий
+
+## Context
+
+Changelog проекта. Обновляется после каждого изменения кода (см. правило в `CLAUDE.md`).
+Текущая версия: v2.1.0. Формат: semver. Каждая запись содержит проблему, решение и затронутые файлы.
 
 ## О документе
 
