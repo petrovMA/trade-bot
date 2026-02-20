@@ -292,6 +292,31 @@ class MainController(orderService: OrderService, private val activeOrdersService
         }
     }
 
+    @PostMapping("/force_sync_bot")
+    fun forceSyncBot(@RequestBody botName: String): ResponseEntity<Response> {
+        log.info("Request for /force_sync_bot with botName = $botName")
+
+        return try {
+            val message = "/forcesync $botName"
+            val result = communicator.onUpdateWithResult(message)
+
+            val isError = result.contains("not found", ignoreCase = true) ||
+                          result.contains("not running", ignoreCase = true) ||
+                          result.contains("error", ignoreCase = true)
+
+            if (isError) {
+                log.warn("Force sync failed: $result")
+                ResponseEntity.status(400).body(Response("error", result))
+            } else {
+                log.info("Force sync queued for $botName: $result")
+                ResponseEntity.ok(Response("success", result))
+            }
+        } catch (e: Exception) {
+            log.error("Error force syncing bot $botName: ${e.message}", e)
+            ResponseEntity.status(500).body(Response("error", "Error: ${e.message}"))
+        }
+    }
+
     data class BotConfigInfo(
         val name: String,
         val settings: BotSettings

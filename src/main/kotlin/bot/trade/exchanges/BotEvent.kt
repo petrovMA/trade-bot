@@ -13,6 +13,7 @@ class BotEvent(val text: String = "", val type: Type) : CommonExchangeData {
         INTERRUPT,
         PAUSE,
         SET_SETTINGS,
-        CREATE_ORDER
+        CREATE_ORDER,
+        FORCE_SYNC
     }
 }

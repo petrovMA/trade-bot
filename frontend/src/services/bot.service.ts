@@ -39,6 +39,16 @@ export const botService = {
     return response.data;
   },
 
+  // Force sync bot (bypasses missing-orders safety check)
+  forceSyncBot: async (botName: string): Promise<ApiResponse> => {
+    const response = await api.post<ApiResponse>('/force_sync_bot', botName, {
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+    });
+    return response.data;
+  },
+
   // Get all bot positions
   getPositions: async (): Promise<BotInfo[]> => {
     const response = await api.get<BotInfo[]>('/positions');

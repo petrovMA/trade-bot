@@ -30,6 +30,10 @@ class BotSettingsGrid(
         @SerializedName("order_quantity") val orderQuantity: OrderQuantity, // Order Quantity:: order size
         @SerializedName("order_distance") val orderDistance: Param, // Order Distance:: distance between every order
         @SerializedName("profit_distance") val profitDistance: Param, // Order Distance:: distance between first order and next order
-        @SerializedName("order_max_quantity") val orderMaxQuantity: Int = Int.MAX_VALUE
+        @SerializedName("order_max_quantity") val orderMaxQuantity: Int = Int.MAX_VALUE,
+        // Minimum order notional in quote currency (e.g. 3.0 for Gate.io USDT pairs).
+        // When a counter-order's price is adjusted to currentPrice (post-spike recovery),
+        // the amount is increased to meet this minimum if needed.
+        @SerializedName("min_notional_usdt") val minNotionalUsdt: BigDecimal? = null
     )
 }

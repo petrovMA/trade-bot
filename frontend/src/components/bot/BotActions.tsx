@@ -126,6 +126,33 @@ const BotActions: React.FC<BotActionsProps> = ({ botName, onActionComplete }) =>
     }
   };
 
+  const handleForceSyncBot = async () => {
+    try {
+      setActionLoading('forcesync');
+      setError(null);
+      setSuccessMessage(null);
+
+      const response = await api.post<ApiResponse>('/force_sync_bot', botName, {
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+      });
+
+      if (response.data.status === 'error') {
+        setError(response.data.data as string || `Failed to force sync bot "${botName}"`);
+      } else {
+        setSuccessMessage(response.data.data as string || `Force sync queued for "${botName}". Check Telegram for result.`);
+        setTimeout(() => setSuccessMessage(null), 8000);
+        onActionComplete?.();
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.data || err.response?.data?.message || err.message || `Failed to force sync bot "${botName}"`;
+      setError(errorMessage);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDeleteBot = async () => {
     try {
       setActionLoading('delete');
@@ -197,6 +224,14 @@ const BotActions: React.FC<BotActionsProps> = ({ botName, onActionComplete }) =>
           className="btn btn-secondary"
         >
           {actionLoading === 'resume' ? 'Resuming...' : 'Resume Bot'}
+        </button>
+        <button
+          onClick={handleForceSyncBot}
+          disabled={actionLoading !== null}
+          className="btn btn-warning"
+          title="Force sync bypasses the safety check that blocks sync when many orders are missing (e.g. after a spike)"
+        >
+          {actionLoading === 'forcesync' ? 'Syncing...' : '⚡ Force Sync'}
         </button>
         <button
           onClick={() => setShowJson(true)}

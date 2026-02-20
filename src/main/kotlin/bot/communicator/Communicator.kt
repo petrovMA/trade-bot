@@ -275,6 +275,10 @@ class Communicator(
                 msg = startBot(message, false)
             }
 
+            cmd.commandForceSyncTradeBot.matches(message) -> {
+                msg = forceSyncBot(message)
+            }
+
             cmd.commandCandlestickData.matches(message) -> {
                 val param = message.split("\\s+".toRegex())
                 if (param.size == 2) {
@@ -641,6 +645,10 @@ class Communicator(
                 msg = startBot(message, isDeleteOldBotData = false)
             }
 
+            cmd.commandForceSyncTradeBot.matches(message) -> {
+                msg = forceSyncBot(message)
+            }
+
             cmd.commandLoadTradeBot.matches(message) -> {
                 val params = message.split("\\s+".toRegex())
                 val tradeBotSettings =
@@ -689,6 +697,16 @@ class Communicator(
         }
 
         return msg
+    }
+
+    private fun forceSyncBot(message: String): String {
+        val param = message.split("\\s+".toRegex())
+        if (param.size != 2) return "Usage: /forcesync <botName>"
+        val key = param[1]
+        val bot = tradeBots[key] ?: return "Bot '$key' not found. Is it loaded?"
+        if (!bot.isAlive) return "Bot '$key' is not running. Use /resume $key first."
+        bot.queue.add(BotEvent("force_sync", BotEvent.Type.FORCE_SYNC))
+        return "⚡ Force sync queued for '$key'. Check Telegram/logs for result."
     }
 
     private fun startBot(message: String, isDeleteOldBotData: Boolean = true): String {

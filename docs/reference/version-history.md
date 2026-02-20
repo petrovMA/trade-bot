@@ -11,7 +11,7 @@ related_files: [CLAUDE.md, docs/index.md]
 ## Context
 
 Changelog проекта. Обновляется после каждого изменения кода (см. правило в `CLAUDE.md`).
-Текущая версия: v2.1.0. Формат: semver. Каждая запись содержит проблему, решение и затронутые файлы.
+Текущая версия: v2.1.6. Формат: semver. Каждая запись содержит проблему, решение и затронутые файлы.
 
 ## О документе
 
@@ -20,6 +20,118 @@ Changelog проекта. Обновляется после каждого из�
 ---
 
 ## Версии
+
+### v2.1.6 - Fix min notional: adjust amount when price is lowered to currentPrice (2026-02-20)
+
+**Статус:** Реализовано
+
+**Проблема:**
+После спайка force sync (individual retry) отправлял BUY counter-ордера по `currentPrice` (~0.027), но с оригинальным количеством (~80 REACT). Notional = 80 × 0.027 = 2.16 USDT < 3 USDT (минимум Gate.io). Биржа отклоняла с `OrderAmountUnderMinimumException: Your order size 2.22 USDT is too small. The minimum is 3 USDT`.
+
+**Решение:**
+1. **`BotSettingsGrid.Parameters`**: добавлено поле `min_notional_usdt: BigDecimal? = null`. Устанавливается в `settings.json` бота (напр. `3.0` для Gate.io).
+2. **`AlgorithmGrid.kt`**: добавлен приватный хелпер `adjustAmountForMinNotional(amount, sendPrice)` — если `amount × sendPrice < minNotionalUsdt`, увеличивает amount до `ceil(minNotional / sendPrice)` с точностью `countOfDigitsAfterDotForAmount`.
+3. Хелпер применяется в **`synchronizeOrders()` individual retry** при корректировке BUY цены на currentPrice.
+4. Хелпер применяется в **`fallbackToGridCounterOrders()`** при корректировке BUY цены на currentPrice.
+
+**Использование:** добавить в `exchangeBots/<botName>/settings.json` → `parameters` → `"min_notional_usdt": 3`.
+
+**Файлы:** `BotSettingsGrid.kt`, `AlgorithmGrid.kt`
+
+---
+
+### v2.1.5 - Force sync command: bypass safety check on demand (2026-02-20)
+
+**Статус:** Реализовано
+
+**Проблема:**
+При большом количестве отсутствующих на бирже ордеров (>30% от общего числа) `synchronizeOrders()` блокировалась safety check с сообщением "⚠️ Sync warning: N orders not found on exchange". Пользователь не мог вручную разрешить синхронизацию без перезапуска бота.
+
+**Решение:**
+Добавлена команда `/forcesync <botName>` для принудительной синхронизации:
+1. **`BotEvent.kt`**: новый тип `FORCE_SYNC`
+2. **`AlgorithmGrid.kt`**: поле `forceSyncEnabled`, обработчик `FORCE_SYNC` события, safety check теперь пропускается при `forceSyncEnabled = true` + сообщение в warning содержит подсказку `/forcesync`
+3. **`Commands.kt`**: regex `commandForceSyncTradeBot`
+4. **`Communicator.kt`**: функция `forceSyncBot()`, команда обрабатывается в обоих обработчиках (Telegram и REST)
+5. **`MainController.kt`**: endpoint `POST /force_sync_bot`
+6. **`BotActions.tsx`**: кнопка "⚡ Force Sync" (оранжевая, `btn-warning`)
+7. **`bot.service.ts`**: метод `forceSyncBot()`
+8. **`global.css`**: стиль `.btn-warning`
+
+**Файлы:** `BotEvent.kt`, `AlgorithmGrid.kt`, `Commands.kt`, `Communicator.kt`, `MainController.kt`, `BotActions.tsx`, `bot.service.ts`, `global.css`
+
+---
+
+### v2.1.4 - Fix spike fallback: per-order resilience + price-band adjustment (2026-02-20)
+
+**Статус:** Реализовано
+
+**Проблема:**
+При массивном спайке (30+ sell-ордеров) aggregated counter-BUY отклонялся биржей (цена спайка слишком далеко от текущей). `fallbackToGridCounterOrders()` пытался отправить все counter-BUY одним батчем — при сбое любого ордера весь батч падал. После сбоя `finally`-блок очищал `pendingSpikeOrders`, оставляя 30 DB-записей в состоянии SELL/filled без counter-ордеров ("дыры" в сетке). На фьючерсных биржах (Gate.io perpetual) limit-ордер, цена которого далеко выше рыночной, отклоняется из-за price-band ограничений — это была причина отказа как aggregated, так и fallback ордеров.
+
+**Решение:**
+1. `fallbackToGridCounterOrders()` переписан с пакетной отправки на **поордерную** с `try-catch` — сбой одного ордера не останавливает остальные.
+2. Для BUY counter-ордеров, где цена grid-слота выше текущей рыночной (`order.price > currentPrice`), отправляется по `currentPrice` вместо цены слота (fills немедленно или в пределах price-band). Оригинальная цена слота восстанавливается в DB после отправки (сохраняется структура сетки).
+3. `synchronizeOrders()` batch-отправка обёрнута в `try-catch` с **individual retry** — при сбое батча каждый ордер отправляется по отдельности с той же price-band корректировкой.
+4. При сбое отдельных fallback-ордеров DB-записи остаются нетронутыми (SELL/filled), что позволяет `synchronizeOrders` восстановить их при следующем перезапуске бота.
+
+**Файлы:** `AlgorithmGrid.kt`
+
+---
+
+### v2.1.3 - Fix spike dedup: duplicate counter-orders during fast spike reversal (2026-02-19)
+
+**Статус:** Реализовано
+
+**Проблема:**
+Во время ценового спайка первые 1-2 sell-ордера исполнялись до срабатывания spike detection и получали индивидуальные counter-buy ордера. Эти counter-buy мгновенно исполнялись (цена резко возвращалась). После этого spike aggregation включала эти же sell-слоты в `ordersWithoutCounter` и создавала дублирующие counter-buy через `redistributeGridAfterSpike`.
+
+**Причина:** `createNextOrder` переиспользует тот же DB `id` для counter-ордера (только меняет `orderSide`). Проверка дедупликации содержала guard `existingReversedOrder.id != order.id`, который отклонял совпадение, т.к. id одинаковые — хотя `orderSide == reversedSide` уже гарантирует корректность матчинга.
+
+**Решение:**
+Удалён `existingReversedOrder.id != order.id` из трёх мест:
+1. WebSocket FILLED handler
+2. `executeSpikeCounterOrders()`
+3. `fallbackToGridCounterOrders()`
+
+Проверка `orderSide == reversedSide` достаточна для корректного обнаружения уже существующего counter-ордера.
+
+**Файлы:** `AlgorithmGrid.kt`
+
+---
+
+### v2.1.2 - Fix duplicate orders not removed on resume/sync (2026-02-17)
+
+**Статус:** Реализовано
+
+**Проблема:**
+При resume (восстановлении) бота `synchronizeOrders()` не проверяла дубликаты ордеров по цене. Если в БД уже существовали два ордера с одинаковой ценой и стороной (например, два BUY по 0.02817), оба сохранялись и отправлялись на биржу, приводя к 101 ордеру вместо 100.
+
+**Решение:**
+Добавлена дедупликация в начале resume-пути `synchronizeOrders()`: группировка DB ордеров по `(price, side)`, при обнаружении дубликатов — отмена лишних на бирже и удаление из БД. Первый (старший) ордер сохраняется, остальные удаляются.
+
+**Файлы:** `AlgorithmGrid.kt`
+
+---
+
+### v2.1.1 - Spike Aggregation: Fix duplicate counter-orders and balance error (2026-02-16)
+
+**Статус:** Реализовано
+
+**Проблема:**
+При ценовом спайке WebSocket FILLED handler и Trade trigger обрабатывали одни и те же ордера независимо. WebSocket handler отправлял counter-sell ордера ДО того, как spike detector обнаружил спайк (не вызывал `registerFill()`). Затем Trade trigger обнаруживал spike и буферизировал те же ордера. При timeout:
+1. Агрегированный ордер пытался продать больше REACT, чем доступно (часть уже заблокирована counter-sell от WebSocket) → `Not enough balance`
+2. Fallback создавал дублирующие counter-ордера → 101 ордер вместо 100
+
+**Решение:**
+1. WebSocket FILLED handler теперь вызывает `spikeDetector.registerFill()` — участвует в spike detection
+2. Если spike обнаружен/активен в WebSocket handler — ордер буферизируется, counter не создаётся
+3. `pendingSpikeOrders` дедуплицируется по `orderId` при добавлении
+4. `executeSpikeCounterOrders()` и `fallbackToGridCounterOrders()` проверяют наличие уже отправленных counter-ордеров через `getOrderByPrice()` и исключают их
+
+**Файлы:** `AlgorithmGrid.kt`
+
+---
 
 ### v2.1.0 - Extended Exchange Integration (Starknet Perpetual Futures DEX) (2026-02-04)
 

@@ -5,6 +5,7 @@ data class Commands(
         val commandCreateTradeBot: Regex = "/?create[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
         val commandStartTradeBot: Regex = "/?start\\s[a-zA-Z0-9_]+$".toRegex(),
         val commandResumeTradeBot: Regex = "/?resume\\s[a-zA-Z0-9_]+$".toRegex(),
+        val commandForceSyncTradeBot: Regex = "/?forcesync\\s[a-zA-Z0-9_]+$".toRegex(),
         val commandEmulateTradeBot: Regex = "/?emulate[\\s,|]+[|A-z,.\\d\\s:-]+".toRegex(),
         val commandLoadTradeBot: Regex = "/?load\\s[a-zA-Z0-9_]+$".toRegex(),
 

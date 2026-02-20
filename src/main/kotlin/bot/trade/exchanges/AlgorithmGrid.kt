@@ -63,6 +63,9 @@ class AlgorithmGrid(
     private val mainBalance = 0.0.toBigDecimal()
     private val balances: MutableMap<String, Balance> = HashMap()
 
+    // Force sync flag: set true via FORCE_SYNC event to bypass the missing-orders safety check
+    @Volatile private var forceSyncEnabled = false
+
     // Spike Aggregation
     private val spikeConfig: SpikeConfig = loadSpikeConfig()
     private val spikeDetector = SpikeDetector(spikeConfig)
@@ -199,12 +202,6 @@ class AlgorithmGrid(
                             if (msg.type == TYPE.LIMIT) {
                                 val threadId = Thread.currentThread().name
 
-                                // If spike is active, Trade trigger handles everything
-                                if (spikeDetector.isActive()) {
-                                    log("[$threadId] WebSocket FILLED: spike active, skipping (handled by Trade trigger)")
-                                    return
-                                }
-
                                 // UserTrade events from Gate.io fire on EVERY partial fill,
                                 // but we must only create counter-orders when the order is FULLY filled.
                                 // Verify actual order status on exchange before proceeding.
@@ -241,14 +238,33 @@ class AlgorithmGrid(
                                         return@let
                                     }
 
+                                    // Spike detection: register fill and check if spike is active
+                                    if (spikeConfig.enabled) {
+                                        spikeDetector.registerFill(dbOrder, msg.price ?: currentPrice)
+                                        if (spikeDetector.isActive()) {
+                                            // Spike detected or already active — buffer order, don't create counter
+                                            if (pendingSpikeOrders.none { it.orderId == dbOrder.orderId }) {
+                                                pendingSpikeOrders.add(dbOrder)
+                                                if (spikeSide == null) spikeSide = dbOrder.orderSide
+                                                log("[$threadId] WebSocket FILLED trigger: Spike active, buffered order ${msg.orderId} (pending=${pendingSpikeOrders.size})")
+                                                sendMessage("Spike detected: ${spikeDetector.getBufferedFills().size} orders. Waiting for price stabilization...", false)
+                                            } else {
+                                                log("[$threadId] WebSocket FILLED trigger: Spike active, order ${msg.orderId} already buffered, skipping")
+                                            }
+                                            return@let
+                                        }
+                                    }
+
                                     val reversedSide = dbOrder.orderSide!!.reverse()
 
-                                    // Check if there's already an order with reversed side at this price level
-                                    // This prevents duplicates when Trade trigger already processed this level
+                                                    // Check if there's already an order with reversed side at this price level
+                                    // This prevents duplicates when Trade trigger already processed this level.
+                                    // Note: createNextOrder reuses the same DB id, so we do NOT check id equality —
+                                    // the orderSide check already ensures we're not matching the order against itself.
                                     val existingReversedOrder = activeOrdersService.getOrderByPrice(
                                         settings.name, settings.direction, dbOrder.price!!
                                     )
-                                    if (existingReversedOrder != null && existingReversedOrder.orderSide == reversedSide && existingReversedOrder.id != dbOrder.id) {
+                                    if (existingReversedOrder != null && existingReversedOrder.orderSide == reversedSide) {
                                         log("[$threadId] WebSocket FILLED trigger: Order at price ${dbOrder.price} already has reversed order (id=${existingReversedOrder.id}, side=${existingReversedOrder.orderSide}), skipping to prevent duplicate")
                                         return@let
                                     }
@@ -286,6 +302,12 @@ class AlgorithmGrid(
                     BotEvent.Type.PAUSE -> {
                         log("${settings.name} received PAUSE signal (not implemented)")
                     }
+                    BotEvent.Type.FORCE_SYNC -> {
+                        log("${settings.name} received FORCE_SYNC signal, bypassing safety check")
+                        sendMessage("🔄 Force sync started for ${settings.name}...", false)
+                        forceSyncEnabled = true
+                        synchronizeOrders()
+                    }
                     else -> log("${settings.name} Unsupported BotEvent type: ${msg.type}")
                 }
             }
@@ -321,10 +343,42 @@ class AlgorithmGrid(
         // Resume mode: synchronize existing orders
         log("Resume mode - synchronizing existing orders")
 
-        val openOrders = client.getOpenOrders(settings.pair)
-        val dbOrderIds = dbOrders.mapNotNull { it.orderId }.toSet()
+        // Remove duplicate orders at the same price level (keep the one with the latest orderId)
+        val duplicatesByPrice = dbOrders.filter { it.price != null && it.orderSide != null }
+            .groupBy { Pair(it.price, it.orderSide) }
+            .filter { it.value.size > 1 }
 
-        log("Sync - DB orders: ${dbOrders.size}, Exchange orders parsed: ${openOrders.size}")
+        if (duplicatesByPrice.isNotEmpty()) {
+            log("Sync - Found ${duplicatesByPrice.size} price levels with duplicate orders")
+            duplicatesByPrice.forEach { (key, orders) ->
+                val (price, side) = key
+                // Keep the first order (oldest), cancel the rest
+                val toKeep = orders.first()
+                val toRemove = orders.drop(1)
+                toRemove.forEach { duplicate ->
+                    log("Sync - Removing duplicate order at price=$price side=$side: orderId=${duplicate.orderId} (keeping orderId=${toKeep.orderId})")
+                    duplicate.orderId?.let { orderId ->
+                        try {
+                            client.cancelOrder(settings.pair, orderId)
+                        } catch (e: Exception) {
+                            log("Sync - Failed to cancel duplicate order $orderId: ${e.message}")
+                        }
+                        activeOrdersService.deleteByOrderId(orderId)
+                    }
+                }
+            }
+            sendMessage("🔄 Sync: removed ${duplicatesByPrice.values.sumOf { it.size - 1 }} duplicate orders", false)
+        }
+
+        // Re-read orders after dedup
+        val cleanDbOrders = if (duplicatesByPrice.isNotEmpty())
+            activeOrdersService.getOrders(settings.name, settings.direction).toList()
+        else dbOrders
+
+        val openOrders = client.getOpenOrders(settings.pair)
+        val dbOrderIds = cleanDbOrders.mapNotNull { it.orderId }.toSet()
+
+        log("Sync - DB orders: ${cleanDbOrders.size}, Exchange orders parsed: ${openOrders.size}")
 
         openOrders.forEach { order ->
             if (!dbOrderIds.contains(order.orderId)) {
@@ -336,20 +390,33 @@ class AlgorithmGrid(
         }
 
         val openOrderIds = openOrders.map { it.orderId }.toSet()
-        val newOrders = dbOrders.filter { !openOrderIds.contains(it.orderId) }
+        val newOrders = cleanDbOrders.filter { !openOrderIds.contains(it.orderId) }
 
         if (newOrders.isNotEmpty()) {
             log("Sync - ${newOrders.size} orders from DB not found in exchange open orders list")
 
-            // Safety check: if too many orders are "missing", likely a parsing issue
-            // Don't create new orders if more than 30% of DB orders are "missing"
-            val missingRatio = newOrders.size.toDouble() / dbOrders.size.toDouble()
+            // Safety check: if too many orders are "missing", likely a parsing issue.
+            // Don't create new orders if more than 30% of DB orders are "missing".
+            // Can be bypassed via /forcesync command (e.g. after a spike left many holes in the grid).
+            val missingRatio = newOrders.size.toDouble() / cleanDbOrders.size.toDouble()
             if (missingRatio > 0.3 && newOrders.size > 10) {
-                log("WARNING: Too many orders missing from exchange (${newOrders.size}/${dbOrders.size} = ${(missingRatio * 100).toInt()}%). " +
-                    "This might indicate a parsing issue. Skipping order creation to prevent duplicates.")
-                sendMessage("⚠️ Sync warning: ${newOrders.size} orders not found on exchange. " +
-                    "Possible API parsing issue. Please check manually.", false)
-                return
+                if (forceSyncEnabled) {
+                    log("Force sync active — bypassing safety check (${newOrders.size}/${cleanDbOrders.size} = ${(missingRatio * 100).toInt()}% missing)")
+                    sendMessage("⚡ Force sync: bypassing safety check for ${newOrders.size} missing orders.", false)
+                    forceSyncEnabled = false
+                } else {
+                    log("WARNING: Too many orders missing from exchange (${newOrders.size}/${cleanDbOrders.size} = ${(missingRatio * 100).toInt()}%). " +
+                        "This might indicate a parsing issue. Skipping order creation to prevent duplicates.")
+                    sendMessage(
+                        "⚠️ Sync warning: ${newOrders.size} orders not found on exchange. " +
+                            "Possible API parsing issue. Please check manually.\n" +
+                            "Use /forcesync ${settings.name} to force sync anyway.", false
+                    )
+                    return
+                }
+            } else {
+                // Reset force flag if it was set but threshold wasn't reached
+                forceSyncEnabled = false
             }
 
             // Verify each order status individually before recreating
@@ -413,9 +480,50 @@ class AlgorithmGrid(
 
             if (ordersForExchange.isNotEmpty()) {
                 log("Sync - Sending ${ordersForExchange.size} orders to exchange")
-                val ordersFromExchange = sendOrders(ordersForExchange, true)
-                val updatedOrders = activeOrdersService.updateOrdersById(ordersFromExchange)
-                log("Sync - sent orders: $updatedOrders")
+                // Try batch first; if it fails, send individually so partial failures don't block full recovery.
+                // This handles post-spike scenarios where some counter-order prices needed adjustment.
+                try {
+                    val ordersFromExchange = sendOrders(ordersForExchange, true)
+                    // Restore original grid prices for any adjusted orders (price fields from ordersForExchange)
+                    val dbUpdates = ordersFromExchange.zip(ordersForExchange).map { (result, original) ->
+                        result.copy(price = original.price, stopPrice = original.stopPrice)
+                    }
+                    val updatedOrders = activeOrdersService.updateOrdersById(dbUpdates)
+                    log("Sync - sent orders: $updatedOrders")
+                } catch (e: Exception) {
+                    log("Sync - Batch send failed (${e.message}), retrying individually")
+                    sendMessage("⚠️ Sync batch failed, retrying orders one by one...", false)
+                    var syncOk = 0; var syncFail = 0
+                    ordersForExchange.forEach { order ->
+                        // For LONG BUY counters: if grid slot price is above current market,
+                        // send at current market price to avoid price-band rejection.
+                        // Also increase amount if needed to meet the exchange minimum notional.
+                        val sendOrder = when {
+                            settings.direction == DIRECTION.LONG && order.orderSide == SIDE.BUY &&
+                                    currentPrice > BigDecimal.ZERO && order.price != null && order.price > currentPrice -> {
+                                val adjustedAmount = adjustAmountForMinNotional(order.amount!!, currentPrice)
+                                log("Sync - Individual retry: BUY price ${order.price} > market $currentPrice → using currentPrice" +
+                                    if (adjustedAmount != order.amount) ", amount ${order.amount} → $adjustedAmount (min notional)" else "")
+                                order.copy(price = currentPrice, amount = adjustedAmount)
+                            }
+                            else -> order
+                        }
+                        try {
+                            val result = sendOrders(listOf(sendOrder), true)
+                            if (result.isNotEmpty()) {
+                                // Restore original grid price in DB
+                                val dbUpdate = result.first().copy(price = order.price, stopPrice = order.stopPrice)
+                                activeOrdersService.updateOrdersById(listOf(dbUpdate))
+                                syncOk++
+                            }
+                        } catch (e2: Exception) {
+                            syncFail++
+                            log("Sync - Individual send failed for id=${order.id}: ${e2.message}")
+                        }
+                    }
+                    log("Sync - Individual retry done: $syncOk/${ordersForExchange.size} placed, $syncFail failed")
+                    sendMessage("Sync recovery: $syncOk/${ordersForExchange.size} orders placed", false)
+                }
             } else {
                 log("Sync - No orders to send after verification")
             }
@@ -539,6 +647,22 @@ class AlgorithmGrid(
         botName = settings.name
     )
 
+    /**
+     * If [amount] × [sendPrice] < [BotSettingsGrid.Parameters.minNotionalUsdt], increases
+     * the amount to meet the exchange minimum notional. Returns the (possibly adjusted) amount
+     * rounded up to the pair's amount precision.
+     * No-op when minNotionalUsdt is null/zero or sendPrice is zero.
+     */
+    private fun adjustAmountForMinNotional(amount: BigDecimal, sendPrice: BigDecimal): BigDecimal {
+        val minNotional = settings.parameters.minNotionalUsdt ?: return amount
+        if (minNotional <= BigDecimal.ZERO || sendPrice <= BigDecimal.ZERO) return amount
+        val notional = amount.multiply(sendPrice)
+        if (notional >= minNotional) return amount
+        val adjusted = minNotional.divide(sendPrice, settings.countOfDigitsAfterDotForAmount, RoundingMode.CEILING)
+        log("Min notional: $amount × $sendPrice = $notional < $minNotional USDT minimum → amount adjusted to $adjusted")
+        return adjusted
+    }
+
     // --- Spike Aggregation ---
 
     private fun loadSpikeConfig(): SpikeConfig = try {
@@ -582,10 +706,13 @@ class AlgorithmGrid(
         }
 
         if (spikeDetector.isActive()) {
-            pendingSpikeOrders.addAll(verifiedOrders)
-            log("[$threadId] Spike buffer: ${pendingSpikeOrders.size} orders pending, " +
+            // Dedup: only add orders not already buffered (e.g. by WebSocket handler)
+            val existingOrderIds = pendingSpikeOrders.mapNotNull { it.orderId }.toSet()
+            val newOrders = verifiedOrders.filter { it.orderId !in existingOrderIds }
+            pendingSpikeOrders.addAll(newOrders)
+            log("[$threadId] Spike buffer: ${pendingSpikeOrders.size} orders pending (added ${newOrders.size}, skipped ${verifiedOrders.size - newOrders.size} duplicates), " +
                 "total amount: ${spikeDetector.getTotalAmount()}, weightedAvgPrice: ${spikeDetector.getWeightedAvgPrice()}, " +
-                "spikeSide=$spikeSide, added ${verifiedOrders.size} orders: [${verifiedOrders.joinToString { "id=${it.id},price=${it.price}" }}]")
+                "spikeSide=$spikeSide")
         } else {
             // Normal mode: standard grid logic
             val newOrders = verifiedOrders.map { createNextOrder(it, it.orderSide!!.reverse()) }
@@ -657,13 +784,33 @@ class AlgorithmGrid(
         val threadId = Thread.currentThread().name
         val reversedSide = spikeSide!!.reverse()
 
-        val totalAmount = pendingSpikeOrders
+        // Filter out orders that already have counter-orders (sent before spike was detected).
+        // Note: createNextOrder reuses the same DB id with reversed side, so we do NOT check
+        // id equality — the orderSide check already ensures we match the correct reversed order.
+        val ordersWithoutCounter = pendingSpikeOrders.filter { order ->
+            val existingReversedOrder = activeOrdersService.getOrderByPrice(
+                settings.name, settings.direction, order.price!!
+            )
+            val alreadyHasCounter = existingReversedOrder != null &&
+                existingReversedOrder.orderSide == reversedSide
+            if (alreadyHasCounter) {
+                log("[$threadId] Spike execute: order id=${order.id} at price=${order.price} already has counter (id=${existingReversedOrder!!.id}), excluding from aggregation")
+            }
+            !alreadyHasCounter
+        }
+
+        if (ordersWithoutCounter.isEmpty()) {
+            log("[$threadId] Spike execute: all ${pendingSpikeOrders.size} orders already have counters, nothing to aggregate")
+            return
+        }
+
+        val totalAmount = ordersWithoutCounter
             .mapNotNull { it.amount }
             .fold(BigDecimal.ZERO, BigDecimal::add)
 
         log("[$threadId] Spike execute: useMarketPrice=$useMarketPrice, reversedSide=$reversedSide, " +
-            "totalAmount=$totalAmount, pendingOrders=${pendingSpikeOrders.size}, " +
-            "orders=[${pendingSpikeOrders.joinToString { "id=${it.id},orderId=${it.orderId},side=${it.orderSide},price=${it.price},amount=${it.amount}" }}]")
+            "totalAmount=$totalAmount, ordersToAggregate=${ordersWithoutCounter.size}/${pendingSpikeOrders.size}, " +
+            "orders=[${ordersWithoutCounter.joinToString { "id=${it.id},orderId=${it.orderId},side=${it.orderSide},price=${it.price},amount=${it.amount}" }}]")
 
         val orderPrice = if (useMarketPrice || spikeConfig.aggregateOrderType == "MARKET") {
             log("[$threadId] Spike execute: using market price $currentPrice (useMarketPrice=$useMarketPrice, configType=${spikeConfig.aggregateOrderType})")
@@ -695,7 +842,7 @@ class AlgorithmGrid(
             log("[$threadId] Spike aggregated order sent: orderId=${result.orderId}, status=${result.status}, " +
                 "executedQty=${result.executedQty}, fee=${result.fee}")
 
-            redistributeGridAfterSpike(pendingSpikeOrders, reversedSide)
+            redistributeGridAfterSpike(ordersWithoutCounter, reversedSide)
 
             val avgSpikePrice = spikeDetector.getWeightedAvgPrice()
             val profit = when (reversedSide) {
@@ -748,17 +895,92 @@ class AlgorithmGrid(
         val threadId = Thread.currentThread().name
         log("[$threadId] Spike FALLBACK: creating standard grid counter-orders for ${pendingSpikeOrders.size} pending orders")
 
-        val newOrders = pendingSpikeOrders.map {
-            log("[$threadId] Spike FALLBACK: order id=${it.id}, price=${it.price}, side=${it.orderSide} -> reversed to ${it.orderSide!!.reverse()}")
-            createNextOrder(it, it.orderSide.reverse())
+        // Filter out orders that already have counter-orders on exchange
+        // (e.g. WebSocket handler or Trade trigger sent counter before spike was detected).
+        // Note: createNextOrder reuses the same DB id with reversed side, so we do NOT check
+        // id equality — the orderSide check already ensures we match the correct reversed order.
+        val ordersToProcess = pendingSpikeOrders.filter { order ->
+            val reversedSide = order.orderSide!!.reverse()
+            val existingReversedOrder = activeOrdersService.getOrderByPrice(
+                settings.name, settings.direction, order.price!!
+            )
+            val alreadyHasCounter = existingReversedOrder != null &&
+                existingReversedOrder.orderSide == reversedSide
+            if (alreadyHasCounter) {
+                log("[$threadId] Spike FALLBACK: order id=${order.id} at price=${order.price} already has counter (id=${existingReversedOrder!!.id}), skipping")
+            }
+            !alreadyHasCounter
         }
 
-        log("[$threadId] Spike FALLBACK: sending ${newOrders.size} counter-orders to exchange")
-        val exchangeOrders = sendOrders(newOrders)
-        log("[$threadId] Spike FALLBACK: sent ${exchangeOrders.size} orders, " +
-            "orderIds=[${exchangeOrders.joinToString { "orderId=${it.orderId}" }}]")
+        if (ordersToProcess.isEmpty()) {
+            log("[$threadId] Spike FALLBACK: all ${pendingSpikeOrders.size} orders already have counters, nothing to do")
+            return
+        }
 
-        val updatedOrders = activeOrdersService.updateOrdersById(exchangeOrders)
-        log("[$threadId] Spike FALLBACK: DB update complete, ${updatedOrders.count()} orders updated")
+        // Send each counter-order individually to avoid one failure aborting the whole batch.
+        // For BUY counter-orders where the grid slot price is above current market price
+        // (common after a spike crashes back), we use currentPrice instead to avoid futures
+        // exchange price-band rejection. The original DB price is restored after sending
+        // to preserve the grid structure for future cycles.
+        var successCount = 0
+        var failCount = 0
+        ordersToProcess.forEach { order ->
+            val reversedSide = order.orderSide!!.reverse()
+            val newOrder = createNextOrder(order, reversedSide)
+
+            // For LONG BUY: if grid slot price is above current market, send at current price.
+            // For LONG SELL: if grid slot stopPrice is below current market, send at current price.
+            val sendPrice = when {
+                settings.direction == DIRECTION.LONG && reversedSide == SIDE.BUY &&
+                        currentPrice > BigDecimal.ZERO && newOrder.price!! > currentPrice ->
+                    currentPrice.also {
+                        log("[$threadId] Spike FALLBACK: grid BUY price ${newOrder.price} > market $currentPrice, sending at market price")
+                    }
+                settings.direction == DIRECTION.LONG && reversedSide == SIDE.SELL &&
+                        currentPrice > BigDecimal.ZERO && newOrder.stopPrice!! < currentPrice ->
+                    currentPrice.also {
+                        log("[$threadId] Spike FALLBACK: grid SELL stopPrice ${newOrder.stopPrice} < market $currentPrice, sending at market price")
+                    }
+                else -> if (reversedSide == SIDE.BUY) newOrder.price!! else newOrder.stopPrice!!
+            }
+
+            // Build send order with adjusted price and (if needed) increased amount for min notional.
+            val orderForSend = when {
+                settings.direction == DIRECTION.LONG && reversedSide == SIDE.BUY -> {
+                    val adjustedAmount = adjustAmountForMinNotional(newOrder.amount!!, sendPrice)
+                    newOrder.copy(price = sendPrice, amount = adjustedAmount)
+                }
+                settings.direction == DIRECTION.LONG && reversedSide == SIDE.SELL -> newOrder.copy(stopPrice = sendPrice)
+                else -> newOrder
+            }
+
+            log("[$threadId] Spike FALLBACK: order id=${order.id}, gridPrice=${newOrder.price}, sendPrice=$sendPrice, side=$reversedSide")
+            try {
+                val exchangeOrders = sendOrders(listOf(orderForSend))
+                if (exchangeOrders.isNotEmpty()) {
+                    // Restore original grid slot prices in DB to preserve grid structure
+                    val dbUpdate = exchangeOrders.first().copy(
+                        price = newOrder.price,
+                        stopPrice = newOrder.stopPrice
+                    )
+                    activeOrdersService.updateOrdersById(listOf(dbUpdate))
+                    successCount++
+                    log("[$threadId] Spike FALLBACK: placed id=${order.id} orderId=${exchangeOrders.first().orderId}")
+                }
+            } catch (e: Exception) {
+                failCount++
+                log("[$threadId] Spike FALLBACK: failed for id=${order.id} price=$sendPrice: ${e.message}. DB left as-is for sync recovery on restart.")
+            }
+        }
+
+        log("[$threadId] Spike FALLBACK done: $successCount/${ordersToProcess.size} succeeded, $failCount failed")
+        if (failCount > 0) {
+            sendMessage(
+                "Spike fallback: $successCount/${ordersToProcess.size} counter-orders placed. " +
+                    "$failCount order(s) will be recovered on next bot restart.", false
+            )
+        } else {
+            sendMessage("Spike fallback: all $successCount counter-orders placed successfully.", false)
+        }
     }
 }

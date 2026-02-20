@@ -3,11 +3,13 @@
 # Images must be pushed first with images_2_push_to_server.sh
 #
 # This script does NOT build images - it uses images already loaded on server.
+# To sync exchangeBots/ settings separately: ./deploy/images_sync_settings.sh
 #
 # Usage:
-#   ./deploy/images_3_restart_containers.sh              # Restart all (frontend + backend)
+#   ./deploy/images_3_restart_containers.sh              # Interactive mode
 #   ./deploy/images_3_restart_containers.sh frontend     # Restart only frontend
 #   ./deploy/images_3_restart_containers.sh backend      # Restart only backend
+#   ./deploy/images_3_restart_containers.sh backend --settings   # Restart backend + sync exchangeBots/
 
 set -euo pipefail
 
@@ -51,12 +53,31 @@ else
     RESTART_TARGET=$(select_target)
 fi
 
+# Check for --settings flag (any position after $1)
+SYNC_SETTINGS=false
+for arg in "${@:2}"; do
+    if [ "$arg" = "--settings" ]; then
+        SYNC_SETTINGS=true
+    fi
+done
+
+# If not passed via flag, ask interactively
+if [ "$SYNC_SETTINGS" = false ]; then
+    echo ""
+    read -p "Sync exchangeBots/ settings to server? [y/N]: " -n 1 sync_choice
+    echo ""
+    if [[ "${sync_choice:-}" =~ ^[Yy]$ ]]; then
+        SYNC_SETTINGS=true
+    fi
+fi
+
 echo "================================================"
 echo "RESTART CONTAINERS ON SERVER"
 echo "================================================"
 echo "Server:       $SERVER"
 echo "Compose file: $COMPOSE_FILE"
 echo "Target:       $RESTART_TARGET"
+echo "Sync settings: $SYNC_SETTINGS"
 echo ""
 
 # Sync compose file to server
@@ -72,7 +93,6 @@ sync_nginx_config() {
     rsync -avz --delete "$PROJECT_ROOT/frontend/nginx/" "$SERVER:$REMOTE_PATH/frontend/nginx/"
     echo -e "${GREEN}✓ Nginx config synced${NC}"
 }
-
 
 restart_frontend() {
     echo -e "${YELLOW}>>> Stopping frontend container...${NC}"
@@ -133,6 +153,12 @@ sync_compose_file
 echo ""
 sync_nginx_config
 echo ""
+
+# Optionally sync exchangeBots/ settings (delegates to images_sync_settings.sh)
+if [ "$SYNC_SETTINGS" = true ]; then
+    /bin/bash "$SCRIPT_DIR/images_sync_settings.sh" --all
+    echo ""
+fi
 
 case "$RESTART_TARGET" in
     frontend)
