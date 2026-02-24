@@ -21,6 +21,18 @@ import exchange_api.gate.rest.client.GateRestApiClient
 import exchange_api.gate.rest.client.GateTradeResponse
 import bot.trade.analytics.GridAnalyticsService
 import bot.trade.analytics.GridAnalyticsResult
+import bot.trade.analytics.GridSuitabilityService
+import bot.trade.analytics.GridSuitabilityResult
+import bot.trade.exchanges.clients.ExchangeEnum.Companion.newClient
+import bot.trade.exchanges.clients.ClientBinance
+import bot.trade.exchanges.clients.ClientByBitBase
+import bot.trade.exchanges.clients.ClientByBitFutures
+import bot.trade.exchanges.clients.ClientGate
+import bot.trade.exchanges.clients.ClientExtended
+import com.google.gson.Gson
+import okhttp3.OkHttpClient as OkHttp
+import okhttp3.Request as OkHttpRequest
+import org.knowm.xchange.currency.CurrencyPair
 import java.math.BigDecimal
 import mu.KLogger
 import mu.KotlinLogging
@@ -648,4 +660,251 @@ class MainController(orderService: OrderService, private val activeOrdersService
         netProfit = BigDecimal.ZERO,
         profitPercentage = BigDecimal.ZERO
     )
+
+    // ============== Grid Suitability Endpoints ==============
+
+    data class GridSuitabilityRequest(val exchange: String, val pair: String)
+
+    @PostMapping("/grid-suitability")
+    fun gridSuitability(@RequestBody request: GridSuitabilityRequest): ResponseEntity<GridSuitabilityResult> {
+        log.info("Request for /grid-suitability: exchange=${request.exchange}, pair=${request.pair}")
+
+        return try {
+            val exchangeEnum = try {
+                ExchangeEnum.valueOf(request.exchange.uppercase())
+            } catch (e: IllegalArgumentException) {
+                return ResponseEntity.badRequest()
+                    .body(GridSuitabilityResult.error(request.exchange, request.pair,
+                        "Unknown exchange '${request.exchange}'. Supported: BINANCE, BINANCE_FUTURES, BYBIT_SPOT, BYBIT_FUTURES, GATE, HUOBI, MEXC, BITMAX"))
+            }
+
+            val client = try {
+                exchangeEnum.newClient()
+            } catch (e: Exception) {
+                log.warn("No config for ${request.exchange}, trying without credentials: ${e.message}")
+                exchangeEnum.newClient(api = null, sec = null)
+            }
+
+            val pair = TradePair(request.pair)
+
+            val candles = try {
+                client.getCandlestickBars(pair, INTERVAL.HOURLY, 500)
+            } catch (e: Exception) {
+                log.error("Failed to fetch candles for ${request.pair} on ${request.exchange}: ${e.message}")
+                return ResponseEntity.ok(
+                    GridSuitabilityResult.error(request.exchange, request.pair,
+                        "Failed to fetch data for pair '${request.pair}': ${e.message}")
+                )
+            } finally {
+                client.close()
+            }
+
+            val result = GridSuitabilityService().analyze(request.exchange, request.pair, candles)
+            ResponseEntity.ok(result)
+
+        } catch (e: Exception) {
+            log.error("Error in /grid-suitability: ${e.message}", e)
+            ResponseEntity.status(500)
+                .body(GridSuitabilityResult.error(request.exchange, request.pair, "Internal error: ${e.message}"))
+        }
+    }
+
+    @GetMapping("/grid-suitability")
+    fun gridSuitabilityPage(): ResponseEntity<String> {
+        return try {
+            val content = File("pages/grid-suitability.html").readText()
+            ResponseEntity.ok()
+                .header("Content-Type", "text/html")
+                .body(content)
+        } catch (e: Exception) {
+            log.error("Error loading grid-suitability page: ${e.message}", e)
+            ResponseEntity.status(500).body("Error loading page: ${e.message}")
+        }
+    }
+
+    // ---- Scan endpoint ----
+
+    data class GridSuitabilityScanRequest(
+        val exchange: String,
+        val quoteCurrency: String?,
+        val limit: Int?
+    )
+
+    @PostMapping("/grid-suitability-scan")
+    fun gridSuitabilityScan(@RequestBody request: GridSuitabilityScanRequest): ResponseEntity<Any> {
+        log.info("Request for /grid-suitability-scan: exchange=${request.exchange}, quote=${request.quoteCurrency}, limit=${request.limit}")
+
+        val exchangeEnum = try {
+            ExchangeEnum.valueOf(request.exchange.uppercase())
+        } catch (e: IllegalArgumentException) {
+            return ResponseEntity.badRequest().body(Response("error", "Unknown exchange: ${request.exchange}"))
+        }
+
+        val quoteCurrency = (request.quoteCurrency ?: "USDT").uppercase()
+        val limit = (request.limit ?: 30).coerceIn(1, 100)
+
+        val client = try {
+            exchangeEnum.newClient()
+        } catch (e: Exception) {
+            log.error("Failed to create client for ${request.exchange}: ${e.message}")
+            return ResponseEntity.status(500).body(Response("error", "Failed to connect to exchange: ${e.message}"))
+        }
+
+        try {
+            val pairs = getExchangePairsForScan(client, request.exchange, quoteCurrency, limit)
+
+            if (pairs.isEmpty()) {
+                return ResponseEntity.ok(
+                    Response("error", "Pair scanning not supported for ${request.exchange}. " +
+                        "Supported exchanges for scan: BINANCE, BINANCE_FUTURES, BYBIT_SPOT, BYBIT_FUTURES, GATE, EXTENDED. " +
+                        "Use the single-pair analyzer for other exchanges.")
+                )
+            }
+
+            log.info("Scanning ${pairs.size} ${quoteCurrency} pairs on ${request.exchange}...")
+
+            val suitabilityService = GridSuitabilityService()
+            val results = pairs.mapNotNull { pair ->
+                    try {
+                        val candles = if (client is ClientGate)
+                            fetchGateCandlesDirect(pair, 168)
+                        else
+                            client.getCandlestickBars(pair, INTERVAL.HOURLY, 168)
+                        if (candles.size < 12) return@mapNotNull null
+                        val r = suitabilityService.analyze(request.exchange, "${pair.first}/${pair.second}", candles)
+                        if (r.error != null) null else r
+                    } catch (e: Exception) {
+                        log.debug("Skipping ${pair.first}/${pair.second}: ${e.message}")
+                        null
+                    }
+                }
+                .sortedByDescending { it.suitabilityScore }
+
+            log.info("Scan complete: ${results.size} pairs analyzed on ${request.exchange}")
+            return ResponseEntity.ok(results)
+
+        } catch (e: Exception) {
+            log.error("Error in scan for ${request.exchange}: ${e.message}", e)
+            return ResponseEntity.status(500).body(Response("error", "Scan failed: ${e.message}"))
+        } finally {
+            client.close()
+        }
+    }
+
+    private fun getExchangePairsForScan(client: Client, exchangeName: String, quoteCurrency: String, limit: Int): List<TradePair> {
+        return try {
+            when (client) {
+                is ClientBinance -> {
+                    client.marketDataService.getTickers(null)
+                        .filter { ticker -> ticker.instrument is CurrencyPair &&
+                            (ticker.instrument as CurrencyPair).counter.currencyCode.equals(quoteCurrency, ignoreCase = true) }
+                        .sortedByDescending { ticker ->
+                            (ticker.instrument as CurrencyPair).let { _ ->
+                                try { ticker.quoteVolume } catch (e: Exception) { ticker.volume }
+                            } ?: BigDecimal.ZERO
+                        }
+                        .take(limit)
+                        .map { ticker ->
+                            val cp = ticker.instrument as CurrencyPair
+                            TradePair(cp.base.currencyCode, cp.counter.currencyCode)
+                        }
+                }
+                is ClientByBitBase -> getByBitPairsForScan(client, quoteCurrency, limit)
+                is ClientGate -> getGatePairsForScan(quoteCurrency, limit)
+                is ClientExtended -> client.getAllPairs()
+                    .filter { it.second.equals(quoteCurrency, ignoreCase = true) }
+                    .take(limit)
+                else -> {
+                    log.warn("Pair scanning not supported for $exchangeName (${client::class.simpleName})")
+                    emptyList()
+                }
+            }
+        } catch (e: Exception) {
+            log.error("Failed to get pairs for $exchangeName: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    // Gate.io public API helpers (no auth required)
+
+    private fun getGatePairsForScan(quoteCurrency: String, limit: Int): List<TradePair> {
+        data class GateTicker(val currency_pair: String?, val vol_24h_quote: String?)
+
+        return try {
+            val body = OkHttp().newCall(
+                OkHttpRequest.Builder().url("https://api.gateio.ws/api/v4/spot/tickers").get().build()
+            ).execute().use { it.body?.string() ?: return emptyList() }
+
+            Gson().fromJson(body, Array<GateTicker>::class.java)
+                .filter { it.currency_pair?.endsWith("_$quoteCurrency", ignoreCase = true) == true }
+                .sortedByDescending { it.vol_24h_quote?.toBigDecimalOrNull() ?: BigDecimal.ZERO }
+                .take(limit)
+                .mapNotNull { t ->
+                    val pair = t.currency_pair ?: return@mapNotNull null
+                    val base = pair.removeSuffix("_$quoteCurrency").removeSuffix("_${quoteCurrency.lowercase()}")
+                    if (base.isBlank()) null else TradePair(base, quoteCurrency)
+                }
+        } catch (e: Exception) {
+            log.error("Failed to fetch Gate pairs: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    private fun fetchGateCandlesDirect(pair: TradePair, limit: Int): List<Candlestick> {
+        val symbol = "${pair.first}_${pair.second}"
+        val url = "https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=$symbol&interval=1h&limit=$limit"
+
+        return try {
+            val body = OkHttp().newCall(
+                OkHttpRequest.Builder().url(url).get().build()
+            ).execute().use { it.body?.string() ?: return emptyList() }
+
+            // Response format: [[timestamp, volume_base, close, high, low, open, volume_quote, is_closed], ...]
+            val raw = Gson().fromJson(body, Array<Array<String>>::class.java)
+            raw.mapNotNull { c ->
+                if (c.size < 6) return@mapNotNull null
+                val ts = c[0].toLongOrNull()?.times(1000) ?: return@mapNotNull null
+                Candlestick(
+                    openTime = ts,
+                    closeTime = ts + 3_600_000L,
+                    open = c[5].toBigDecimalOrNull() ?: return@mapNotNull null,
+                    high = c[3].toBigDecimalOrNull() ?: return@mapNotNull null,
+                    low = c[4].toBigDecimalOrNull() ?: return@mapNotNull null,
+                    close = c[2].toBigDecimalOrNull() ?: return@mapNotNull null,
+                    volume = c[1].toBigDecimalOrNull() ?: BigDecimal.ZERO
+                )
+            }
+        } catch (e: Exception) {
+            log.error("Failed to fetch Gate candles for ${pair.first}/${pair.second}: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    private fun getByBitPairsForScan(client: ClientByBitBase, quoteCurrency: String, limit: Int): List<TradePair> {
+        val category = if (client is ClientByBitFutures) "linear" else "spot"
+        val url = "https://api.bybit.com/v5/market/tickers?category=$category"
+
+        data class ByBitSymbol(val symbol: String?, val turnover24h: String?)
+        data class ByBitResult(val list: List<ByBitSymbol>?)
+        data class ByBitResponse(val result: ByBitResult?)
+
+        return try {
+            val body = OkHttp().newCall(OkHttpRequest.Builder().url(url).get().build())
+                .execute().use { it.body?.string() ?: return emptyList() }
+
+            val response = Gson().fromJson(body, ByBitResponse::class.java)
+            (response.result?.list ?: emptyList())
+                .filter { it.symbol?.endsWith(quoteCurrency, ignoreCase = true) == true }
+                .sortedByDescending { it.turnover24h?.toBigDecimalOrNull() ?: BigDecimal.ZERO }
+                .take(limit)
+                .mapNotNull { sym ->
+                    val symbol = sym.symbol ?: return@mapNotNull null
+                    val base = symbol.removeSuffix(quoteCurrency).removeSuffix(quoteCurrency.lowercase())
+                    if (base.isBlank()) null else TradePair(base, quoteCurrency)
+                }
+        } catch (e: Exception) {
+            log.error("Failed to fetch ByBit pairs: ${e.message}", e)
+            emptyList()
+        }
+    }
 }

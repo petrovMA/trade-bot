@@ -11,7 +11,7 @@ related_files: [CLAUDE.md, docs/index.md]
 ## Context
 
 Changelog проекта. Обновляется после каждого изменения кода (см. правило в `CLAUDE.md`).
-Текущая версия: v2.1.6. Формат: semver. Каждая запись содержит проблему, решение и затронутые файлы.
+Текущая версия: v2.1.13. Формат: semver. Каждая запись содержит проблему, решение и затронутые файлы.
 
 ## О документе
 
@@ -20,6 +20,143 @@ Changelog проекта. Обновляется после каждого из�
 ---
 
 ## Версии
+
+### v2.1.13 - Spike: always LIMIT at avgSpikePrice, cancel old orders on redistribute (2026-02-24)
+
+**Статус:** Реализовано
+
+**Проблема 1:**
+Spike safety cutoff и timeout отправляли MARKET ордер по `currentPrice`. Если цена уже откатилась ниже средней покупки, MARKET SELL продавал в убыток. Пример: avg BUY 0.03041, safety cutoff MARKET SELL @ 0.02925 → убыток -0.50 USDT.
+
+**Проблема 2:**
+`redistributeGridAfterSpike()` обнуляла `orderId` в БД, но не отменяла старые ордера на бирже. Старые ордера оставались live, но untracked → их fill-ы терялись ("not found in DB"), вызывая разбалансировку позиции.
+
+**Решение:**
+1. `executeSpikeCounterOrders()`: убран параметр `useMarketPrice`. Всегда используется **LIMIT** с ценой `avgSpikePrice ± offset` (гарантирует прибыль). Ордер заполнится когда цена вернётся к выгодному уровню.
+2. `redistributeGridAfterSpike()`: перед обнулением `orderId` — отмена старых ордеров на бирже через `cancelOrder()`.
+
+**Файлы:** `AlgorithmGrid.kt`
+
+---
+
+### v2.1.12 - Fix spike aggregation double-buy bug (2026-02-23)
+
+**Статус:** Реализовано
+
+**Проблема:**
+`executeSpikeCounterOrders()` отправлял на биржу И аггрегированный ордер (BUY 330 REACT), И 3 отдельных grid-ордера через `redistributeGridAfterSpike()` (ещё 330 REACT). Итого ~660 REACT куплено вместо ~330. Это вызывало разбалансировку: бот тратил все USDT на покупку REACT.
+
+**Решение:**
+`redistributeGridAfterSpike()` теперь только обновляет БД (переворачивает side, очищает orderId) **без отправки на биржу**. Аггрегированный ордер уже покрывает всю counter-позицию. Grid-ордера будут размещены на бирже при следующем `synchronizeOrders()`.
+
+**Файлы:** `AlgorithmGrid.kt`
+
+---
+
+### v2.1.11 - Grid range change detection on resume (2026-02-21)
+
+**Статус:** Реализовано
+
+**Задача:**
+При изменении `trading_range` в settings.json и `/resume` бота, существующие ордера не корректировались — бот работал со старой решёткой.
+
+**Решение:**
+При resume в `synchronizeOrders()` добавлена автоматическая проверка диапазона:
+1. **Contraction** (сужение): ордера за пределами нового диапазона отменяются на бирже и удаляются из БД
+2. **Expansion** (расширение): для новых grid-уровней внутри диапазона создаются ордера с правильным side (BUY ≤ currentPrice, SELL > currentPrice)
+3. Существующие ордера внутри нового диапазона не затрагиваются
+4. При добавлении >30% новых ордеров автоматически включается `forceSyncEnabled`
+
+Новая функция `buildOrderForGridLevel()` зеркалит логику конструктора `GridOrders` для создания одного ордера на заданном уровне.
+
+**Файлы:**
+- `src/main/kotlin/bot/trade/exchanges/AlgorithmGrid.kt` — range-change detection в `synchronizeOrders()`, новая функция `buildOrderForGridLevel()`
+
+---
+
+### v2.1.10 - Grid Suitability: Estimated Earnings + Gate/Extended scan (2026-02-21)
+
+**Статус:** Реализовано
+
+**Задача:**
+Добавить расчёт потенциального заработка со вложенного капитала; добавить Gate.io и Extended в сканер.
+
+**Решение:**
+- `GridSuitabilityResult` + `GridSuitabilityService`: новые поля `numGridLevels`, `estimatedDailyReturnPct`, `estimatedMonthlyReturnPct`
+- Формула: `dailyReturnPct = (fillsPerDay/2) × profitDistancePct / numGridLevels`
+- UI: поле ввода капитала ($100 по умолчанию); блок "Estimated Earnings" с daily/monthly/annual; пересчёт при изменении капитала без повторного запроса
+- Gate.io scan: прямой HTTP к Gate public API (`/api/v4/spot/tickers` + `/api/v4/spot/candlesticks`) — обход сломанного `getCandlestickBars()` в ClientGate
+- Extended (Starknet) scan: использует `getAllPairs()` + `getCandlestickBars()` (оба работают)
+- Scan dropdown добавлены: Gate.io, Extended
+
+**Затронутые файлы:**
+- `src/main/kotlin/bot/trade/analytics/GridSuitabilityService.kt`
+- `src/main/kotlin/bot/trade/rest_controller/MainController.kt`
+- `pages/grid-suitability.html`
+
+---
+
+### v2.1.9 - Grid Suitability: Exchange Scanner + link fix (2026-02-21)
+
+**Статус:** Реализовано
+
+**Задача:**
+Добавить сканирование биржи для поиска лучших пар для грид-бота; исправить ссылку в main.html.
+
+**Решение:**
+- Новый endpoint `POST /grid-suitability-scan`: принимает exchange/quoteCurrency/limit, возвращает `List<GridSuitabilityResult>` отсортированный по score
+- Для Binance: использует `marketDataService.getTickers()` (XChange) → сортировка по quoteVolume
+- Для ByBit: прямой HTTP запрос к публичному `/v5/market/tickers` API → сортировка по turnover24h
+- Последовательный анализ пар (168 свечей = 1 неделя hourly) через Kotlin `mapNotNull`
+- UI: таблица результатов с кликом по строке для быстрого детального анализа; показывает время выполнения
+- Ссылка на Grid Suitability добавлена в `pages/main.html`
+- Локальный URL: `localhost:8080/grid-suitability`
+
+**Затронутые файлы:**
+- `src/main/kotlin/bot/trade/rest_controller/MainController.kt`
+- `pages/grid-suitability.html`
+- `pages/main.html`
+
+---
+
+### v2.1.8 - Grid Suitability Checker (2026-02-20)
+
+**Статус:** Реализовано
+
+**Задача:**
+Инструмент для быстрой оценки пары на бирже — насколько она подходит для запуска грид-бота.
+
+**Решение:**
+- Новый сервис `GridSuitabilityService` вычисляет метрики из ~500 свечей (1h): дневную волатильность, диапазон цены, объём, расчётное количество заполнений сетки в день
+- Оценка пригодности (score 0–100) и лейбл (Excellent/Good/Fair/Poor/Not Suitable)
+- Предлагаемые параметры: торговый диапазон, order distance %, profit distance %
+- Новые REST-эндпоинты: `POST /grid-suitability` (JSON-ответ), `GET /grid-suitability` (HTML-страница)
+- Фронтенд: `pages/grid-suitability.html` — выбор биржи из dropdown (только поддерживаемые), ввод пары вручную
+
+**Затронутые файлы:**
+- `src/main/kotlin/bot/trade/analytics/GridSuitabilityService.kt` (новый)
+- `src/main/kotlin/bot/trade/rest_controller/MainController.kt`
+- `pages/grid-suitability.html` (новый)
+
+---
+
+### v2.1.7 - Fix inflated amount persisting in DB after min notional adjustment (2026-02-20)
+
+**Статус:** Реализовано
+
+**Проблема:**
+`adjustAmountForMinNotional` увеличивала BUY amount с ~64 до ~108 REACT для отправки на биржу (чтобы пройти минимум 3 USDT). Но увеличенный amount **сохранялся в БД** вместо оригинального. `createNextOrder()` копировала inflated amount в counter-ордера → grid slot навсегда «раздувался». При восстановлении цены (0.027 → 0.048) ордер в 108 REACT × 0.048 = 5.2 USDT вместо оригинальных 3.1 USDT.
+
+Это также приводило к тому, что бот тратил все USDT за один цикл force sync: 25+ BUY ордеров × 108 REACT × 0.027 = ~73 USDT.
+
+**Решение:**
+В обоих местах, где DB update восстанавливает оригинальные `price`/`stopPrice`, теперь также восстанавливается оригинальный `amount`:
+1. **`synchronizeOrders()` individual retry** (строка 515): `amount = order.amount`
+2. **`fallbackToGridCounterOrders()`** (строка 963): `amount = newOrder.amount`
+
+**Файлы:** `AlgorithmGrid.kt`
+
+---
 
 ### v2.1.6 - Fix min notional: adjust amount when price is lowered to currentPrice (2026-02-20)
 

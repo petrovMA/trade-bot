@@ -31,6 +31,9 @@ function Navigation() {
           <a href="/trade-bot/grid-analysis" className="px-3 py-2 rounded-md text-sm font-medium text-green-700 hover:bg-green-100 border border-green-300">
             Grid Analysis
           </a>
+          <a href="/trade-bot/grid-suitability" className="px-3 py-2 rounded-md text-sm font-medium text-green-700 hover:bg-green-100 border border-green-300">
+            Grid Suitability
+          </a>
         </div>
       </div>
     </nav>

@@ -9,7 +9,7 @@
 #   ./deploy/images_3_restart_containers.sh              # Interactive mode
 #   ./deploy/images_3_restart_containers.sh frontend     # Restart only frontend
 #   ./deploy/images_3_restart_containers.sh backend      # Restart only backend
-#   ./deploy/images_3_restart_containers.sh backend --settings   # Restart backend + sync exchangeBots/
+# Note: Use ./deploy/images_sync_settings.sh separately to sync exchangeBots/ settings
 
 set -euo pipefail
 
@@ -53,7 +53,7 @@ else
     RESTART_TARGET=$(select_target)
 fi
 
-# Check for --settings flag (any position after $1)
+# Check for --settings flag (any position after $1) if needed
 SYNC_SETTINGS=false
 for arg in "${@:2}"; do
     if [ "$arg" = "--settings" ]; then
@@ -61,23 +61,12 @@ for arg in "${@:2}"; do
     fi
 done
 
-# If not passed via flag, ask interactively
-if [ "$SYNC_SETTINGS" = false ]; then
-    echo ""
-    read -p "Sync exchangeBots/ settings to server? [y/N]: " -n 1 sync_choice
-    echo ""
-    if [[ "${sync_choice:-}" =~ ^[Yy]$ ]]; then
-        SYNC_SETTINGS=true
-    fi
-fi
-
 echo "================================================"
 echo "RESTART CONTAINERS ON SERVER"
 echo "================================================"
 echo "Server:       $SERVER"
 echo "Compose file: $COMPOSE_FILE"
 echo "Target:       $RESTART_TARGET"
-echo "Sync settings: $SYNC_SETTINGS"
 echo ""
 
 # Sync compose file to server

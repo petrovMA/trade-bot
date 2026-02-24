@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Suitability Checker</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f0f2f5; }
+        .page-header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 30px 0 20px;
+            margin-bottom: 30px;
+        }
+        .form-card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .result-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .score-circle {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 10px;
+        }
+        .score-excellent { background: #d4edda; color: #155724; border: 3px solid #28a745; }
+        .score-good      { background: #cce5ff; color: #004085; border: 3px solid #007bff; }
+        .score-fair      { background: #fff3cd; color: #856404; border: 3px solid #ffc107; }
+        .score-poor      { background: #f8d7da; color: #721c24; border: 3px solid #dc3545; }
+        .score-not       { background: #e2e3e5; color: #383d41; border: 3px solid #6c757d; }
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .metric-item:last-child { border-bottom: none; }
+        .metric-label { color: #6c757d; font-size: 0.9rem; }
+        .metric-value { font-weight: 600; }
+        .suggestion-box {
+            background: #e8f4fd;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+            padding: 15px 20px;
+        }
+        .suggestion-box code {
+            background: #d0e9ff;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        .loading-spinner { display: none; }
+        #results { display: none; }
+        #errorBox { display: none; }
+        #scanResults { display: none; }
+        #scanErrorBox { display: none; }
+        .exchange-badge {
+            display: inline-block;
+            background: #343a40;
+            color: #fff;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.8rem;
+            margin-right: 5px;
+        }
+        .section-divider {
+            border: none;
+            border-top: 2px dashed #dee2e6;
+            margin: 30px 0;
+        }
+        .scan-row:hover { background: #f8f9fa; cursor: pointer; }
+        .badge-score {
+            display: inline-block;
+            width: 36px;
+            text-align: center;
+            border-radius: 50%;
+            padding: 4px 0;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+        .tab-btn { cursor: pointer; }
+        .tab-btn.active { font-weight: bold; border-bottom: 3px solid #007bff; }
+        .section-header {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-header">
+    <div class="container">
+        <h2 class="mb-1">Grid Suitability Checker</h2>
+        <small class="text-light">Analyze whether a trading pair is suitable for grid bot trading</small>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ===== SINGLE PAIR ANALYSIS ===== -->
+    <div class="form-card">
+        <h6 class="section-header">Single Pair Analysis</h6>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="exchangeSelect"><strong>Exchange</strong></label>
+                    <select id="exchangeSelect" class="form-control">
+                        <option value="BINANCE">Binance (Spot)</option>
+                        <option value="BINANCE_FUTURES">Binance Futures</option>
+                        <option value="BYBIT_SPOT">ByBit (Spot)</option>
+                        <option value="BYBIT_FUTURES">ByBit Futures</option>
+                        <option value="GATE">Gate.io (Spot)</option>
+                        <option value="HUOBI">Huobi</option>
+                        <option value="MEXC">MEXC</option>
+                        <option value="BITMAX">BitMAX</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label for="pairInput"><strong>Trading Pair</strong></label>
+                    <input type="text" id="pairInput" class="form-control" placeholder="e.g. BTC/USDT or BTCUSDT" value="BTC/USDT">
+                    <small class="text-muted">Slash, underscore, or no separator</small>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="form-group">
+                    <label for="capitalInput"><strong>Capital ($)</strong></label>
+                    <input type="number" id="capitalInput" class="form-control" value="100" min="1" step="10">
+                </div>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <div class="form-group w-100">
+                    <button id="analyzeBtn" class="btn btn-primary btn-block" onclick="analyze()">Analyze</button>
+                </div>
+            </div>
+        </div>
+        <div class="loading-spinner text-center py-3" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="mt-2 text-muted">Fetching ~500 candles from exchange...</div>
+        </div>
+    </div>
+
+    <div id="errorBox" class="alert alert-danger"></div>
+
+    <div id="results">
+        <div class="row">
+            <!-- Score card -->
+            <div class="col-md-3">
+                <div class="result-card text-center">
+                    <div class="score-circle" id="scoreCircle">
+                        <div style="font-size:2rem" id="scoreValue">--</div>
+                        <div style="font-size:0.75rem" id="scoreLabel">--</div>
+                    </div>
+                    <div class="mt-2 text-muted" style="font-size:0.85rem">Suitability Score</div>
+                    <hr>
+                    <div id="exchangeBadge" class="exchange-badge">--</div>
+                    <strong id="pairDisplay">--</strong>
+                    <div class="mt-1 text-muted" style="font-size:0.8rem">
+                        <span id="periodDays">--</span> days analyzed
+                        (<span id="candlesAnalyzed">--</span> candles)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price metrics -->
+            <div class="col-md-4">
+                <div class="result-card">
+                    <h6 class="section-header">Price Metrics</h6>
+                    <div class="metric-item">
+                        <span class="metric-label">Current Price</span>
+                        <span class="metric-value" id="currentPrice">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Period Low</span>
+                        <span class="metric-value" id="priceMin">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Period High</span>
+                        <span class="metric-value" id="priceMax">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Price Range</span>
+                        <span class="metric-value" id="priceRangePct">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Avg Daily Volatility</span>
+                        <span class="metric-value" id="avgDailyVolatilityPct">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Avg Daily Volume</span>
+                        <span class="metric-value" id="avgDailyVolume">--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Est. Grid Fills/Day</span>
+                        <span class="metric-value" id="estimatedFillsPerDay">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suggested parameters -->
+            <div class="col-md-5">
+                <div class="result-card">
+                    <h6 class="section-header">Suggested Grid Parameters</h6>
+                    <div class="suggestion-box">
+                        <div class="metric-item" style="border-bottom: 1px solid #c9e0f5">
+                            <span class="metric-label">Trading Range (lower)</span>
+                            <span class="metric-value"><code id="suggestedLower">--</code></span>
+                        </div>
+                        <div class="metric-item" style="border-bottom: 1px solid #c9e0f5">
+                            <span class="metric-label">Trading Range (upper)</span>
+                            <span class="metric-value"><code id="suggestedUpper">--</code></span>
+                        </div>
+                        <div class="metric-item" style="border-bottom: 1px solid #c9e0f5">
+                            <span class="metric-label">Order Distance</span>
+                            <span class="metric-value"><code id="suggestedOrderDist">--</code></span>
+                        </div>
+                        <div class="metric-item" style="border-bottom: 1px solid #c9e0f5">
+                            <span class="metric-label">Profit Distance</span>
+                            <span class="metric-value"><code id="suggestedProfitDist">--</code></span>
+                        </div>
+                        <div class="metric-item" style="border: none">
+                            <span class="metric-label">Grid Levels (~)</span>
+                            <span class="metric-value" id="numGridLevels">--</span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-muted" style="font-size:0.8rem">
+                        Order &amp; profit distances are % of price.<br>
+                        Range is centered on current price using historical high/low.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estimated Earnings row -->
+        <div class="result-card">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <h6 class="section-header mb-1">Estimated Earnings</h6>
+                    <small class="text-muted">Based on <span id="earningsCapital">$100</span> deployed capital</small>
+                </div>
+                <div class="col-md-3 text-center border-right">
+                    <div class="text-muted" style="font-size:0.8rem">Daily Return</div>
+                    <div style="font-size:1.5rem;font-weight:bold;color:#28a745" id="earningsDaily">--</div>
+                    <div class="text-muted" style="font-size:0.8rem" id="earningsDailyPct">--</div>
+                </div>
+                <div class="col-md-3 text-center border-right">
+                    <div class="text-muted" style="font-size:0.8rem">Monthly Return</div>
+                    <div style="font-size:1.5rem;font-weight:bold;color:#007bff" id="earningsMonthly">--</div>
+                    <div class="text-muted" style="font-size:0.8rem" id="earningsMonthlyPct">--</div>
+                </div>
+                <div class="col-md-3 text-center">
+                    <div class="text-muted" style="font-size:0.8rem">Annual Return</div>
+                    <div style="font-size:1.5rem;font-weight:bold;color:#6f42c1" id="earningsAnnual">--</div>
+                    <div class="text-muted" style="font-size:0.8rem" id="earningsAnnualPct">--</div>
+                </div>
+            </div>
+            <div class="mt-2 text-muted" style="font-size:0.75rem">
+                ⚠ Estimated only. Assumes full capital deployed across ~<span id="earningsLevels">N</span> grid levels. Does not account for fees, slippage, or price moving outside the range.
+            </div>
+        </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- ===== EXCHANGE SCAN ===== -->
+    <div class="form-card">
+        <h6 class="section-header">Scan Exchange for Best Grid Pairs</h6>
+        <div class="alert alert-info py-2 mb-3" style="font-size:0.85rem">
+            Scans top pairs by volume and ranks them by grid suitability. Supported: <strong>Binance, Binance Futures, ByBit Spot, ByBit Futures, Gate.io, Extended</strong>. Scan may take 30–90 seconds.
+        </div>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="scanExchange"><strong>Exchange</strong></label>
+                    <select id="scanExchange" class="form-control">
+                        <option value="BINANCE">Binance (Spot)</option>
+                        <option value="BINANCE_FUTURES">Binance Futures</option>
+                        <option value="BYBIT_SPOT">ByBit (Spot)</option>
+                        <option value="BYBIT_FUTURES">ByBit Futures</option>
+                        <option value="GATE">Gate.io (Spot)</option>
+                        <option value="EXTENDED">Extended (Starknet)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="scanQuote"><strong>Quote Currency</strong></label>
+                    <select id="scanQuote" class="form-control">
+                        <option value="USDT">USDT</option>
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="USDC">USDC</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label for="scanLimit"><strong>Pairs to Scan</strong></label>
+                    <select id="scanLimit" class="form-control">
+                        <option value="20">Top 20 by volume</option>
+                        <option value="30" selected>Top 30 by volume</option>
+                        <option value="50">Top 50 by volume</option>
+                        <option value="100">Top 100 by volume</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <div class="form-group w-100">
+                    <button id="scanBtn" class="btn btn-success btn-block" onclick="scan()">Scan</button>
+                </div>
+            </div>
+        </div>
+        <div class="loading-spinner text-center py-3" id="scanLoadingSpinner">
+            <div class="spinner-border text-success" role="status"></div>
+            <div class="mt-2 text-muted" id="scanProgressText">Fetching pair list and analyzing candles...</div>
+        </div>
+    </div>
+
+    <div id="scanErrorBox" class="alert alert-warning"></div>
+
+    <div id="scanResults">
+        <div class="result-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="section-header mb-0">Scan Results — <span id="scanSummary"></span></h6>
+                <small class="text-muted" id="scanTimeTaken"></small>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover" id="scanTable">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Pair</th>
+                            <th>Score</th>
+                            <th>Label</th>
+                            <th>Daily Volatility</th>
+                            <th>Price Range</th>
+                            <th>Est. Fills/Day</th>
+                            <th>Order Dist %</th>
+                            <th>Current Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scanTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ===== Single-pair analyzer =====
+async function analyze() {
+    const exchange = document.getElementById('exchangeSelect').value;
+    const pair = document.getElementById('pairInput').value.trim();
+
+    if (!pair) { showError('Please enter a trading pair.'); return; }
+
+    document.getElementById('errorBox').style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('analyzeBtn').disabled = true;
+
+    try {
+        const apiBase = window.location.pathname.startsWith('/trade-bot/') ? '/trade-bot/api' : '';
+        const resp = await fetch(apiBase + '/grid-suitability', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exchange, pair })
+        });
+        const data = await resp.json();
+        if (data.error) { showError(data.error); return; }
+        lastResult = data;
+        renderResults(data);
+    } catch (e) {
+        showError('Request failed: ' + e.message);
+    } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+        document.getElementById('analyzeBtn').disabled = false;
+    }
+}
+
+function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+}
+
+function renderResults(d) {
+    const scoreEl = document.getElementById('scoreCircle');
+    scoreEl.className = 'score-circle ' + scoreClass(d.suitabilityLabel);
+    document.getElementById('scoreValue').textContent = d.suitabilityScore;
+    document.getElementById('scoreLabel').textContent = d.suitabilityLabel;
+    document.getElementById('exchangeBadge').textContent = d.exchange;
+    document.getElementById('pairDisplay').textContent = d.pair;
+    document.getElementById('periodDays').textContent = d.periodDays;
+    document.getElementById('candlesAnalyzed').textContent = d.candlesAnalyzed;
+    document.getElementById('currentPrice').textContent = fmt(d.currentPrice);
+    document.getElementById('priceMin').textContent = fmt(d.priceMin);
+    document.getElementById('priceMax').textContent = fmt(d.priceMax);
+    document.getElementById('priceRangePct').textContent = d.priceRangePct + '%';
+    document.getElementById('avgDailyVolatilityPct').textContent = d.avgDailyVolatilityPct + '%';
+    document.getElementById('avgDailyVolume').textContent = fmtVol(d.avgDailyVolume);
+    document.getElementById('estimatedFillsPerDay').textContent = d.estimatedFillsPerDay;
+    document.getElementById('suggestedLower').textContent = fmt(d.suggestedLowerBound);
+    document.getElementById('suggestedUpper').textContent = fmt(d.suggestedUpperBound);
+    document.getElementById('suggestedOrderDist').textContent = d.suggestedOrderDistancePct + '%';
+    document.getElementById('suggestedProfitDist').textContent = d.suggestedProfitDistancePct + '%';
+    document.getElementById('numGridLevels').textContent = d.numGridLevels;
+
+    // Estimated earnings
+    const capital = parseFloat(document.getElementById('capitalInput').value) || 100;
+    const dailyPct = parseFloat(d.estimatedDailyReturnPct) || 0;
+    const monthlyPct = parseFloat(d.estimatedMonthlyReturnPct) || 0;
+    const annualPct = dailyPct * 365;
+    const daily = capital * dailyPct / 100;
+    const monthly = capital * monthlyPct / 100;
+    const annual = capital * annualPct / 100;
+
+    document.getElementById('earningsCapital').textContent = '$' + capital.toLocaleString();
+    document.getElementById('earningsDaily').textContent = '$' + daily.toFixed(2);
+    document.getElementById('earningsDailyPct').textContent = dailyPct.toFixed(3) + '% / day';
+    document.getElementById('earningsMonthly').textContent = '$' + monthly.toFixed(2);
+    document.getElementById('earningsMonthlyPct').textContent = monthlyPct.toFixed(2) + '% / month';
+    document.getElementById('earningsAnnual').textContent = '$' + annual.toFixed(0);
+    document.getElementById('earningsAnnualPct').textContent = annualPct.toFixed(1) + '% / year';
+    document.getElementById('earningsLevels').textContent = d.numGridLevels;
+
+    document.getElementById('results').style.display = 'block';
+}
+
+// ===== Exchange scanner =====
+async function scan() {
+    const exchange = document.getElementById('scanExchange').value;
+    const quoteCurrency = document.getElementById('scanQuote').value;
+    const limit = parseInt(document.getElementById('scanLimit').value);
+
+    document.getElementById('scanErrorBox').style.display = 'none';
+    document.getElementById('scanResults').style.display = 'none';
+    document.getElementById('scanLoadingSpinner').style.display = 'block';
+    document.getElementById('scanBtn').disabled = true;
+    document.getElementById('scanProgressText').textContent =
+        `Fetching top ${limit} ${quoteCurrency} pairs and analyzing 1-week of candles...`;
+
+    const t0 = Date.now();
+    try {
+        const apiBase = window.location.pathname.startsWith('/trade-bot/') ? '/trade-bot/api' : '';
+        const resp = await fetch(apiBase + '/grid-suitability-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exchange, quoteCurrency, limit })
+        });
+        const data = await resp.json();
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+        // Check if it's an error response object
+        if (data.status === 'error' || (typeof data === 'object' && !Array.isArray(data) && data.data)) {
+            const msg = data.data || data.status || 'Unknown error';
+            showScanError(msg);
+            return;
+        }
+
+        if (!Array.isArray(data) || data.length === 0) {
+            showScanError('No pairs found or scan returned no results. Check exchange connection.');
+            return;
+        }
+
+        renderScanResults(data, exchange, quoteCurrency, elapsed);
+    } catch (e) {
+        showScanError('Scan request failed: ' + e.message);
+    } finally {
+        document.getElementById('scanLoadingSpinner').style.display = 'none';
+        document.getElementById('scanBtn').disabled = false;
+    }
+}
+
+function showScanError(msg) {
+    const box = document.getElementById('scanErrorBox');
+    box.textContent = msg;
+    box.style.display = 'block';
+}
+
+function renderScanResults(results, exchange, quote, elapsed) {
+    document.getElementById('scanSummary').textContent =
+        `${results.length} pairs on ${exchange} (${quote})`;
+    document.getElementById('scanTimeTaken').textContent = `Completed in ${elapsed}s`;
+
+    const tbody = document.getElementById('scanTableBody');
+    tbody.innerHTML = '';
+
+    results.forEach((r, i) => {
+        const tr = document.createElement('tr');
+        tr.className = 'scan-row';
+        tr.onclick = () => {
+            // Fill single-pair form with this pair
+            document.getElementById('exchangeSelect').value = r.exchange;
+            document.getElementById('pairInput').value = r.pair;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            renderResults(r);
+        };
+        tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td><strong>${r.pair}</strong></td>
+            <td><span class="badge-score" style="${scoreBadgeStyle(r.suitabilityLabel)}">${r.suitabilityScore}</span></td>
+            <td><small>${r.suitabilityLabel}</small></td>
+            <td>${r.avgDailyVolatilityPct}%</td>
+            <td>${r.priceRangePct}%</td>
+            <td>${r.estimatedFillsPerDay}</td>
+            <td>${r.suggestedOrderDistancePct}%</td>
+            <td>${fmt(r.currentPrice)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('scanResults').style.display = 'block';
+}
+
+function scoreBadgeStyle(label) {
+    const styles = {
+        'Excellent': 'background:#d4edda;color:#155724;border:2px solid #28a745',
+        'Good':      'background:#cce5ff;color:#004085;border:2px solid #007bff',
+        'Fair':      'background:#fff3cd;color:#856404;border:2px solid #ffc107',
+        'Poor':      'background:#f8d7da;color:#721c24;border:2px solid #dc3545',
+    };
+    return styles[label] || 'background:#e2e3e5;color:#383d41;border:2px solid #6c757d';
+}
+
+function scoreClass(label) {
+    const map = { 'Excellent': 'score-excellent', 'Good': 'score-good', 'Fair': 'score-fair', 'Poor': 'score-poor' };
+    return map[label] || 'score-not';
+}
+
+function fmt(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return v;
+    if (n >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (n >= 1)    return n.toFixed(4);
+    return n.toPrecision(4);
+}
+
+function fmtVol(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return v;
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
+    if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
+    return n.toFixed(2);
+}
+
+let lastResult = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('pairInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') analyze();
+    });
+    document.getElementById('capitalInput').addEventListener('input', () => {
+        if (lastResult) renderResults(lastResult);
+    });
+});
+</script>
+</body>
+</html>

@@ -371,9 +371,65 @@ class AlgorithmGrid(
         }
 
         // Re-read orders after dedup
-        val cleanDbOrders = if (duplicatesByPrice.isNotEmpty())
+        var cleanDbOrders = if (duplicatesByPrice.isNotEmpty())
             activeOrdersService.getOrders(settings.name, settings.direction).toList()
         else dbOrders
+
+        // --- Range change detection ---
+        // If trading_range was changed in settings.json before resume, adjust orders:
+        // 1) Remove orders outside the new range (contraction)
+        // 2) Add orders for new levels inside the range (expansion)
+        val newLowerBound = settings.parameters.tradingRange.lowerBound
+        val newUpperBound = settings.parameters.tradingRange.upperBound
+
+        // Step A: Contraction — cancel orders outside new range
+        val outOfRangeOrders = cleanDbOrders.filter { order ->
+            order.price != null && (order.price < newLowerBound || order.price >= newUpperBound)
+        }
+        if (outOfRangeOrders.isNotEmpty()) {
+            log("Sync - Range contraction: ${outOfRangeOrders.size} orders outside new range [$newLowerBound, $newUpperBound)")
+            outOfRangeOrders.forEach { order ->
+                order.orderId?.let { orderId ->
+                    try {
+                        client.cancelOrder(settings.pair, orderId)
+                        log("Sync - Cancelled out-of-range order: orderId=$orderId price=${order.price}")
+                    } catch (e: Exception) {
+                        log("Sync - Failed to cancel out-of-range order $orderId: ${e.message}")
+                    }
+                }
+                order.id?.let { activeOrdersService.deleteById(it) }
+            }
+            cleanDbOrders = activeOrdersService.getOrders(settings.name, settings.direction).toList()
+            sendMessage("Grid range contraction: removed ${outOfRangeOrders.size} orders outside [$newLowerBound, $newUpperBound)", false)
+        }
+
+        // Step B: Expansion — add orders for new grid levels not covered by existing orders
+        val existingPrices = cleanDbOrders.mapNotNull { it.price }.toSet()
+        val expectedLevels = mutableListOf<BigDecimal>()
+        var levelPrice = newLowerBound
+        while (levelPrice < newUpperBound) {
+            expectedLevels.add(levelPrice)
+            levelPrice += GridOrders.orderDistance(levelPrice, settings.parameters.orderDistance)
+        }
+
+        val missingLevels = expectedLevels.filter { level ->
+            existingPrices.none { it.compareTo(level) == 0 }
+        }
+
+        if (missingLevels.isNotEmpty()) {
+            log("Sync - Range expansion: ${missingLevels.size} new grid levels to add (existing: ${existingPrices.size}, expected: ${expectedLevels.size})")
+            val newOrders = missingLevels.map { price -> buildOrderForGridLevel(price) }
+            activeOrdersService.saveAll(newOrders)
+            cleanDbOrders = activeOrdersService.getOrders(settings.name, settings.direction).toList()
+            sendMessage("Grid range expansion: added ${missingLevels.size} new orders", false)
+
+            // If many new orders, auto-enable force sync so safety check doesn't block them
+            val newRatio = missingLevels.size.toDouble() / cleanDbOrders.size.toDouble()
+            if (newRatio > 0.3 && missingLevels.size > 10) {
+                log("Sync - Range expansion added >30% new orders, enabling force sync")
+                forceSyncEnabled = true
+            }
+        }
 
         val openOrders = client.getOpenOrders(settings.pair)
         val dbOrderIds = cleanDbOrders.mapNotNull { it.orderId }.toSet()
@@ -511,8 +567,8 @@ class AlgorithmGrid(
                         try {
                             val result = sendOrders(listOf(sendOrder), true)
                             if (result.isNotEmpty()) {
-                                // Restore original grid price in DB
-                                val dbUpdate = result.first().copy(price = order.price, stopPrice = order.stopPrice)
+                                // Restore original grid price and amount in DB (amount may have been inflated by min notional)
+                                val dbUpdate = result.first().copy(price = order.price, stopPrice = order.stopPrice, amount = order.amount)
                                 activeOrdersService.updateOrdersById(listOf(dbUpdate))
                                 syncOk++
                             }
@@ -648,6 +704,42 @@ class AlgorithmGrid(
     )
 
     /**
+     * Build a new ActiveOrder for a grid level price.
+     * Mirrors the logic from [GridOrders] constructor:
+     * - side: BUY if levelPrice <= currentPrice, SELL otherwise
+     * - amount: calculated via [GridOrders.calcAmount]
+     * - stopPrice: levelPrice ± profitDistance (+ for LONG, - for SHORT)
+     * The order is saved without orderId — the sync loop will send it to exchange.
+     */
+    private fun buildOrderForGridLevel(levelPrice: BigDecimal): ActiveOrder {
+        val side = if (levelPrice <= currentPrice) SIDE.BUY else SIDE.SELL
+        val amount = GridOrders.calcAmount(
+            settings.parameters.orderQuantity,
+            levelPrice,
+            settings.countOfDigitsAfterDotForAmount
+        )
+        val profitDist = GridOrders.orderDistance(levelPrice, settings.parameters.profitDistance)
+        val stopPrice = when (settings.direction) {
+            DIRECTION.LONG -> levelPrice + profitDist
+            DIRECTION.SHORT -> levelPrice - profitDist
+        }.let {
+            if (settings.parameters.profitDistance.usePercent)
+                it.setScale(settings.countOfDigitsAfterDotForPrice, RoundingMode.HALF_UP)
+            else it
+        }
+        return ActiveOrder(
+            tradePair = settings.pair.let { "${it.first}${it.second}" },
+            amount = amount,
+            orderSide = side,
+            price = levelPrice,
+            stopPrice = stopPrice,
+            lastBorderPrice = currentPrice,
+            direction = settings.direction,
+            botName = settings.name
+        )
+    }
+
+    /**
      * If [amount] × [sendPrice] < [BotSettingsGrid.Parameters.minNotionalUsdt], increases
      * the amount to meet the exchange minimum notional. Returns the (possibly adjusted) amount
      * rounded up to the pair's amount precision.
@@ -749,7 +841,7 @@ class AlgorithmGrid(
                 log("[$threadId] Spike SAFETY CUTOFF: price=$currentPrice drifted ${driftPercent}% from avgPrice=$avgPrice, " +
                     "maxDrift=${spikeConfig.maxPriceDriftPercent}%, spikeSide=$spikeSide, elapsed=${elapsed}ms")
                 sendMessage("Spike safety cutoff! Price drift exceeded ${spikeConfig.maxPriceDriftPercent}%. Executing immediate counter-orders.", false)
-                executeSpikeCounterOrders(useMarketPrice = true)
+                executeSpikeCounterOrders()
                 return
             }
         }
@@ -759,7 +851,7 @@ class AlgorithmGrid(
             log("[$threadId] Spike TIMEOUT: elapsed=${elapsed}ms, maxWait=${spikeConfig.maxWaitTimeMs}ms, " +
                 "currentPrice=$currentPrice, avgPrice=$avgPrice, drift=${driftPercent}%")
             sendMessage("Spike timeout reached. Executing counter-orders at current price.", false)
-            executeSpikeCounterOrders(useMarketPrice = true)
+            executeSpikeCounterOrders()
             return
         }
 
@@ -770,7 +862,7 @@ class AlgorithmGrid(
             log("[$threadId] Spike STABILIZED: medianPrice=$medianPrice, currentPrice=$currentPrice, " +
                 "avgPrice=$avgPrice, elapsed=${elapsed}ms, pendingOrders=${pendingSpikeOrders.size}")
             sendMessage("Price stabilized at $medianPrice. Executing aggregated counter-order.", false)
-            executeSpikeCounterOrders(useMarketPrice = false)
+            executeSpikeCounterOrders()
             return
         }
 
@@ -780,7 +872,7 @@ class AlgorithmGrid(
             "isStable=$isStable, pendingOrders=${pendingSpikeOrders.size}, spikeSide=$spikeSide")
     }
 
-    private fun executeSpikeCounterOrders(useMarketPrice: Boolean) {
+    private fun executeSpikeCounterOrders() {
         val threadId = Thread.currentThread().name
         val reversedSide = spikeSide!!.reverse()
 
@@ -808,28 +900,24 @@ class AlgorithmGrid(
             .mapNotNull { it.amount }
             .fold(BigDecimal.ZERO, BigDecimal::add)
 
-        log("[$threadId] Spike execute: useMarketPrice=$useMarketPrice, reversedSide=$reversedSide, " +
+        log("[$threadId] Spike execute: reversedSide=$reversedSide, " +
             "totalAmount=$totalAmount, ordersToAggregate=${ordersWithoutCounter.size}/${pendingSpikeOrders.size}, " +
             "orders=[${ordersWithoutCounter.joinToString { "id=${it.id},orderId=${it.orderId},side=${it.orderSide},price=${it.price},amount=${it.amount}" }}]")
 
-        val orderPrice = if (useMarketPrice || spikeConfig.aggregateOrderType == "MARKET") {
-            log("[$threadId] Spike execute: using market price $currentPrice (useMarketPrice=$useMarketPrice, configType=${spikeConfig.aggregateOrderType})")
-            currentPrice
-        } else {
-            val median = priceStabilizer.getMedianPrice()
-            val offset = median.multiply(spikeConfig.limitPriceOffsetPercent)
-                .divide(BigDecimal(100), 8, RoundingMode.HALF_UP)
-            val limitPrice = when (reversedSide) {
-                SIDE.BUY -> median - offset
-                SIDE.SELL -> median + offset
-                else -> median
-            }
-            log("[$threadId] Spike execute: using limit price $limitPrice (median=$median, offset=$offset, " +
-                "offsetPercent=${spikeConfig.limitPriceOffsetPercent}%, reversedSide=$reversedSide)")
-            limitPrice
+        // Always use LIMIT orders to avoid selling/buying at a loss.
+        // Price is based on avgSpikePrice ± offset to guarantee profit.
+        val avgSpikePrice = spikeDetector.getWeightedAvgPrice()
+        val offset = avgSpikePrice.multiply(spikeConfig.limitPriceOffsetPercent)
+            .divide(BigDecimal(100), 8, RoundingMode.HALF_UP)
+        val orderPrice = when (reversedSide) {
+            SIDE.BUY -> avgSpikePrice - offset
+            SIDE.SELL -> avgSpikePrice + offset
+            else -> avgSpikePrice
         }
+        log("[$threadId] Spike execute: using LIMIT price $orderPrice (avgSpikePrice=$avgSpikePrice, offset=$offset, " +
+            "offsetPercent=${spikeConfig.limitPriceOffsetPercent}%, reversedSide=$reversedSide)")
 
-        val orderType = if (useMarketPrice) TYPE.MARKET else TYPE.LIMIT
+        val orderType = TYPE.LIMIT
         log("[$threadId] Spike aggregated order: $reversedSide $totalAmount @ $orderPrice, type=$orderType")
 
         try {
@@ -844,7 +932,6 @@ class AlgorithmGrid(
 
             redistributeGridAfterSpike(ordersWithoutCounter, reversedSide)
 
-            val avgSpikePrice = spikeDetector.getWeightedAvgPrice()
             val profit = when (reversedSide) {
                 SIDE.BUY -> (avgSpikePrice - orderPrice) * totalAmount
                 SIDE.SELL -> (orderPrice - avgSpikePrice) * totalAmount
@@ -875,20 +962,33 @@ class AlgorithmGrid(
         val threadId = Thread.currentThread().name
 
         log("[$threadId] Redistributing grid: ${filledOrders.size} filled orders -> newSide=$newSide, " +
-            "orders=[${filledOrders.joinToString { "id=${it.id},price=${it.price},stopPrice=${it.stopPrice}" }}]")
+            "orders=[${filledOrders.joinToString { "id=${it.id},price=${it.price},stopPrice=${it.stopPrice},orderId=${it.orderId}" }}]")
 
-        val newOrders = filledOrders.map { order ->
-            createNextOrder(order, newSide)
+        // Cancel old orders on exchange before clearing orderId in DB.
+        // Without this, old orders remain live on exchange but untracked in DB,
+        // causing untracked fills and position imbalance.
+        filledOrders.forEach { order ->
+            order.orderId?.let { orderId ->
+                try {
+                    cancelOrder(settings.pair, order)
+                    log("[$threadId] Redistributing grid: cancelled exchange order $orderId")
+                } catch (e: Exception) {
+                    log("[$threadId] Redistributing grid: failed to cancel $orderId: ${e.message}")
+                }
+            }
         }
 
-        log("[$threadId] Redistributing grid: sending ${newOrders.size} orders to exchange")
+        // Only update DB (flip side, clear orderId). Do NOT send to exchange —
+        // the aggregated spike order already covers the full counter-position.
+        // These grid orders will be placed on exchange by synchronizeOrders() on next sync cycle,
+        // or when the bot is restarted. This prevents double-buying/selling.
+        val newOrders = filledOrders.map { order ->
+            createNextOrder(order, newSide).copy(orderId = null)
+        }
 
-        val exchangeOrders = sendOrders(newOrders)
-        log("[$threadId] Grid redistributed: ${exchangeOrders.size} orders placed, " +
-            "orderIds=[${exchangeOrders.joinToString { "id=${it.id},orderId=${it.orderId},side=${it.orderSide},price=${it.price}" }}]")
-
-        val updatedOrders = activeOrdersService.updateOrdersById(exchangeOrders)
-        log("[$threadId] Grid redistribution DB update: ${updatedOrders.count()} orders updated")
+        val updatedOrders = activeOrdersService.updateOrdersById(newOrders)
+        log("[$threadId] Grid redistributed (DB only, no exchange send): ${updatedOrders.count()} orders updated, " +
+            "orders=[${newOrders.joinToString { "id=${it.id},side=${it.orderSide},price=${it.price}" }}]")
     }
 
     private fun fallbackToGridCounterOrders() {
@@ -958,10 +1058,11 @@ class AlgorithmGrid(
             try {
                 val exchangeOrders = sendOrders(listOf(orderForSend))
                 if (exchangeOrders.isNotEmpty()) {
-                    // Restore original grid slot prices in DB to preserve grid structure
+                    // Restore original grid slot prices and amount in DB (amount may have been inflated by min notional)
                     val dbUpdate = exchangeOrders.first().copy(
                         price = newOrder.price,
-                        stopPrice = newOrder.stopPrice
+                        stopPrice = newOrder.stopPrice,
+                        amount = newOrder.amount
                     )
                     activeOrdersService.updateOrdersById(listOf(dbUpdate))
                     successCount++

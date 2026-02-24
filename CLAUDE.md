@@ -194,6 +194,10 @@ The project extends XChange's capabilities with custom implementations for excha
 - Use the existing logging and error handling patterns
 - **IMPORTANT: After every code change, add a short description to `docs/VERSIONS.md`** following the existing format (version number, date, problem/solution, affected files)
 - **DO NOT run `./gradlew build` or `./gradlew clean build` after every completed task.** Gradle build is already included in all deploy scripts (`deploy_frontend.sh`, `quick_deploy_backend.sh`, `Dockerfile.backend`). Running it manually wastes time. Only run build explicitly when you need to verify compilation fixes or run specific tests with `./gradlew test --tests "..."`.
+- **NEVER deploy code to production autonomously.** Only deploy when the user explicitly requests it. When deploying, use exactly these three scripts from the `deploy/` folder in order:
+  1. `deploy/images_1_build_local.sh` — build Docker image locally
+  2. `deploy/images_2_push_to_server.sh` — push Docker image to server
+  3. `deploy/images_3_restart_containers.sh` — restart Docker containers on server
 
 ## Documentation
 
