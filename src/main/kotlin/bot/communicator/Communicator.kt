@@ -15,6 +15,7 @@ import bot.trade.exchanges.clients.Candlestick
 import bot.trade.exchanges.clients.Client
 import bot.trade.exchanges.clients.ExchangeEnum
 import bot.trade.exchanges.clients.ExchangeEnum.Companion.newClient
+import bot.trade.exchanges.clients.SIDE
 import bot.trade.exchanges.clients.INTERVAL
 import bot.trade.exchanges.clients.Position
 import bot.trade.exchanges.clients.TestClientFileData
@@ -47,6 +48,7 @@ import com.typesafe.config.Config
 import mu.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -790,6 +792,48 @@ class Communicator(
                     } else {
                         // Non-grid bot: just delete from DB
                         activeOrdersService.deleteByBotName(key)
+                    }
+                } else if (bot.botSettings is BotSettingsGrid) {
+                    // Resume: check balance for pending orders (orderId=null, not yet sent to exchange)
+                    val gridSettings = bot.botSettings
+                    val orders = activeOrdersService.getOrders(key, gridSettings.direction)
+                    val pendingOrders = orders.filter { it.orderId == null }
+
+                    if (pendingOrders.isNotEmpty()) {
+                        val requiredFirst = pendingOrders
+                            .filter { it.orderSide == SIDE.SELL }
+                            .sumOf { it.amount ?: BigDecimal.ZERO }
+
+                        val requiredSecond = pendingOrders
+                            .filter { it.orderSide == SIDE.BUY }
+                            .sumOf { (it.amount ?: BigDecimal.ZERO) * (it.price ?: BigDecimal.ZERO) }
+
+                        val leverage = gridSettings.leverage?.takeIf { it > BigDecimal.ZERO }
+                        val adjustedFirst = if (leverage != null) requiredFirst.divide(leverage, 8, RoundingMode.CEILING) else requiredFirst
+                        val adjustedSecond = if (leverage != null) requiredSecond.divide(leverage, 8, RoundingMode.CEILING) else requiredSecond
+
+                        val firstBalance = bot.client.getBalance(gridSettings.pair.first)
+                            ?.free ?: run { return@let "Can't receive firstBalance from exchange" }
+
+                        val secondBalance = bot.client.getBalance(gridSettings.pair.second)
+                            ?.free ?: run { return@let "Can't receive secondBalance from exchange" }
+
+                        var balanceMessage = ""
+
+                        val leverageInfo = leverage?.let { " (with ${it}x leverage)" } ?: ""
+
+                        if (adjustedFirst > firstBalance)
+                            balanceMessage += "Insufficient ${gridSettings.pair.first} balance for ${pendingOrders.count { it.orderSide == SIDE.SELL }} pending SELL orders. " +
+                                    "Required: $adjustedFirst$leverageInfo, Available: $firstBalance \n\n"
+
+                        if (adjustedSecond > secondBalance)
+                            balanceMessage += "Insufficient ${gridSettings.pair.second} balance for ${pendingOrders.count { it.orderSide == SIDE.BUY }} pending BUY orders. " +
+                                    "Required: $adjustedSecond$leverageInfo, Available: $secondBalance"
+
+                        if (balanceMessage.isNotBlank()) {
+                            log.warn("Resume balance check failed for $key: $balanceMessage")
+                            return@let "⚠️ Resume blocked — not enough balance for ${pendingOrders.size} pending orders:\n\n$balanceMessage"
+                        }
                     }
                 }
 

@@ -446,90 +446,107 @@ class AlgorithmGrid(
         }
 
         val openOrderIds = openOrders.map { it.orderId }.toSet()
-        val newOrders = cleanDbOrders.filter { !openOrderIds.contains(it.orderId) }
+        val allMissing = cleanDbOrders.filter { !openOrderIds.contains(it.orderId) }
 
-        if (newOrders.isNotEmpty()) {
-            log("Sync - ${newOrders.size} orders from DB not found in exchange open orders list")
+        // Separate pending orders (orderId=null, never sent to exchange — from redistribute or range expansion)
+        // from truly missing orders (had orderId, but not found on exchange — suspicious).
+        val pendingOrders = allMissing.filter { it.orderId == null }
+        val missingOrders = allMissing.filter { it.orderId != null }
 
-            // Safety check: if too many orders are "missing", likely a parsing issue.
-            // Don't create new orders if more than 30% of DB orders are "missing".
-            // Can be bypassed via /forcesync command (e.g. after a spike left many holes in the grid).
-            val missingRatio = newOrders.size.toDouble() / cleanDbOrders.size.toDouble()
-            if (missingRatio > 0.3 && newOrders.size > 10) {
-                if (forceSyncEnabled) {
-                    log("Force sync active — bypassing safety check (${newOrders.size}/${cleanDbOrders.size} = ${(missingRatio * 100).toInt()}% missing)")
-                    sendMessage("⚡ Force sync: bypassing safety check for ${newOrders.size} missing orders.", false)
-                    forceSyncEnabled = false
+        if (allMissing.isNotEmpty()) {
+            log("Sync - ${allMissing.size} orders from DB not found in exchange open orders list " +
+                "(${pendingOrders.size} pending/never-sent, ${missingOrders.size} previously on exchange)")
+
+            // Safety check applies ONLY to orders that had an orderId but disappeared from exchange.
+            // Pending orders (orderId=null) are expected — they come from redistribute or range expansion
+            // and need to be sent to exchange.
+            var missingOrdersBlocked = false
+            if (missingOrders.isNotEmpty()) {
+                val missingRatio = missingOrders.size.toDouble() / cleanDbOrders.size.toDouble()
+                if (missingRatio > 0.3 && missingOrders.size > 10) {
+                    if (forceSyncEnabled) {
+                        log("Force sync active — bypassing safety check (${missingOrders.size}/${cleanDbOrders.size} = ${(missingRatio * 100).toInt()}% missing)")
+                        sendMessage("⚡ Force sync: bypassing safety check for ${missingOrders.size} missing orders.", false)
+                        forceSyncEnabled = false
+                    } else {
+                        log("WARNING: Too many orders missing from exchange (${missingOrders.size}/${cleanDbOrders.size} = ${(missingRatio * 100).toInt()}%). " +
+                            "This might indicate a parsing issue. Skipping order creation to prevent duplicates.")
+                        sendMessage(
+                            "⚠️ Sync warning: ${missingOrders.size} orders not found on exchange. " +
+                                "Possible API parsing issue. Please check manually.\n" +
+                                "Use /forcesync ${settings.name} to force sync anyway.", false
+                        )
+                        missingOrdersBlocked = true
+                        // Still process pending orders even if missing orders are blocked
+                        if (pendingOrders.isEmpty()) return
+                    }
                 } else {
-                    log("WARNING: Too many orders missing from exchange (${newOrders.size}/${cleanDbOrders.size} = ${(missingRatio * 100).toInt()}%). " +
-                        "This might indicate a parsing issue. Skipping order creation to prevent duplicates.")
-                    sendMessage(
-                        "⚠️ Sync warning: ${newOrders.size} orders not found on exchange. " +
-                            "Possible API parsing issue. Please check manually.\n" +
-                            "Use /forcesync ${settings.name} to force sync anyway.", false
-                    )
-                    return
+                    forceSyncEnabled = false
                 }
             } else {
-                // Reset force flag if it was set but threshold wasn't reached
                 forceSyncEnabled = false
             }
 
-            // Verify each order status individually before recreating
-            val ordersForExchange = newOrders.mapNotNull { exchangeOrder ->
-                val orderStatus = exchangeOrder.orderId?.let {
-                    try {
-                        client.getOrder(settings.pair, it)?.status
-                    } catch (e: Exception) {
-                        log("Sync - Failed to get order status for ${it}: ${e.message}")
-                        null
-                    }
-                }
+            // Verify each order status individually before recreating.
+            // For pending orders (orderId=null), skip exchange status check — just send them.
+            val ordersToProcess = if (missingOrdersBlocked) pendingOrders else allMissing
 
-                when (orderStatus) {
-                    STATUS.FILLED -> {
-                        log("Sync - Order filled: $exchangeOrder")
-                        createNextOrder(exchangeOrder, exchangeOrder.orderSide!!.reverse())
-                    }
-                    STATUS.NEW, STATUS.PARTIALLY_FILLED -> {
-                        // Order exists on exchange but wasn't in parsed list - skip to avoid duplicate
-                        log("Sync - Order ${exchangeOrder.orderId} still active on exchange (status=$orderStatus), skipping")
+            val ordersForExchange = ordersToProcess.mapNotNull { exchangeOrder ->
+                if (exchangeOrder.orderId == null) {
+                    // Pending order — never sent to exchange, send as-is with correct side
+                    log("Sync - Pending order (never sent): id=${exchangeOrder.id} price=${exchangeOrder.price} side=${exchangeOrder.orderSide}")
+                    exchangeOrder
+                } else {
+                    val orderStatus = try {
+                        client.getOrder(settings.pair, exchangeOrder.orderId)?.status
+                    } catch (e: Exception) {
+                        log("Sync - Failed to get order status for ${exchangeOrder.orderId}: ${e.message}")
                         null
                     }
-                    STATUS.CANCELED, STATUS.REJECTED -> {
-                        log("Sync - Order ${exchangeOrder.orderId} was canceled/rejected, recreating")
-                        if (currentPrice >= exchangeOrder.price!!)
-                            when (exchangeOrder.orderSide) {
-                                SIDE.BUY -> exchangeOrder
-                                SIDE.SELL -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
-                                else -> throw UnsupportedOrderSideException()
-                            }
-                        else
-                            when (exchangeOrder.orderSide) {
-                                SIDE.BUY -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
-                                SIDE.SELL -> exchangeOrder
-                                else -> throw UnsupportedOrderSideException()
-                            }
-                    }
-                    null -> {
-                        // Order not found on exchange at all - recreate
-                        log("Sync - Order ${exchangeOrder.orderId} not found on exchange, recreating")
-                        if (currentPrice >= exchangeOrder.price!!)
-                            when (exchangeOrder.orderSide) {
-                                SIDE.BUY -> exchangeOrder
-                                SIDE.SELL -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
-                                else -> throw UnsupportedOrderSideException()
-                            }
-                        else
-                            when (exchangeOrder.orderSide) {
-                                SIDE.BUY -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
-                                SIDE.SELL -> exchangeOrder
-                                else -> throw UnsupportedOrderSideException()
-                            }
-                    }
-                    else -> {
-                        log("Sync - Unexpected order status: $orderStatus for ${exchangeOrder.orderId}")
-                        null
+
+                    when (orderStatus) {
+                        STATUS.FILLED -> {
+                            log("Sync - Order filled: $exchangeOrder")
+                            createNextOrder(exchangeOrder, exchangeOrder.orderSide!!.reverse())
+                        }
+                        STATUS.NEW, STATUS.PARTIALLY_FILLED -> {
+                            log("Sync - Order ${exchangeOrder.orderId} still active on exchange (status=$orderStatus), skipping")
+                            null
+                        }
+                        STATUS.CANCELED, STATUS.REJECTED -> {
+                            log("Sync - Order ${exchangeOrder.orderId} was canceled/rejected, recreating")
+                            if (currentPrice >= exchangeOrder.price!!)
+                                when (exchangeOrder.orderSide) {
+                                    SIDE.BUY -> exchangeOrder
+                                    SIDE.SELL -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
+                                    else -> throw UnsupportedOrderSideException()
+                                }
+                            else
+                                when (exchangeOrder.orderSide) {
+                                    SIDE.BUY -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
+                                    SIDE.SELL -> exchangeOrder
+                                    else -> throw UnsupportedOrderSideException()
+                                }
+                        }
+                        null -> {
+                            log("Sync - Order ${exchangeOrder.orderId} not found on exchange, recreating")
+                            if (currentPrice >= exchangeOrder.price!!)
+                                when (exchangeOrder.orderSide) {
+                                    SIDE.BUY -> exchangeOrder
+                                    SIDE.SELL -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
+                                    else -> throw UnsupportedOrderSideException()
+                                }
+                            else
+                                when (exchangeOrder.orderSide) {
+                                    SIDE.BUY -> createNextOrder(exchangeOrder, exchangeOrder.orderSide.reverse())
+                                    SIDE.SELL -> exchangeOrder
+                                    else -> throw UnsupportedOrderSideException()
+                                }
+                        }
+                        else -> {
+                            log("Sync - Unexpected order status: $orderStatus for ${exchangeOrder.orderId}")
+                            null
+                        }
                     }
                 }
             }
@@ -970,7 +987,7 @@ class AlgorithmGrid(
         filledOrders.forEach { order ->
             order.orderId?.let { orderId ->
                 try {
-                    cancelOrder(settings.pair, order)
+                    client.cancelOrder(settings.pair, orderId)
                     log("[$threadId] Redistributing grid: cancelled exchange order $orderId")
                 } catch (e: Exception) {
                     log("[$threadId] Redistributing grid: failed to cancel $orderId: ${e.message}")
